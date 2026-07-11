@@ -11,7 +11,7 @@ WORKDIR /app
 
 # Copy the whole workspace config to install correctly
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
@@ -31,8 +31,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
 # Set the correct permission for prerender cache
 RUN mkdir .next

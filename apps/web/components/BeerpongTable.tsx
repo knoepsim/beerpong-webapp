@@ -89,9 +89,9 @@ const SoloCup = ({ color = "red", className }: { color?: "red" | "blue", classNa
 };
 
 interface BeerpongTableProps {
-  leftCups: number;
-  rightCups: number;
-  className?: string;
+  readonly leftCups: number;
+  readonly rightCups: number;
+  readonly className?: string;
 }
 
 export function BeerpongTable({ leftCups, rightCups, className }: BeerpongTableProps) {
