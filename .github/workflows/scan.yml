@@ -31,11 +31,11 @@ jobs:
 
       - name: Install Playwright Browsers
         working-directory: ./apps/web
-        run: pnpm exec playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium
 
       - name: Run Playwright tests
         working-directory: ./apps/web
-        run: pnpm exec playwright test
+        run: npx playwright test
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
