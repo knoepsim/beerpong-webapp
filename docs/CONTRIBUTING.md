@@ -5,7 +5,11 @@ Der `main`-Branch ist immer stabil und deploybar.
 
 ## 🌿 Branching & Pull Requests
 
-1. **Branch erstellen:** Erstelle für jedes Feature oder jeden Bugfix einen eigenen Branch vom `main` (z.B. `feature/login` oder `fix/slider`).
+1. **Branch erstellen:** Erstelle für jedes Feature oder jeden Bugfix einen eigenen Branch vom `main`  
+Format: <type>/<kurze-beschreibung>
+Types: feat, fix, refactor, chore, docs, test, ci
+Beispiele: feat/web-slider-component, fix/api-cors-config
+Nur Kleinbuchstaben, Bindestriche statt Leerzeichen/Unterstriche
 2. **Commit:** Wir nutzen [Conventional Commits (v1.0.0)](https://www.conventionalcommits.org/de/v1.0.0/) für unsere Commit-Nachrichten (z.B. `feat: add new slider`, `fix: header padding`). Pushe danach auf deinen Branch.
 3. **Pull Request (PR) erstellen:** Erstelle einen PR gegen den `main`-Branch.
 

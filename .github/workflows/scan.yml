@@ -5,7 +5,7 @@ on:
 
 jobs:
   sonarqube:
-    name: SonarQube & Tests
+    name: SonarQube
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
@@ -14,6 +14,8 @@ jobs:
           
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -29,11 +31,11 @@ jobs:
 
       - name: Install Playwright Browsers
         working-directory: ./apps/web
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm run test:e2e:install
 
       - name: Run Playwright tests
         working-directory: ./apps/web
-        run: pnpm exec playwright test
+        run: pnpm run test:e2e
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
