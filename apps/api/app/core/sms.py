@@ -30,10 +30,13 @@ class DummySmsService:
 
     def send_code(self, phone_number: str, code: str) -> None:
         masked_phone = _mask_phone_number(phone_number)
-        logger.info("SMS [DUMMY] → %s: Your verification code is %s", masked_phone, code)
+        # Die Ausgabe des Codes ist im Dummy-Service für die lokale Entwicklung zwingend notwendig.
+        # codeql[py/clear-text-logging-sensitive-data]
+        logger.info("SMS [DUMMY] → %s: Your verification code is %s", masked_phone, code)  # NOSONAR
         print(f"\n{'='*50}")
         print(f"  SMS → {masked_phone}")
-        print(f"  Code: {code}")
+        # codeql[py/clear-text-logging-sensitive-data]
+        print(f"  Code: {code}")  # NOSONAR
         print(f"{'='*50}\n")
 
 

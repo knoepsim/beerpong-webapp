@@ -26,7 +26,8 @@ async def generate_bracket(db: AsyncSession, tournament_id: UUID) -> list[Match]
     )
     entries = list(result.scalars().all())
     team_ids = [e.team_id for e in entries]
-    secrets.SystemRandom().shuffle(team_ids)
+    # Für das Mischen der Teams reicht diese Zufallsverteilung aus und birgt kein Sicherheitsrisiko
+    secrets.SystemRandom().shuffle(team_ids)  # NOSONAR
 
     num_teams = len(team_ids)
     if num_teams < 2:
