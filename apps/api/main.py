@@ -1,39 +1,27 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
-import uvicorn
+
+from app.core.exceptions import register_exception_handlers
+from app.routers import auth, results, roles, teams, tournaments, users
 
 app = FastAPI(
-    title="Bierpong API", 
-    description="Backend API für die Bierpong Webapp", 
-    version="0.1.0"
+    title="Bierpong API",
+    description="Backend API für die Bierpong-Turnier-App",
+    version="0.1.0",
 )
 
-class StatusResponse(BaseModel):
-    status: str
-    version: str
-    environment: str
+# Register global exception handler for consistent error responses
+register_exception_handlers(app)
 
-@app.get(
-    "/status",
-    response_model=StatusResponse,
-    summary="System Status abrufen",
-    description="Gibt den aktuellen Betriebsstatus der API, die Version und die Umgebung zurück.",
-    tags=["System"]
-)
+# Register routers
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(teams.router)
+app.include_router(tournaments.router)
+app.include_router(roles.router)
+app.include_router(results.router)
+
+
+@app.get("/status", tags=["System"], summary="System Status")
 def get_status():
-    """
-    Diese Route dient als erweiterter Health-Check.
-    Sie wird in der Swagger UI (/docs) ausführlich dokumentiert,
-    inklusive der Pydantic Response Models.
-    """
-    return StatusResponse(
-        status="online",
-        version="1.0.0",
-        environment="development"
-    )
-
-def main():
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
-if __name__ == "__main__":
-    main()
+    """Health-check endpoint."""
+    return {"status": "online", "version": "0.1.0"}
