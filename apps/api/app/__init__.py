@@ -1,0 +1,1 @@
+"""Bierpong API application package."""

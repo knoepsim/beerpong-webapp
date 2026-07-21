@@ -1,19 +1,27 @@
 from fastapi import FastAPI
-import uvicorn
 
-app = FastAPI(title="Bierpong API")
+from app.core.exceptions import register_exception_handlers
+from app.routers import auth, results, roles, teams, tournaments, users
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello from bierpong-api!"}
+app = FastAPI(
+    title="Bierpong API",
+    description="Backend API für die Bierpong-Turnier-App",
+    version="0.1.0",
+)
 
-@app.get("/api/health")
-def health_check():
-    return {"status": "ok"}
+# Register global exception handler for consistent error responses
+register_exception_handlers(app)
 
-def main():
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+# Register routers
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(teams.router)
+app.include_router(tournaments.router)
+app.include_router(roles.router)
+app.include_router(results.router)
 
-if __name__ == "__main__":
-    main()
 
+@app.get("/status", tags=["System"], summary="System Status")
+def get_status():
+    """Health-check endpoint."""
+    return {"status": "online", "version": "0.1.0"}
