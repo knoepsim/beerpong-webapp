@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -37,8 +38,8 @@ async def _get_match(db: AsyncSession, match_id: UUID) -> Match:
 async def create_result(
     match_id: UUID,
     body: ResultCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
     await role_service.require_role(
@@ -56,8 +57,8 @@ async def create_result(
 async def modify_result(
     match_id: UUID,
     body: ResultCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
     await role_service.require_role(
@@ -86,8 +87,8 @@ async def modify_result(
 )
 async def delete_result(
     match_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
     await role_service.require_role(
@@ -114,8 +115,8 @@ async def delete_result(
 )
 async def list_results(
     match_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await _get_match(db, match_id)
     result = await db.execute(

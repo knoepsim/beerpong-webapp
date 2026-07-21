@@ -7,8 +7,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import settings
 
-# Import all models so Base.metadata knows about them
-from app.models import *  # noqa: F401, F403
+import app.models  # noqa: F401
 from app.core.database import Base
 
 config = context.config

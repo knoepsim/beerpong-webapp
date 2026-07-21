@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     summary="SMS-Code anfordern",
     description="Sendet einen 6-stelligen Verifizierungscode an die angegebene Telefonnummer.",
 )
-async def request_code(body: SmsCodeRequest, db: AsyncSession = Depends(get_db)):
+async def request_code(body: SmsCodeRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     await auth_service.request_sms_code(db, body.phone_number)
 
 
@@ -25,7 +26,7 @@ async def request_code(body: SmsCodeRequest, db: AsyncSession = Depends(get_db))
     description="Verifiziert den SMS-Code und gibt JWT Access- und Refresh-Tokens zurück. "
     "Erstellt automatisch einen neuen User, falls die Telefonnummer noch nicht registriert ist.",
 )
-async def verify_code(body: SmsCodeVerify, db: AsyncSession = Depends(get_db)):
+async def verify_code(body: SmsCodeVerify, db: Annotated[AsyncSession, Depends(get_db)]):
     return await auth_service.verify_code_and_authenticate(db, body.phone_number, body.code)
 
 
@@ -35,5 +36,5 @@ async def verify_code(body: SmsCodeVerify, db: AsyncSession = Depends(get_db)):
     summary="Access-Token erneuern",
     description="Tauscht einen gültigen Refresh-Token gegen ein neues Token-Paar (Token Rotation).",
 )
-async def refresh_token(body: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+async def refresh_token(body: RefreshTokenRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     return await auth_service.refresh_access_token(db, body.refresh_token)

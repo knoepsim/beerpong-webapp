@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables or .env file."""
 
     # Database
-    database_url: str = "postgresql+asyncpg://beerpong:beerpong_dev@localhost:5432/beerpong"
+    database_url: str = "postgresql+asyncpg://localhost:5432/beerpong"
 
     # JWT
     secret_key: str = "CHANGE-ME-IN-PRODUCTION"

@@ -111,7 +111,7 @@ async def soft_delete_tournament(db: AsyncSession, tournament_id: UUID) -> None:
 
 
 async def join_tournament(
-    db: AsyncSession, tournament_id: UUID, team_id: UUID, user_id: UUID
+    db: AsyncSession, tournament_id: UUID, team_id: UUID
 ) -> TournamentTeam:
     """Join a tournament with a team. Implements the 5-step validation from requirements."""
     await get_tournament(db, tournament_id)  # Validates tournament exists and is not deleted

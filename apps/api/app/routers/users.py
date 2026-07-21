@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
     summary="Eigenes Profil abrufen",
     description="Gibt das Profil des authentifizierten Users zurück.",
 )
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
     return current_user
 
 
@@ -28,7 +29,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 )
 async def update_me(
     body: UserUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await user_service.update_user(db, current_user, body)

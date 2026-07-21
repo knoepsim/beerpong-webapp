@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -23,8 +24,8 @@ router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 )
 async def create_tournament(
     body: TournamentCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await tournament_service.create_tournament(db, body, current_user.id)
 
@@ -37,8 +38,8 @@ async def create_tournament(
     "in denen der User eine Rolle hat oder mit einem Team teilnimmt.",
 )
 async def list_tournaments(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await tournament_service.list_tournaments(db, current_user.id)
 
@@ -50,8 +51,8 @@ async def list_tournaments(
 )
 async def get_tournament(
     tournament_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await tournament_service.get_tournament(db, tournament_id)
 
@@ -65,8 +66,8 @@ async def get_tournament(
 async def update_tournament(
     tournament_id: UUID,
     body: TournamentUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await role_service.require_role(db, tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await tournament_service.update_tournament(db, tournament_id, body)
@@ -80,8 +81,8 @@ async def update_tournament(
 )
 async def delete_tournament(
     tournament_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await role_service.require_role(db, tournament_id, current_user.id, TournamentRoleType.ADMIN)
     await tournament_service.soft_delete_tournament(db, tournament_id)
@@ -97,10 +98,10 @@ async def delete_tournament(
 async def join_tournament(
     tournament_id: UUID,
     body: TournamentJoinRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await tournament_service.join_tournament(db, tournament_id, body.team_id, current_user.id)
+    return await tournament_service.join_tournament(db, tournament_id, body.team_id)
 
 
 @router.post(
@@ -111,8 +112,8 @@ async def join_tournament(
 )
 async def start_tournament(
     tournament_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await role_service.require_role(db, tournament_id, current_user.id, TournamentRoleType.ADMIN)
     await bracket_service.generate_bracket(db, tournament_id)
@@ -127,7 +128,7 @@ async def start_tournament(
 )
 async def get_bracket(
     tournament_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await bracket_service.get_bracket(db, tournament_id)

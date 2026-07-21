@@ -1,5 +1,5 @@
 import math
-import random
+import secrets
 from uuid import UUID
 
 from sqlalchemy import select
@@ -26,7 +26,7 @@ async def generate_bracket(db: AsyncSession, tournament_id: UUID) -> list[Match]
     )
     entries = list(result.scalars().all())
     team_ids = [e.team_id for e in entries]
-    random.shuffle(team_ids)
+    secrets.SystemRandom().shuffle(team_ids)
 
     num_teams = len(team_ids)
     if num_teams < 2:
@@ -36,55 +36,60 @@ async def generate_bracket(db: AsyncSession, tournament_id: UUID) -> list[Match]
     total_slots = 2 ** math.ceil(math.log2(num_teams))
     total_rounds = int(math.log2(total_slots))
 
-    # Build match tree from final backwards to round 1
-    all_matches: list[Match] = []
+    matches_by_round, all_matches = _create_empty_matches(db, tournament_id, total_rounds, total_slots)
+    await db.flush()  # Generate IDs for all matches
 
-    # Create all matches for each round (from final to round 1)
-    matches_by_round: dict[int, list[Match]] = {}
+    _link_matches(matches_by_round, total_rounds)
+    await _assign_teams_and_process_byes(db, matches_by_round[1], team_ids, all_matches)
 
+    return all_matches
+
+
+def _create_empty_matches(
+    db: AsyncSession, tournament_id: UUID, total_rounds: int, total_slots: int
+) -> tuple[dict[int, list[Match]], list[Match]]:
+    """Helper to create match entities for all rounds."""
+    all_matches = []
+    matches_by_round = {}
     for round_num in range(total_rounds, 0, -1):
         matches_in_round = total_slots // (2**round_num)
         round_matches = []
-
         for pos in range(matches_in_round):
-            match = Match(
-                tournament_id=tournament_id,
-                round=round_num,
-                position=pos,
-            )
+            match = Match(tournament_id=tournament_id, round=round_num, position=pos)
             db.add(match)
             round_matches.append(match)
             all_matches.append(match)
-
         matches_by_round[round_num] = round_matches
+    return matches_by_round, all_matches
 
-    await db.flush()  # Generate IDs for all matches
 
-    # Link matches: each round-1 match pair feeds into a round-2 match
+def _link_matches(matches_by_round: dict[int, list[Match]], total_rounds: int) -> None:
+    """Helper to link matches to their parents in the next round."""
     for round_num in range(1, total_rounds):
         current_round = matches_by_round[round_num]
         next_round = matches_by_round[round_num + 1]
-
         for i, match in enumerate(current_round):
             parent_match = next_round[i // 2]
             match.next_match_id = parent_match.id
             match.next_match_slot = "a" if i % 2 == 0 else "b"
 
-    # Assign teams to round 1 matches, handling byes
-    round_1 = matches_by_round[1]
+
+async def _assign_teams_and_process_byes(
+    db: AsyncSession, round_1_matches: list[Match], team_ids: list[UUID], all_matches: list[Match]
+) -> None:
+    """Helper to assign teams to round 1 and advance teams with byes."""
+    num_teams = len(team_ids)
     team_index = 0
 
-    for i, match in enumerate(round_1):
+    for match in round_1_matches:
         if team_index < num_teams:
             match.team_a_id = team_ids[team_index]
             team_index += 1
-
         if team_index < num_teams:
             match.team_b_id = team_ids[team_index]
             team_index += 1
 
-    # Handle byes: if a round-1 match has only one team, advance that team
-    for match in round_1:
+    for match in round_1_matches:
         if match.team_a_id is not None and match.team_b_id is None:
             # Bye: team_a advances directly
             if match.next_match_id is not None:
@@ -92,8 +97,6 @@ async def generate_bracket(db: AsyncSession, tournament_id: UUID) -> list[Match]
             # Remove this bye match (no actual game)
             await db.delete(match)
             all_matches.remove(match)
-
-    return all_matches
 
 
 async def _advance_team(

@@ -18,13 +18,21 @@ class SmsService(Protocol):
         ...
 
 
+def _mask_phone_number(phone_number: str) -> str:
+    """Mask all but the last 2 digits of a phone number for safe logging."""
+    if len(phone_number) <= 2:
+        return "**"
+    return "*" * (len(phone_number) - 2) + phone_number[-2:]
+
+
 class DummySmsService:
     """Development SMS service that logs codes to the console."""
 
     def send_code(self, phone_number: str, code: str) -> None:
-        logger.info("SMS [DUMMY] → %s: Your verification code is %s", phone_number, code)
+        masked_phone = _mask_phone_number(phone_number)
+        logger.info("SMS [DUMMY] → %s: Your verification code is %s", masked_phone, code)
         print(f"\n{'='*50}")
-        print(f"  SMS → {phone_number}")
+        print(f"  SMS → {masked_phone}")
         print(f"  Code: {code}")
         print(f"{'='*50}\n")
 

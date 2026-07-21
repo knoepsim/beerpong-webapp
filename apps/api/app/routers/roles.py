@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -23,8 +24,8 @@ router = APIRouter(prefix="/tournaments/{tournament_id}/roles", tags=["Roles"])
 async def assign_role(
     tournament_id: UUID,
     body: RoleAssignRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await role_service.assign_role(
         db, tournament_id, body.user_id, body.role, current_user.id
@@ -40,8 +41,8 @@ async def assign_role(
 async def revoke_role(
     tournament_id: UUID,
     role_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await role_service.revoke_role(db, tournament_id, role_id, current_user.id)
 
@@ -54,7 +55,7 @@ async def revoke_role(
 )
 async def list_roles(
     tournament_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await role_service.list_roles(db, tournament_id)

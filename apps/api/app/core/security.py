@@ -26,7 +26,7 @@ def create_access_token(user_id: UUID) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
-def create_refresh_token(user_id: UUID) -> tuple[str, str]:
+def create_refresh_token() -> tuple[str, str]:
     """Create a long-lived refresh token. Returns (raw_token, token_hash)."""
     raw_token = secrets.token_urlsafe(64)
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()

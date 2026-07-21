@@ -73,7 +73,7 @@ async def verify_code_and_authenticate(
 
     # Create tokens
     access_token = create_access_token(user.id)
-    raw_refresh, refresh_hash = create_refresh_token(user.id)
+    raw_refresh, refresh_hash = create_refresh_token()
 
     # Store refresh token server-side
     refresh_entry = RefreshToken(
@@ -109,7 +109,7 @@ async def refresh_access_token(db: AsyncSession, raw_refresh_token: str) -> Toke
 
     # Issue new token pair
     access_token = create_access_token(stored_token.user_id)
-    new_raw_refresh, new_refresh_hash = create_refresh_token(stored_token.user_id)
+    new_raw_refresh, new_refresh_hash = create_refresh_token()
 
     new_refresh_entry = RefreshToken(
         user_id=stored_token.user_id,

@@ -1,3 +1,4 @@
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -21,8 +22,8 @@ router = APIRouter(prefix="/teams", tags=["Teams"])
 )
 async def create_team(
     body: TeamCreate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     team = await team_service.create_team(db, body.name, current_user.id)
     members = await team_service.get_team_members(db, team.id)
@@ -43,8 +44,8 @@ async def create_team(
     description="Gibt alle Teams zurück, in denen der authentifizierte User Mitglied ist.",
 )
 async def list_my_teams(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     teams = await team_service.get_user_teams(db, current_user.id)
     result = []
@@ -71,8 +72,8 @@ async def list_my_teams(
 )
 async def get_team(
     team_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     team = await team_service.get_team(db, team_id)
     members = await team_service.get_team_members(db, team.id)
@@ -96,8 +97,8 @@ async def get_team(
 )
 async def create_invite(
     team_id: UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     return await team_service.create_invite(db, team_id, current_user.id)
 
@@ -110,8 +111,8 @@ async def create_invite(
 )
 async def accept_invite(
     token: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     team = await team_service.accept_invite(db, token, current_user.id)
     members = await team_service.get_team_members(db, team.id)
