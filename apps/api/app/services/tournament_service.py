@@ -84,9 +84,10 @@ async def list_tournaments(db: AsyncSession, user_id: UUID) -> list[Tournament]:
         )
     )
 
+    from sqlalchemy import union
     # Union all three queries
-    combined = public_q.union(user_q).union(team_q)
-    result = await db.execute(combined)
+    combined = union(public_q, user_q, team_q)
+    result = await db.execute(select(Tournament).from_statement(combined))
     return list(result.scalars().all())
 
 
