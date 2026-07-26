@@ -10,11 +10,18 @@ import type {
   TournamentUserRole,
   User,
   Result,
+  MyTournamentsResponse,
 } from "@/types";
 
 export class ApiError extends Error {
   constructor(public status: number, public data: Record<string, unknown>) {
-    super((data?.detail as string) || "Ein Fehler ist aufgetreten");
+    let msg = "Ein Fehler ist aufgetreten";
+    if (Array.isArray(data?.detail)) {
+      msg = data.detail.map((e: any) => e.msg).join(", ");
+    } else if (typeof data?.detail === "string") {
+      msg = data.detail;
+    }
+    super(msg);
   }
 }
 
@@ -68,7 +75,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
   return res;
 }
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   if (!options.headers) {
@@ -109,10 +116,22 @@ export const api = {
 
   users: {
     me: () => request<User>("/users/me"),
-    updateMe: (name: string) =>
+    updateMe: (data: { name?: string; email?: string }) =>
       request<User>("/users/me", {
         method: "PATCH",
-        body: JSON.stringify({ name }),
+        body: JSON.stringify(data),
+      }),
+    search: (query: string) =>
+      request<User[]>(`/users/search?query=${encodeURIComponent(query)}`),
+    requestPhoneChange: (new_phone_number: string) =>
+      request<void>("/users/me/phone/request", {
+        method: "POST",
+        body: JSON.stringify({ new_phone_number }),
+      }),
+    verifyPhoneChange: (new_phone_number: string, code: string) =>
+      request<User>("/users/me/phone/verify", {
+        method: "POST",
+        body: JSON.stringify({ new_phone_number, code }),
       }),
   },
 
@@ -124,6 +143,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ name }),
       }),
+    update: (id: string, name: string) =>
+      request<Team>(`/teams/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    delete: (id: string) =>
+      request<void>(`/teams/${id}`, {
+        method: "DELETE",
+      }),
     createInvite: (teamId: string) =>
       request<TeamInvite>(`/teams/${teamId}/invite`, { method: "POST" }),
     acceptInvite: (token: string) =>
@@ -132,6 +160,8 @@ export const api = {
 
   tournaments: {
     list: () => request<Tournament[]>("/tournaments"),
+    getMyTournaments: () => request<MyTournamentsResponse>("/tournaments/me"),
+    my: () => request<MyTournamentsResponse>("/tournaments/me"),
     get: (id: string) => request<Tournament>(`/tournaments/${id}`),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
@@ -150,10 +180,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ team_id: teamId }),
       }),
+    leave: (tournamentId: string) =>
+      request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),
+    removeTeam: (tournamentId: string, teamId: string) =>
+      request<void>(`/tournaments/${tournamentId}/teams/${teamId}`, { method: "DELETE" }),
     start: (id: string) =>
       request<Bracket>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string) =>
       request<Bracket>(`/tournaments/${id}/bracket`),
+    getTeams: (id: string) =>
+      request<Team[]>(`/tournaments/${id}/teams`),
   },
 
   roles: {

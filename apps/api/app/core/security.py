@@ -87,3 +87,15 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+
+async def get_current_system_admin(
+    current_user=Depends(get_current_user),
+):
+    """FastAPI dependency: ensure the current user is a system admin."""
+    if not current_user.is_system_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires system admin privileges",
+        )
+    return current_user

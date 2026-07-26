@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get("beerpong_access_token")?.value;
 
-  // Protected routes: everything except /login, / and static assets
-  const publicPaths = ["/login", "/"];
+  // Protected routes: everything except /login, /, /reset and static assets
+  const publicPaths = ["/login", "/", "/reset"];
   const isPublic = publicPaths.includes(pathname);
 
   if (!isPublic && !token) {

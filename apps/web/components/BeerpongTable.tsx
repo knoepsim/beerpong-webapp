@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const SoloCup = ({ color = "red", className }: { color?: "red" | "blue", className?: string }) => {
-  const baseColor = color === "red" ? "#e93338" : "#1d47c1";
+  const baseColor = color === "red" ? "var(--team-red)" : "var(--team-blue)";
 
   return (
     <svg viewBox="0 0 100 120" className={className} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
@@ -137,11 +137,12 @@ export function BeerpongTable({ leftCups, rightCups, className }: BeerpongTableP
 
   return (
     <div
-      className={cn("w-full max-w-5xl mx-auto p-4 md:p-12", className)}
+      className={cn("w-full max-w-5xl mx-auto p-2 md:p-12 overflow-x-auto no-scrollbar", className)}
       style={{ perspective: "1000px" }}
     >
-      <div
-        className="relative w-full aspect-[33/10] bg-zinc-900 border-[12px] border-zinc-800 rounded-xl shadow-2xl"
+      <div className="min-w-[600px] md:min-w-full mx-auto">
+        <div
+          className="relative w-full aspect-[33/10] bg-zinc-900 border-[8px] md:border-[12px] border-zinc-800 rounded-xl shadow-2xl"
         style={{
           transform: "rotateX(60deg)",
           transformStyle: "preserve-3d",
@@ -209,6 +210,7 @@ export function BeerpongTable({ leftCups, rightCups, className }: BeerpongTableP
             </motion.div>
           ))}
         </AnimatePresence>
+      </div>
       </div>
     </div>
   );

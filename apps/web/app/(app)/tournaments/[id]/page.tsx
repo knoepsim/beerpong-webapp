@@ -12,7 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { BracketView } from "@/components/bracket-view";
 import { MatchResultDialog } from "@/components/match-result-dialog";
-import { MapPin, Calendar, Users, Edit, Trash2, Play, Trophy } from "lucide-react";
+import { TournamentSettings } from "@/components/tournament-settings";
+import { MapPin, Calendar, Users, Trophy, Trash2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +44,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [roles, setRoles] = useState<TournamentUserRole[]>([]);
   const [allTeams, setAllTeams] = useState<Team[]>([]); // needed for bracket names
   const [myTeams, setMyTeams] = useState<Team[]>([]); // for joining
+  const [tournamentTeams, setTournamentTeams] = useState<Team[]>([]); // Teams in this tournament
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,16 +58,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const loadData = async () => {
     try {
-      const [tData, teamsData, rolesData, myTeamsData] = await Promise.all([
+      const [tData, teamsData, rolesData, myTeamsData, tTeamsData] = await Promise.all([
         api.tournaments.get(tournamentId),
         api.teams.list(), // using this to resolve all team names for now
         api.roles.list(tournamentId),
-        api.teams.list() // currently list returns user teams
+        api.teams.list(), // currently list returns user teams
+        api.tournaments.getTeams(tournamentId)
       ]);
       setTournament(tData);
       setAllTeams(teamsData);
       setRoles(rolesData);
       setMyTeams(myTeamsData);
+      setTournamentTeams(tTeamsData);
 
       try {
         const bData = await api.tournaments.getBracket(tournamentId);
@@ -108,19 +114,43 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       ? "LÄUFT" // Simplified for now
       : "LÄUFT";
 
+  const myTournamentTeam = useMemo(() => {
+    if (!user || !tournamentTeams.length) return null;
+    return tournamentTeams.find(team => team.members.some(m => m.user_id === user.id)) || null;
+  }, [user, tournamentTeams]);
+
   const handleJoin = async () => {
     if (!selectedTeamId) return;
     setIsJoining(true);
     try {
       await api.tournaments.join(tournamentId, selectedTeamId);
       setJoinDialogOpen(false);
-      // reload to reflect changes, though we don't list teams explicitly yet unless we add an endpoint
-      alert("Erfolgreich beigetreten!");
+      await loadData();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Fehler beim Beitreten";
       alert(message);
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!confirm("Möchtest du dein Team wirklich aus dem Turnier abmelden?")) return;
+    try {
+      await api.tournaments.leave(tournamentId);
+      await loadData();
+    } catch (err: unknown) {
+      alert("Fehler beim Abmelden");
+    }
+  };
+
+  const handleRemoveTeam = async (teamId: string, teamName: string) => {
+    if (!confirm(`Möchtest du das Team "${teamName}" wirklich aus dem Turnier entfernen?`)) return;
+    try {
+      await api.tournaments.removeTeam(tournamentId, teamId);
+      await loadData();
+    } catch (err: unknown) {
+      alert("Fehler beim Entfernen des Teams");
     }
   };
 
@@ -158,14 +188,26 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
               <Badge variant={status === "SETUP" ? "secondary" : "default"}>{status}</Badge>
+              {tournament.start_time && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" /> 
+                  {new Date(tournament.start_time).toLocaleString("de-DE", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  })} Uhr
+                </span>
+              )}
               {tournament.location && (
                 <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> {tournament.location}</span>
               )}
-              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {tournament.table_count} Tische</span>
+              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {tournamentTeams.length} {tournamentTeams.length === 1 ? 'Team' : 'Teams'}</span>
             </div>
           </div>
           
-          {status === "SETUP" && (
+          {status === "SETUP" && !myTournamentTeam && (
             <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
               <DialogTrigger render={<Button />}>
                 Mit Team beitreten
@@ -204,19 +246,79 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </DialogContent>
             </Dialog>
           )}
-        </div>
 
-        {tournament.description && (
-          <p className="text-muted-foreground">{tournament.description}</p>
-        )}
+          {status === "SETUP" && myTournamentTeam && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden sm:inline">
+                Angemeldet mit <strong className="text-foreground">{myTournamentTeam.name}</strong>
+              </span>
+              <Button variant="outline" onClick={handleLeave}>
+                Team abmelden
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <Tabs defaultValue="bracket" className="w-full">
-        <TabsList className="w-full grid grid-cols-2 md:grid-cols-3">
-          <TabsTrigger value="bracket">Spielplan</TabsTrigger>
-          <TabsTrigger value="teams">Teams</TabsTrigger>
-          {canManage && <TabsTrigger value="admin" className="hidden md:flex">Admin</TabsTrigger>}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
+          <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
+          <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
+          <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
+          {canManage && <TabsTrigger value="admin" className="flex-1">Einstellungen</TabsTrigger>}
         </TabsList>
+
+        <TabsContent value="overview" className="mt-6 space-y-6">
+          {tournament.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Beschreibung</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {tournament.description}
+                  </ReactMarkdown>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {myTournamentTeam && bracket && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Was betrifft mich gerade?</CardTitle>
+                <CardDescription>Dein nächstes oder aktuelles Spiel</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const myMatches = bracket.matches.filter(m => m.team_a_id === myTournamentTeam.id || m.team_b_id === myTournamentTeam.id);
+                  const currentMatch = myMatches.sort((a,b) => b.round - a.round)[0];
+                  if (!currentMatch) return <p className="text-muted-foreground">Du hast aktuell kein aktives Spiel.</p>;
+                  
+                  const opponentId = currentMatch.team_a_id === myTournamentTeam.id ? currentMatch.team_b_id : currentMatch.team_a_id;
+                  const opponent = opponentId ? teamsMap[opponentId] : null;
+                  
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <p className="font-medium text-sm text-primary">Runde {currentMatch.round}</p>
+                      <div className="p-4 rounded-lg border bg-card flex items-center justify-between shadow-sm">
+                        <span className="font-bold truncate text-right flex-1">{myTournamentTeam.name}</span>
+                        <span className="text-muted-foreground mx-4 text-xs font-semibold">VS</span>
+                        <span className={`truncate text-left flex-1 ${opponent ? "font-bold" : "italic text-muted-foreground"}`}>{opponent ? opponent.name : "TBD"}</span>
+                      </div>
+                      {currentMatch.table_number && (
+                        <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
+                          <Trophy className="h-4 w-4" /> Tisch {currentMatch.table_number}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
         <TabsContent value="bracket" className="mt-6">
           <Card>
@@ -232,11 +334,30 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <p className="text-sm mt-1">Das Turnier befindet sich noch in der Anmeldephase.</p>
                 </div>
               ) : (
-                <BracketView 
-                  bracket={bracket} 
-                  teamsMap={teamsMap} 
-                  onMatchClick={canReferee ? handleMatchClick : undefined}
-                />
+                <div className="space-y-8">
+                  <BracketView 
+                    bracket={bracket} 
+                    teamsMap={teamsMap} 
+                    onMatchClick={canReferee ? handleMatchClick : undefined}
+                  />
+                  
+                  <div className="border-t pt-6">
+                    <h3 className="font-semibold mb-4">Alle Spiele</h3>
+                    <div className="space-y-2">
+                      {[...bracket.matches].sort((a,b) => a.round - b.round || a.position - b.position).map(m => {
+                        const tA = m.team_a_id ? teamsMap[m.team_a_id] : null;
+                        const tB = m.team_b_id ? teamsMap[m.team_b_id] : null;
+                        return (
+                          <div key={m.id} className="p-3 border rounded-lg flex items-center justify-between text-sm">
+                            <div className="flex-1 text-right truncate font-medium">{tA ? tA.name : "TBD"}</div>
+                            <div className="px-4 text-[10px] uppercase font-bold text-muted-foreground">Runde {m.round}</div>
+                            <div className="flex-1 text-left truncate font-medium">{tB ? tB.name : "TBD"}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -249,49 +370,67 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <CardDescription>Teams, die an diesem Turnier teilnehmen</CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Note: Missing endpoint to fetch tournament teams cleanly without bracket, 
-                  for now we just list all teams we know about or show a placeholder */}
-              <p className="text-muted-foreground italic">
-                Die Teilnehmerliste wird bald verfügbar sein.
-              </p>
+              {tournamentTeams.length === 0 ? (
+                <p className="text-muted-foreground italic text-center py-8">
+                  Noch keine Teams beigetreten.
+                </p>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {tournamentTeams.map((team) => {
+                    const isMyTeam = team.id === myTournamentTeam?.id;
+                    return (
+                    <div 
+                      key={team.id} 
+                      className={`relative flex flex-col p-3 border rounded-lg gap-2 ${
+                        isMyTeam ? "border-primary bg-primary/5" : "bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <p className="font-medium truncate">{team.name}</p>
+                      </div>
+                      {team.members.length > 0 ? (
+                        <div className="text-sm text-muted-foreground flex gap-1.5 flex-wrap">
+                          {team.members.map(m => (
+                            <span key={m.user_id} className="bg-secondary/50 px-2 py-0.5 rounded-md text-xs">{m.name}</span>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground italic text-xs">
+                          Keine Spieler
+                        </div>
+                      )}
+                      
+                      {canManage && status === "SETUP" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 absolute top-2 right-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => handleRemoveTeam(team.id, team.name)}
+                          title="Team entfernen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {canManage && (
-          <TabsContent value="admin" className="mt-6 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Turnier-Verwaltung</CardTitle>
-                <CardDescription>Aktionen für Administratoren und Manager</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {status === "SETUP" && (
-                  <div className="rounded-lg border bg-card p-4 space-y-3">
-                    <h3 className="font-semibold">Turnier starten</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Sobald alle Teams angemeldet sind, kannst du das Bracket generieren lassen.
-                      Danach ist keine Anmeldung mehr möglich.
-                    </p>
-                    <Button onClick={handleGenerateBracket} className="w-full sm:w-auto">
-                      <Play className="mr-2 h-4 w-4" />
-                      Spielplan generieren
-                    </Button>
-                  </div>
-                )}
-                
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
-                  <Button variant="outline" className="flex-1">
-                    <Edit className="mr-2 h-4 w-4" /> Bearbeiten
-                  </Button>
-                  {userRole === TournamentRoleType.ADMIN && (
-                    <Button variant="destructive" className="flex-1">
-                      <Trash2 className="mr-2 h-4 w-4" /> Löschen
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="admin" className="mt-6">
+            <TournamentSettings 
+              tournament={tournament}
+              status={status}
+              roles={roles}
+              userRole={userRole}
+              teamCount={tournamentTeams.length}
+              onGenerateBracket={handleGenerateBracket}
+              onReload={loadData}
+            />
           </TabsContent>
         )}
       </Tabs>

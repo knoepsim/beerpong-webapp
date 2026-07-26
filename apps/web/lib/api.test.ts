@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { apiClient } from './api';
+import { request } from './api';
 import { setTokens, clearTokens } from './auth';
 
 // Mock fetch
 global.fetch = vi.fn();
 
-describe('apiClient', () => {
+describe('request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearTokens();
@@ -19,7 +19,7 @@ describe('apiClient', () => {
       json: async () => ({ success: true })
     });
 
-    await apiClient('test-endpoint');
+    await request('test-endpoint');
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('/test-endpoint'),
@@ -40,7 +40,7 @@ describe('apiClient', () => {
       json: async () => ({ detail: 'Invalid input' })
     });
 
-    await expect(apiClient('test-endpoint')).rejects.toThrow('Invalid input');
+    await expect(request('test-endpoint')).rejects.toThrow('Invalid input');
   });
 
   it('returns empty object on 204 No Content', async () => {
@@ -49,7 +49,7 @@ describe('apiClient', () => {
       status: 204,
     });
 
-    const result = await apiClient('test-endpoint');
+    const result = await request('test-endpoint');
     expect(result).toEqual({});
   });
 });

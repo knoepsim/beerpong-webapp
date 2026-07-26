@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     # JWT
     secret_key: str = "CHANGE-ME-IN-PRODUCTION"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 43200
     refresh_token_expire_days: int = 30
 
     # SMS Verification
@@ -18,6 +18,9 @@ class Settings(BaseSettings):
 
     # SMS Backend: "dummy" (v1) or "httpsms" (future)
     sms_backend: str = "dummy"
+
+    # System Admin
+    super_admin_phones: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -12,14 +12,33 @@ export const metadata: Metadata = {
   description: "Organisiere und verwalte deine Bierpong-Turniere",
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+import { UserProvider } from "@/components/user-provider";
+import { QueryProvider } from "@/components/query-provider";
+import { Toaster } from "@/components/ui/sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className={`${inter.variable} dark h-full`}>
-      <body className="min-h-full flex flex-col antialiased">{children}</body>
+    <html lang="de" suppressHydrationWarning className={`${inter.variable} h-full`}>
+      <body className="min-h-full flex flex-col antialiased">
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <UserProvider>
+              {children}
+            </UserProvider>
+            <Toaster />
+          </ThemeProvider>
+        </QueryProvider>
+      </body>
     </html>
   );
 }

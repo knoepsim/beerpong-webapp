@@ -36,3 +36,9 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Playwright
+.playwright-mcp/
+playwright-report/
+test-results/
+blob-report/

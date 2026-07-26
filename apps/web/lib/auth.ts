@@ -6,7 +6,7 @@ export function setTokens(accessToken: string, refreshToken: string) {
     localStorage.setItem(TOKEN_KEY, accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
     // Also set a cookie so the middleware can read the access token for basic route protection
-    document.cookie = `${TOKEN_KEY}=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    document.cookie = `${TOKEN_KEY}=${accessToken}; path=/; max-age=2592000; SameSite=Lax`;
   }
 }
 

@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy, Users, UserCircle } from "lucide-react";
+import { Trophy, Users, UserCircle, LogOut, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCurrentUser } from "./user-provider";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { clearTokens } from "@/lib/auth";
 
 const navItems = [
   { href: "/tournaments", label: "Turniere", icon: Trophy },
@@ -36,22 +39,53 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    isActive
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
                 </Link>
               );
             })}
+
+            {user?.is_system_admin && (
+              <Link
+                href="/admin"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${pathname.startsWith("/admin")
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           {user && (
-            <div className="hidden md:block text-sm text-muted-foreground">
-              {user.name}
+            <div className="hidden md:flex items-center gap-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="ghost" className="text-sm text-muted-foreground font-normal hover:text-foreground" />}>
+                  {user.name}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem render={<Link href="/profile" className="cursor-pointer" />}>
+                    Profil bearbeiten
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                    onClick={() => {
+                      clearTokens();
+                      window.location.href = "/login";
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Abmelden
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -69,17 +103,29 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition-colors ${
-                  isActive
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition-colors ${isActive
                     ? "text-primary"
                     : "text-muted-foreground"
-                }`}
+                  }`}
               >
                 <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
                 {item.label}
               </Link>
             );
           })}
+
+          {user?.is_system_admin && (
+            <Link
+              href="/admin"
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition-colors ${pathname.startsWith("/admin")
+                  ? "text-primary"
+                  : "text-muted-foreground"
+                }`}
+            >
+              <Users className={`h-5 w-5 ${pathname.startsWith("/admin") ? "text-primary" : ""}`} />
+              Admin
+            </Link>
+          )}
         </div>
       </nav>
     </div>

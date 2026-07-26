@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.exceptions import register_exception_handlers
-from app.routers import auth, results, roles, teams, tournaments, users
+from app.routers import admin, auth, results, roles, teams, tournaments, users
 
 app = FastAPI(
     title="Bierpong API",
@@ -13,6 +13,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
+    allow_origin_regex="https?://.*", # Erlaubt Zugriff von lokalen IPs (Handy)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -22,6 +23,7 @@ app.add_middleware(
 register_exception_handlers(app)
 
 # Register routers
+app.include_router(admin.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(teams.router)

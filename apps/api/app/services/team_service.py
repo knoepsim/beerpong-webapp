@@ -1,7 +1,7 @@
 import secrets
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -12,12 +12,12 @@ from app.core.exceptions import (
 )
 from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
+from app.repositories.team_repository import team_repository
 
 
 async def create_team(db: AsyncSession, name: str, creator_id: UUID) -> Team:
     """Create a new team and add the creator as the first member."""
-    team = Team(name=name)
-    db.add(team)
+    team = await team_repository.create(db, obj_in={"name": name})
     await db.flush()
 
     member = TeamMember(team_id=team.id, user_id=creator_id)
@@ -26,36 +26,46 @@ async def create_team(db: AsyncSession, name: str, creator_id: UUID) -> Team:
 
 
 async def get_team(db: AsyncSession, team_id: UUID) -> Team:
-    """Get a team by ID or raise NotFoundError."""
-    result = await db.execute(select(Team).where(Team.id == team_id))
-    team = result.scalar_one_or_none()
+    """Get a team by ID or raise NotFoundError. Ensures team is not deleted."""
+    team = await team_repository.get_by_id_active(db, team_id)
     if team is None:
         raise NotFoundError("Team")
     return team
 
 
 async def get_user_teams(db: AsyncSession, user_id: UUID) -> list[Team]:
-    """Get all teams a user is a member of."""
-    result = await db.execute(
-        select(Team)
-        .join(TeamMember, TeamMember.team_id == Team.id)
-        .where(TeamMember.user_id == user_id)
-    )
-    return list(result.scalars().all())
+    """Get all teams a user is a member of (excluding deleted)."""
+    return await team_repository.get_user_teams(db, user_id)
 
 
 async def get_team_members(db: AsyncSession, team_id: UUID) -> list[TeamMember]:
     """Get all members of a team."""
-    result = await db.execute(select(TeamMember).where(TeamMember.team_id == team_id))
-    return list(result.scalars().all())
+    return await team_repository.get_team_members(db, team_id)
+
+
+async def get_team_members_with_names(db: AsyncSession, team_id: UUID) -> list[dict]:
+    """Get all members of a team including their names."""
+    return await team_repository.get_team_members_with_names(db, team_id)
 
 
 async def get_team_member_count(db: AsyncSession, team_id: UUID) -> int:
     """Count the number of members in a team."""
-    result = await db.execute(
-        select(func.count()).select_from(TeamMember).where(TeamMember.team_id == team_id)
-    )
-    return result.scalar_one()
+    return await team_repository.get_team_member_count(db, team_id)
+
+
+async def get_team_flags(db: AsyncSession, team_id: UUID) -> tuple[bool, bool]:
+    """Returns (is_deletable, is_renamable)."""
+    return await team_repository.get_team_flags(db, team_id)
+
+
+async def update_team(db: AsyncSession, team_id: UUID, name: str) -> Team:
+    team = await get_team(db, team_id)
+    return await team_repository.update(db, db_obj=team, obj_in={"name": name})
+
+
+async def soft_delete_team(db: AsyncSession, team_id: UUID) -> None:
+    team = await get_team(db, team_id)
+    await team_repository.update(db, db_obj=team, obj_in={"is_deleted": True})
 
 
 async def create_invite(db: AsyncSession, team_id: UUID, user_id: UUID) -> TeamInvite:
@@ -69,7 +79,7 @@ async def create_invite(db: AsyncSession, team_id: UUID, user_id: UUID) -> TeamI
 
     invite = TeamInvite(
         team_id=team_id,
-        token=secrets.token_urlsafe(32),
+        token=secrets.token_urlsafe(6),
     )
     db.add(invite)
     await db.flush()

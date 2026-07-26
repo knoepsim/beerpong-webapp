@@ -80,6 +80,8 @@ async def assign_role(
         role=role,
     )
     db.add(new_role)
+    await db.flush()
+    await db.refresh(new_role)
     return new_role
 
 

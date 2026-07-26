@@ -38,11 +38,8 @@ async def request_sms_code(db: AsyncSession, phone_number: str) -> None:
     sms_service.send_code(phone_number, code)
 
 
-async def verify_code_and_authenticate(
-    db: AsyncSession, phone_number: str, code: str
-) -> TokenResponse:
-    """Verify SMS code, create user if needed, and return JWT tokens."""
-    # Find the latest unused, non-expired verification for this number
+async def verify_sms_code_only(db: AsyncSession, phone_number: str, code: str) -> None:
+    """Verifies an SMS code without issuing tokens. Raises InvalidCredentialsError if invalid."""
     result = await db.execute(
         select(SmsVerification)
         .where(
@@ -61,6 +58,13 @@ async def verify_code_and_authenticate(
     # Mark code as used
     verification.used = True
 
+
+async def verify_code_and_authenticate(
+    db: AsyncSession, phone_number: str, code: str
+) -> TokenResponse:
+    """Verify SMS code, create user if needed, and return JWT tokens."""
+    await verify_sms_code_only(db, phone_number, code)
+
     # Find or create user
     user_result = await db.execute(select(User).where(User.phone_number == phone_number))
     user = user_result.scalar_one_or_none()
@@ -69,6 +73,12 @@ async def verify_code_and_authenticate(
         # First-time registration: create user with phone number as temporary name
         user = User(phone_number=phone_number, name=phone_number)
         db.add(user)
+        await db.flush()
+
+    # Admin Bootstrapping
+    super_admin_phones = [p.strip() for p in settings.super_admin_phones.split(",") if p.strip()]
+    if phone_number in super_admin_phones and not user.is_system_admin:
+        user.is_system_admin = True
         await db.flush()
 
     # Create tokens

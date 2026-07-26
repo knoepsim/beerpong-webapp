@@ -4,6 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from app.models.tournament import TournamentMode, TournamentVisibility
+from app.models.tournament_role import TournamentRoleType
+from app.schemas.team import TeamResponse
 
 
 class TournamentCreate(BaseModel):
@@ -48,3 +50,22 @@ class TournamentResponse(BaseModel):
 class TournamentJoinRequest(BaseModel):
     """Request body for joining a tournament with a team."""
     team_id: UUID
+
+
+class ParticipatingTournament(BaseModel):
+    tournament: TournamentResponse
+    team: TeamResponse
+
+    model_config = {"from_attributes": True}
+
+
+class ManagedTournament(BaseModel):
+    tournament: TournamentResponse
+    role: TournamentRoleType
+
+    model_config = {"from_attributes": True}
+
+
+class MyTournamentsResponse(BaseModel):
+    participating: list[ParticipatingTournament]
+    managing: list[ManagedTournament]

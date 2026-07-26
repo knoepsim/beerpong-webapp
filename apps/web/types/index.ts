@@ -10,12 +10,15 @@ export interface User {
   id: string;
   phone_number: string;
   name: string;
+  email: string | null;
+  is_system_admin: boolean;
   created_at: string;
 }
 
 // ── Team ──────────────────────────────────────────────
 export interface TeamMember {
   user_id: string;
+  name: string;
   joined_at: string;
 }
 
@@ -25,6 +28,8 @@ export interface Team {
   max_size: number;
   members: TeamMember[];
   is_complete: boolean;
+  is_deletable: boolean;
+  is_renamable: boolean;
   created_at: string;
 }
 
@@ -72,6 +77,21 @@ export interface TournamentCreateRequest {
 }
 
 // ── Match & Bracket ───────────────────────────────────
+export interface ParticipatingTournament {
+  tournament: Tournament;
+  team: Team;
+}
+
+export interface ManagedTournament {
+  tournament: Tournament;
+  role: TournamentRoleType;
+}
+
+export interface MyTournamentsResponse {
+  participating: ParticipatingTournament[];
+  managing: ManagedTournament[];
+}
+
 export interface Match {
   id: string;
   tournament_id: string;
@@ -119,6 +139,7 @@ export interface TournamentUserRole {
   id: string;
   tournament_id: string;
   user_id: string;
+  user_name?: string;
   role: TournamentRoleType;
   assigned_at: string;
 }
