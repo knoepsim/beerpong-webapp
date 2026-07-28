@@ -28,8 +28,8 @@ jobs:
         working-directory: ./apps/web
         run: |
           corepack enable pnpm
-          pnpm install --frozen-lockfile --ignore-scripts --config.minimum-release-age=0
-          pnpm run test:coverage
+          pnpm install --frozen-lockfile --ignore-scripts
+          npm run test:coverage
 
       - name: Install Playwright Browsers
         working-directory: ./apps/web
