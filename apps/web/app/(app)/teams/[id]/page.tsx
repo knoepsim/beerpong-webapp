@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, Link as LinkIcon, Check, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -49,7 +50,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
       const invite = await api.teams.createInvite(teamId);
       setInviteToken(invite.token);
     } catch (err: unknown) {
-      alert("Fehler beim Erstellen des Links");
+      toast.error("Fehler beim Erstellen des Links");
     } finally {
       setIsGenerating(false);
     }

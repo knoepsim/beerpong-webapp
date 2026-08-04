@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   : "text-muted-foreground"
                 }`}
             >
-              <Users className={`h-5 w-5 ${pathname.startsWith("/admin") ? "text-primary" : ""}`} />
+              <Wrench className={`h-5 w-5 ${pathname.startsWith("/admin") ? "text-primary" : ""}`} />
               Admin
             </Link>
           )}

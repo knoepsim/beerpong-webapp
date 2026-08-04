@@ -67,8 +67,9 @@ def verify_sms_code(code: str, code_hash: str) -> bool:
 
 def generate_sms_code() -> str:
     """Generate a random numeric SMS verification code."""
-    # Hardcoded for local testing during development
-    return "123456"
+    if settings.sms_backend == "dummy":
+        return "123456"
+    return "".join(str(secrets.randbelow(10)) for _ in range(settings.sms_code_length))
 
 
 async def get_current_user(

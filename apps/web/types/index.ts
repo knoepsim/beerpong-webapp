@@ -33,11 +33,20 @@ export interface Team {
   created_at: string;
 }
 
+export interface TournamentTeam extends Team {
+  is_checked_in: boolean;
+}
+
 export interface TeamInvite {
   id: string;
   team_id: string;
   token: string;
   created_at: string;
+}
+
+export interface TeamInviteDetails {
+  team_name: string;
+  inviter_name: string;
 }
 
 // ── Tournament ────────────────────────────────────────
@@ -51,12 +60,19 @@ export enum TournamentVisibility {
   PUBLIC_UNLISTED = "public_unlisted",
 }
 
+export interface TournamentInvite {
+  token: string;
+}
+
 export interface Tournament {
   id: string;
   name: string;
   location: string | null;
   description: string | null;
   start_time: string | null;
+  registration_end_time: string | null;
+  checkin_start_time: string | null;
+  started_at: string | null;
   table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
@@ -70,7 +86,9 @@ export interface TournamentCreateRequest {
   name: string;
   location?: string | null;
   description?: string | null;
-  start_time?: string | null;
+  start_time: string;
+  registration_end_time?: string | null;
+  checkin_start_time?: string | null;
   table_count?: number;
   mode?: TournamentMode;
   visibility?: TournamentVisibility;
@@ -113,9 +131,9 @@ export interface Bracket {
 
 // ── Result ────────────────────────────────────────────
 export enum ResultType {
-  CREATED = "CREATED",
-  MODIFIED = "MODIFIED",
-  DELETED = "DELETED",
+  CREATED = "created",
+  MODIFIED = "modified",
+  DELETED = "deleted",
 }
 
 export interface Result {
@@ -125,6 +143,7 @@ export interface Result {
   winner_team_id: string | null;
   cups_left: number | null;
   reported_by_user_id: string;
+  reported_by_username?: string;
   created_at: string;
 }
 

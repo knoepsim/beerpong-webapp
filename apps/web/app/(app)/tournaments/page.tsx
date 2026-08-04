@@ -39,6 +39,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
@@ -164,11 +165,30 @@ export default function TournamentsPage() {
     });
     
     return Array.from(map.values()).sort((a, b) => {
+      const aActive = a.tournament.started_at ? 1 : 0;
+      const bActive = b.tournament.started_at ? 1 : 0;
+      
+      if (aActive !== bActive) {
+        return bActive - aActive; // Active first (1 before 0)
+      }
+      
       const dateA = a.tournament.start_time ? new Date(a.tournament.start_time).getTime() : new Date(a.tournament.created_at).getTime();
       const dateB = b.tournament.start_time ? new Date(b.tournament.start_time).getTime() : new Date(b.tournament.created_at).getTime();
-      return dateA - dateB;
+      
+      // If active, older first (currently running). If not active, sooner first (upcoming).
+      return aActive ? dateB - dateA : dateA - dateB;
     });
   }, [data]);
+
+  const { activeTournaments, plannedTournaments } = useMemo(() => {
+    const active: typeof combinedTournaments = [];
+    const planned: typeof combinedTournaments = [];
+    combinedTournaments.forEach(t => {
+      if (t.tournament.started_at) active.push(t);
+      else planned.push(t);
+    });
+    return { activeTournaments: active, plannedTournaments: planned };
+  }, [combinedTournaments]);
 
   if (isLoading) {
     return (
@@ -200,57 +220,123 @@ export default function TournamentsPage() {
             description="Du bist noch keinem Turnier beigetreten."
           />
         ) : (
-          <div className="space-y-3">
-            {combinedTournaments.map((item) => {
-              const t = item.tournament;
-              return (
-                <Card
-                  key={t.id}
-                  className="cursor-pointer transition-colors hover:bg-accent/50"
-                  onClick={() => router.push(`/tournaments/${t.id}`)}
-                >
-                  <CardHeader className="p-3 pb-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{t.name}</CardTitle>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {item.team && (
-                          <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-primary/50 text-primary">
-                            Team: {item.team.name}
-                          </Badge>
+          <Tabs defaultValue="active" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="active">Laufend / Abgeschlossen ({activeTournaments.length})</TabsTrigger>
+              <TabsTrigger value="planned">Geplant ({plannedTournaments.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="active" className="space-y-3 mt-0">
+              {activeTournaments.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground text-sm">Keine laufenden Turniere</div>
+              ) : (
+                activeTournaments.map((item) => {
+                  const t = item.tournament;
+                  return (
+                    <Card
+                      key={t.id}
+                      className="cursor-pointer transition-colors hover:bg-accent/50 mb-3"
+                      onClick={() => router.push(`/tournaments/${t.id}`)}
+                    >
+                      <CardHeader className="p-3 pb-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base">{t.name}</CardTitle>
+                          <div className="flex flex-wrap gap-1 justify-end">
+                            {item.team && (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-primary/50 text-primary">
+                                Team: {item.team.name}
+                              </Badge>
+                            )}
+                            {item.role && (
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
+                                {roleLabel(item.role)}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {t.description && (
+                          <div className="line-clamp-3 text-xs text-muted-foreground overflow-hidden prose prose-sm prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {t.description}
+                            </ReactMarkdown>
+                          </div>
                         )}
-                        {item.role && (
-                          <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-                            {roleLabel(item.role)}
-                          </Badge>
+                      </CardHeader>
+                      <CardContent className="px-3 pb-3 pt-0 mt-2">
+                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                          {t.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {t.location}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {t.start_time ? formatDate(t.start_time) : formatDate(t.created_at)}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </TabsContent>
+            
+            <TabsContent value="planned" className="space-y-3 mt-0">
+              {plannedTournaments.length === 0 ? (
+                <div className="text-center py-10 text-muted-foreground text-sm">Keine geplanten Turniere</div>
+              ) : (
+                plannedTournaments.map((item) => {
+                  const t = item.tournament;
+                  return (
+                    <Card
+                      key={t.id}
+                      className="cursor-pointer transition-colors hover:bg-accent/50 mb-3"
+                      onClick={() => router.push(`/tournaments/${t.id}`)}
+                    >
+                      <CardHeader className="p-3 pb-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-base">{t.name}</CardTitle>
+                          <div className="flex flex-wrap gap-1 justify-end">
+                            {item.team && (
+                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-primary/50 text-primary">
+                                Team: {item.team.name}
+                              </Badge>
+                            )}
+                            {item.role && (
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
+                                {roleLabel(item.role)}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        {t.description && (
+                          <div className="line-clamp-3 text-xs text-muted-foreground overflow-hidden prose prose-sm prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {t.description}
+                            </ReactMarkdown>
+                          </div>
                         )}
-                      </div>
-                    </div>
-                    {t.description && (
-                      <div className="line-clamp-3 text-xs text-muted-foreground overflow-hidden prose prose-sm prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {t.description}
-                        </ReactMarkdown>
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="px-3 pb-3 pt-0 mt-2">
-                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                      {t.location && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {t.location}
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {t.start_time ? formatDate(t.start_time) : formatDate(t.created_at)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                      </CardHeader>
+                      <CardContent className="px-3 pb-3 pt-0 mt-2">
+                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                          {t.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {t.location}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {t.start_time ? formatDate(t.start_time) : formatDate(t.created_at)}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </TabsContent>
+          </Tabs>
         )}
       </div>
 

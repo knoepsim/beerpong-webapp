@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.team import TeamCreate, TeamInviteResponse, TeamMemberResponse, TeamResponse, TeamUpdate
-from app.services import team_service
+from app.schemas.team import TeamCreate, TeamInviteResponse, TeamInviteDetailsResponse, TeamMemberResponse, TeamResponse, TeamUpdate
+from app.services.team_service import TeamService
 
 router = APIRouter(prefix="/teams", tags=["Teams"])
 
@@ -25,9 +25,9 @@ async def create_team(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    team = await team_service.create_team(db, body.name, current_user.id)
-    members = await team_service.get_team_members_with_names(db, team.id)
-    is_deletable, is_renamable = await team_service.get_team_flags(db, team.id)
+    team = await TeamService(db).create_team(body.name, current_user.id)
+    members = await TeamService(db).get_team_members_with_names(team.id)
+    is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
     return TeamResponse(
         id=team.id,
         name=team.name,
@@ -50,11 +50,11 @@ async def list_my_teams(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    teams = await team_service.get_user_teams(db, current_user.id)
+    teams = await TeamService(db).get_user_teams(current_user.id)
     result = []
     for team in teams:
-        members = await team_service.get_team_members_with_names(db, team.id)
-        is_deletable, is_renamable = await team_service.get_team_flags(db, team.id)
+        members = await TeamService(db).get_team_members_with_names(team.id)
+        is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
         result.append(
             TeamResponse(
                 id=team.id,
@@ -81,9 +81,9 @@ async def get_team(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    team = await team_service.get_team(db, team_id)
-    members = await team_service.get_team_members_with_names(db, team.id)
-    is_deletable, is_renamable = await team_service.get_team_flags(db, team.id)
+    team = await TeamService(db).get_team(team_id)
+    members = await TeamService(db).get_team_members_with_names(team.id)
+    is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
     return TeamResponse(
         id=team.id,
         name=team.name,
@@ -97,7 +97,7 @@ async def get_team(
 
 
 async def _ensure_is_member(db: AsyncSession, team_id: UUID, user_id: UUID):
-    members = await team_service.get_team_members(db, team_id)
+    members = await TeamService(db).get_team_members(team_id)
     if not any(m.user_id == user_id for m in members):
         raise HTTPException(status_code=403, detail="Only team members can perform this action.")
 
@@ -114,16 +114,16 @@ async def update_team(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    team = await team_service.get_team(db, team_id)
+    team = await TeamService(db).get_team(team_id)
     await _ensure_is_member(db, team_id, current_user.id)
-    _, is_renamable = await team_service.get_team_flags(db, team_id)
+    _, is_renamable = await TeamService(db).get_team_flags(team_id)
     
     if not is_renamable:
         raise HTTPException(status_code=403, detail="Team can't be renamed right now.")
         
-    team = await team_service.update_team(db, team.id, body.name)
-    members = await team_service.get_team_members_with_names(db, team.id)
-    is_deletable, is_renamable = await team_service.get_team_flags(db, team.id)
+    team = await TeamService(db).update_team(team.id, body.name)
+    members = await TeamService(db).get_team_members_with_names(team.id)
+    is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
     
     return TeamResponse(
         id=team.id,
@@ -148,14 +148,14 @@ async def delete_team(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    team = await team_service.get_team(db, team_id)
+    team = await TeamService(db).get_team(team_id)
     await _ensure_is_member(db, team_id, current_user.id)
-    is_deletable, _ = await team_service.get_team_flags(db, team_id)
+    is_deletable, _ = await TeamService(db).get_team_flags(team_id)
     
     if not is_deletable:
         raise HTTPException(status_code=403, detail="Team can't be deleted right now.")
         
-    await team_service.soft_delete_team(db, team.id)
+    await TeamService(db).soft_delete_team(team.id)
 
 
 @router.post(
@@ -171,7 +171,21 @@ async def create_invite(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await team_service.create_invite(db, team_id, current_user.id)
+    return await TeamService(db).create_invite(team_id, current_user.id)
+
+
+@router.get(
+    "/invite/{token}",
+    response_model=TeamInviteDetailsResponse,
+    summary="Einladungs-Details abrufen",
+    description="Gibt Team- und Einlader-Namen für einen Invite-Link zurück.",
+)
+async def get_invite_details(
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    details = await TeamService(db).get_invite_details(token)
+    return TeamInviteDetailsResponse(**details)
 
 
 @router.post(
@@ -185,9 +199,9 @@ async def accept_invite(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    team = await team_service.accept_invite(db, token, current_user.id)
-    members = await team_service.get_team_members_with_names(db, team.id)
-    is_deletable, is_renamable = await team_service.get_team_flags(db, team.id)
+    team = await TeamService(db).accept_invite(token, current_user.id)
+    members = await TeamService(db).get_team_members_with_names(team.id)
+    is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
     return TeamResponse(
         id=team.id,
         name=team.name,

@@ -4,6 +4,7 @@ import type {
   Bracket,
   Team,
   TeamInvite,
+  TeamInviteDetails,
   TokenResponse,
   Tournament,
   TournamentCreateRequest,
@@ -11,6 +12,7 @@ import type {
   User,
   Result,
   MyTournamentsResponse,
+  TournamentTeam,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -62,13 +64,21 @@ async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Re
 
   let res = await fetch(url, { ...options, headers });
 
-  if (res.status === 401 && token) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      headers.set("Authorization", `Bearer ${newToken}`);
-      res = await fetch(url, { ...options, headers });
-    } else if (typeof window !== "undefined") {
-      window.location.href = "/login";
+  if (res.status === 401) {
+    if (token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.set("Authorization", `Bearer ${newToken}`);
+        res = await fetch(url, { ...options, headers });
+        if (res.status !== 401) return res;
+      }
+    }
+    
+    if (typeof window !== "undefined") {
+      const currentUrl = window.location.pathname + window.location.search;
+      window.location.href = `/login?redirect=${encodeURIComponent(currentUrl)}`;
+      // Prevent further execution while browser is redirecting
+      await new Promise(() => {});
     }
   }
 
@@ -80,6 +90,9 @@ export async function request<T>(endpoint: string, options: RequestInit = {}): P
 
   if (!options.headers) {
     options.headers = { "Content-Type": "application/json" };
+  }
+  if (!options.cache) {
+    options.cache = "no-store";
   }
 
   const res = await fetchWithAuth(url, options);
@@ -154,6 +167,8 @@ export const api = {
       }),
     createInvite: (teamId: string) =>
       request<TeamInvite>(`/teams/${teamId}/invite`, { method: "POST" }),
+    getInviteDetails: (token: string) =>
+      request<TeamInviteDetails>(`/teams/invite/${token}`),
     acceptInvite: (token: string) =>
       request<Team>(`/teams/join/${token}`, { method: "POST" }),
   },
@@ -161,8 +176,8 @@ export const api = {
   tournaments: {
     list: () => request<Tournament[]>("/tournaments"),
     getMyTournaments: () => request<MyTournamentsResponse>("/tournaments/me"),
-    my: () => request<MyTournamentsResponse>("/tournaments/me"),
-    get: (id: string) => request<Tournament>(`/tournaments/${id}`),
+    get: (id: string, inviteToken?: string | null) => 
+      request<Tournament>(`/tournaments/${id}${inviteToken ? `?invite=${inviteToken}` : ''}`),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
         method: "POST",
@@ -175,21 +190,32 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/tournaments/${id}`, { method: "DELETE" }),
-    join: (tournamentId: string, teamId: string) =>
+    join: (tournamentId: string, teamId: string, inviteToken?: string | null) =>
       request<void>(`/tournaments/${tournamentId}/join`, {
         method: "POST",
-        body: JSON.stringify({ team_id: teamId }),
+        body: JSON.stringify({ team_id: teamId, invite_token: inviteToken }),
       }),
     leave: (tournamentId: string) =>
       request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),
     removeTeam: (tournamentId: string, teamId: string) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}`, { method: "DELETE" }),
-    start: (id: string) =>
-      request<Bracket>(`/tournaments/${id}/start`, { method: "POST" }),
+    generateBracket: (id: string) =>
+      request<Bracket>(`/tournaments/${id}/generate-bracket`, { method: "POST" }),
+    startTournament: (id: string) =>
+      request<void>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string) =>
       request<Bracket>(`/tournaments/${id}/bracket`),
     getTeams: (id: string) =>
-      request<Team[]>(`/tournaments/${id}/teams`),
+      request<TournamentTeam[]>(`/tournaments/${id}/teams`),
+    checkin: (tournamentId: string, teamId: string, is_checked_in: boolean) =>
+      request<void>(`/tournaments/${tournamentId}/teams/${teamId}/checkin`, {
+        method: "POST",
+        body: JSON.stringify({ is_checked_in }),
+      }),
+    generateInvite: (tournamentId: string) =>
+      request<{token: string}>(`/tournaments/${tournamentId}/invite`, {
+        method: "POST",
+      }),
   },
 
   roles: {

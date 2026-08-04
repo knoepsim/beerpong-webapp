@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.user import UserResponse, UserUpdate, PhoneNumberChangeRequest, PhoneNumberChangeVerify
-from app.services import user_service
+from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -32,7 +32,7 @@ async def update_me(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await user_service.update_user(db, current_user, body)
+    return await UserService(db).update_user(current_user, body)
 
 
 @router.post(
@@ -46,7 +46,7 @@ async def request_phone_change(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    await user_service.request_phone_number_change(db, body.new_phone_number)
+    await UserService(db).request_phone_number_change(body.new_phone_number)
 
 
 @router.post(
@@ -60,7 +60,7 @@ async def verify_phone_change(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await user_service.verify_and_update_phone_number(db, current_user, body.new_phone_number, body.code)
+    return await UserService(db).verify_and_update_phone_number(current_user, body.new_phone_number, body.code)
 
 
 @router.get(
@@ -76,4 +76,4 @@ async def search_users(
 ):
     if len(query) < 2:
         return []
-    return await user_service.search_users(db, query)
+    return await UserService(db).search_users(query)

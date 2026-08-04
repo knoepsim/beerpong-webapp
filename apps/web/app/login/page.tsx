@@ -88,7 +88,7 @@ export default function LoginPage() {
       if (!user.email || !user.name || user.name === user.phone_number) {
         setStep("new_user");
       } else {
-        router.push(redirectUrl || "/tournaments");
+        window.location.href = redirectUrl || "/tournaments";
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Ungültiger oder abgelaufener Code";
@@ -107,7 +107,7 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold">Bierpong Turnier</CardTitle>
           <CardDescription>
             {step === "phone" && "Melde dich mit deiner Telefonnummer an"}
-            {step === "code" && `Code an ${currentPhone} gesendet`}
+            {step === "code" && `Code an +49 ${currentPhone} gesendet`}
             {step === "new_user" && "Account Einrichtung"}
           </CardDescription>
         </CardHeader>
@@ -248,7 +248,7 @@ export default function LoginPage() {
                     const redirectUrl = new URLSearchParams(window.location.search).get("redirect");
                     let path = "/onboarding";
                     if (redirectUrl) path += `?redirect=${encodeURIComponent(redirectUrl)}`;
-                    router.push(path);
+                    window.location.href = path;
                   }}
                 >
                   Ja, Account erstellen

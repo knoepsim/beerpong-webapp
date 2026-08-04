@@ -7,7 +7,7 @@ import type { Tournament, TournamentUserRole, User } from "@/types";
 import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
+import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert, Link, Copy, Check } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +19,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function TournamentSettings({
   tournament,
@@ -34,7 +48,7 @@ export function TournamentSettings({
   roles: TournamentUserRole[];
   userRole: TournamentRoleType | null;
   teamCount: number;
-  onGenerateBracket: () => Promise<void>;
+  onGenerateBracket: () => void;
   onReload: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -47,13 +61,44 @@ export function TournamentSettings({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    description?: string;
+    action: () => void;
+  } | null>(null);
+
   // Edit details form state
   const [editName, setEditName] = useState(tournament.name);
   const [editLocation, setEditLocation] = useState(tournament.location || "");
   const [editDescription, setEditDescription] = useState(tournament.description || "");
   const [editTableCount, setEditTableCount] = useState(tournament.table_count.toString());
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
+  // Helper to format Date to YYYY-MM-DDThh:mm for local datetime-local inputs
+  const toLocalDatetime = (dateStr: string | null) => {
+    if (!dateStr) return "";
+    const d = new Date(dateStr);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const [editStartTime, setEditStartTime] = useState(toLocalDatetime(tournament.start_time));
+  const [editRegEndTime, setEditRegEndTime] = useState(toLocalDatetime(tournament.registration_end_time));
+  const [editCheckinStartTime, setEditCheckinStartTime] = useState(toLocalDatetime(tournament.checkin_start_time));
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const isDirty =
+    editName !== tournament.name ||
+    editLocation !== (tournament.location || "") ||
+    editDescription !== (tournament.description || "") ||
+    editTableCount !== tournament.table_count.toString() ||
+    editVisibility !== tournament.visibility ||
+    editStartTime !== toLocalDatetime(tournament.start_time) ||
+    editRegEndTime !== toLocalDatetime(tournament.registration_end_time) ||
+    editCheckinStartTime !== toLocalDatetime(tournament.checkin_start_time);
 
   const handleUpdateTournament = async () => {
     setIsUpdating(true);
@@ -64,11 +109,14 @@ export function TournamentSettings({
         description: editDescription || undefined,
         table_count: parseInt(editTableCount) || 1,
         visibility: editVisibility,
+        start_time: editStartTime ? new Date(editStartTime).toISOString() : undefined,
+        registration_end_time: editRegEndTime ? new Date(editRegEndTime).toISOString() : null,
+        checkin_start_time: editCheckinStartTime ? new Date(editCheckinStartTime).toISOString() : null,
       });
       await onReload();
-      alert("Turnier-Details erfolgreich gespeichert!");
+      toast.success("Turnier-Details erfolgreich gespeichert!");
     } catch (err) {
-      alert("Fehler beim Speichern der Turnier-Details");
+      toast.error("Fehler beim Speichern der Turnier-Details");
     } finally {
       setIsUpdating(false);
     }
@@ -81,7 +129,7 @@ export function TournamentSettings({
       const results = await api.users.search(searchQuery);
       setSearchResults(results);
     } catch (err) {
-      alert("Fehler bei der Suche");
+      toast.error("Fehler bei der Suche");
     } finally {
       setIsSearching(false);
     }
@@ -96,36 +144,63 @@ export function TournamentSettings({
       setSearchResults([]);
       setSelectedUser("");
       await onReload();
-      alert("Rolle erfolgreich zugewiesen!");
+      toast.success("Rolle erfolgreich zugewiesen!");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Fehler";
-      alert(msg);
+      toast.error(msg);
     } finally {
       setIsAssigning(false);
     }
   };
 
-  const handleRevokeRole = async (roleId: string) => {
-    if (!confirm("Rolle wirklich entziehen?")) return;
+  const handleGenerateInvite = async () => {
+    setIsGeneratingInvite(true);
     try {
-      await api.roles.revoke(tournament.id, roleId);
-      await onReload();
+      const res = await api.tournaments.generateInvite(tournament.id);
+      const link = `${window.location.origin}/tournaments/${tournament.id}?invite=${res.token}`;
+      setInviteLink(link);
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success("Link kopiert!");
+      setTimeout(() => setCopied(false), 2000);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Fehler";
-      alert(msg);
+      toast.error("Fehler beim Generieren des Einladungslinks");
+    } finally {
+      setIsGeneratingInvite(false);
     }
   };
 
-  const handleDeleteTournament = async () => {
-    if (!confirm("Möchtest du dieses Turnier wirklich unwiderruflich löschen?")) return;
-    setIsDeleting(true);
-    try {
-      await api.tournaments.delete(tournament.id);
-      router.push("/tournaments");
-    } catch (err) {
-      alert("Fehler beim Löschen des Turniers");
-      setIsDeleting(false);
-    }
+  const handleRevokeRole = (roleId: string) => {
+    setConfirmState({
+      title: "Rolle wirklich entziehen?",
+      action: async () => {
+        try {
+          await api.roles.revoke(tournament.id, roleId);
+          await onReload();
+          toast.success("Rolle erfolgreich entzogen.");
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Fehler";
+          toast.error(msg);
+        }
+      }
+    });
+  };
+
+  const handleDeleteTournament = () => {
+    setConfirmState({
+      title: "Möchtest du dieses Turnier wirklich unwiderruflich löschen?",
+      action: async () => {
+        setIsDeleting(true);
+        try {
+          await api.tournaments.delete(tournament.id);
+          toast.success("Turnier gelöscht.");
+          router.push("/tournaments");
+        } catch (err) {
+          toast.error("Fehler beim Löschen des Turniers");
+          setIsDeleting(false);
+        }
+      }
+    });
   };
 
   const canAssignAdmin = userRole === TournamentRoleType.ADMIN;
@@ -134,26 +209,6 @@ export function TournamentSettings({
 
   return (
     <div className="space-y-6">
-      {status === "SETUP" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Turnier starten</CardTitle>
-            <CardDescription>Sobald alle Teams angemeldet sind, kannst du das Bracket generieren lassen. Danach ist keine Anmeldung mehr möglich.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {teamCount < 2 ? (
-              <div className="text-sm text-destructive mb-3">
-                Es müssen mindestens 2 Teams angemeldet sein, um einen Spielplan zu generieren.
-              </div>
-            ) : null}
-            <Button onClick={onGenerateBracket} disabled={teamCount < 2}>
-              <Play className="mr-2 h-4 w-4" />
-              Spielplan generieren
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
       {(userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
         <Card>
           <CardHeader>
@@ -181,24 +236,90 @@ export function TournamentSettings({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PUBLIC">Öffentlich (sichtbar für alle)</SelectItem>
-                    <SelectItem value="PRIVATE">Privat (nur mit Link/Einladung)</SelectItem>
+                    <SelectItem value="public_listed">Öffentlich (sichtbar für alle)</SelectItem>
+                    <SelectItem value="private">Privat (nur mit Link/Einladung)</SelectItem>
+                    <SelectItem value="public_unlisted">Versteckt (nur mit Link)</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Startzeit (Erforderlich)</Label>
+                <Input type="datetime-local" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Anmeldeschluss (Optional)</Label>
+                <Input type="datetime-local" value={editRegEndTime} onChange={e => setEditRegEndTime(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Check-in Start (Optional)</Label>
+                <Input type="datetime-local" value={editCheckinStartTime} onChange={e => setEditCheckinStartTime(e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">
               <Label>Beschreibung (Markdown unterstützt)</Label>
-              <Textarea 
-                value={editDescription} 
-                onChange={e => setEditDescription(e.target.value)} 
-                rows={5}
-                placeholder="Turnier-Regeln, Zeitplan, Preise..."
-              />
+              <Tabs defaultValue="edit" className="w-full">
+                <TabsList className="mb-2">
+                  <TabsTrigger value="edit">Bearbeiten</TabsTrigger>
+                  <TabsTrigger value="preview">Vorschau</TabsTrigger>
+                </TabsList>
+                <TabsContent value="edit">
+                  <Textarea
+                    value={editDescription}
+                    onChange={e => setEditDescription(e.target.value)}
+                    rows={5}
+                    placeholder="Turnier-Regeln, Zeitplan, Preise..."
+                  />
+                </TabsContent>
+                <TabsContent value="preview">
+                  <div className="p-4 bg-muted/30 border rounded-md min-h-[120px] prose prose-sm dark:prose-invert max-w-none">
+                    {editDescription ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {editDescription}
+                      </ReactMarkdown>
+                    ) : (
+                      <span className="text-muted-foreground italic">Keine Beschreibung...</span>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
-            <Button onClick={handleUpdateTournament} disabled={isUpdating || !editName.trim()}>
-              Speichern
+            <Button onClick={handleUpdateTournament} disabled={isUpdating || !editName.trim() || !isDirty}>
+              {isUpdating ? "Speichern..." : (isDirty ? "Änderungen speichern" : "Gespeichert")}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {tournament.visibility === "private" && (userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Einladungslink (Privates Turnier)</CardTitle>
+            <CardDescription>
+              Da dieses Turnier privat ist, können Teams nur mit einem Einladungslink beitreten.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleGenerateInvite}
+                disabled={isGeneratingInvite}
+                variant="secondary"
+                className="w-full sm:w-auto"
+              >
+                {isGeneratingInvite ? (
+                  "Generiere..."
+                ) : copied ? (
+                  <><Check className="mr-2 h-4 w-4" /> Kopiert</>
+                ) : (
+                  <><Link className="mr-2 h-4 w-4" /> Link generieren & kopieren</>
+                )}
+              </Button>
+            </div>
+            {inviteLink && (
+              <div className="mt-4 p-3 bg-muted rounded-md text-sm break-all font-mono">
+                {inviteLink}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -213,8 +334,8 @@ export function TournamentSettings({
             <h3 className="font-medium text-sm">Rolle zuweisen</h3>
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 flex gap-2">
-                <Input 
-                  placeholder="Nutzername suchen..." 
+                <Input
+                  placeholder="Nutzername suchen..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -270,7 +391,7 @@ export function TournamentSettings({
                     <span className="text-sm font-medium">{r.user_name || r.user_id}</span>
                     <span className="text-xs text-muted-foreground uppercase">{r.role}</span>
                   </div>
-                  {userRole === TournamentRoleType.ADMIN && (
+                  {(userRole === TournamentRoleType.ADMIN || (userRole === TournamentRoleType.MANAGER && r.role === TournamentRoleType.REFEREE)) && (
                     <Button variant="ghost" size="sm" onClick={() => handleRevokeRole(r.id)}>
                       <UserMinus className="h-4 w-4 text-destructive" />
                     </Button>
@@ -297,6 +418,19 @@ export function TournamentSettings({
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={!!confirmState} onOpenChange={(open) => !open && setConfirmState(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
+            {confirmState?.description && <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmState?.action()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Bestätigen</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

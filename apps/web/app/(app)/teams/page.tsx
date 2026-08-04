@@ -40,8 +40,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Users, Plus, MoreVertical, Pencil, Trash, User as UserIcon, Copy, Share } from "lucide-react";
+import { Trash, Pencil, MoreVertical, Plus, User as UserIcon, Share, Copy, Users } from "lucide-react";
+import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TeamsPage() {
   const router = useRouter();
@@ -102,7 +104,7 @@ export default function TeamsPage() {
       await navigator.clipboard.writeText(link);
       setInviteLinks(prev => ({ ...prev, [team.id]: link }));
     } catch (err: unknown) {
-      alert("Fehler beim Erstellen der Einladung.");
+      toast.error("Fehler beim Erstellen der Einladung.");
     }
   };
 
@@ -118,12 +120,12 @@ export default function TeamsPage() {
         });
       } else {
         await navigator.clipboard.writeText(link);
-        alert("Einladungslink wurde in die Zwischenablage kopiert! (Teilen wird auf diesem Gerät nicht unterstützt)");
+        toast.success("Einladungslink kopiert! (Teilen wird nicht unterstützt)");
       }
     } catch (err: unknown) {
       // User cancelled share or error
       if (err instanceof Error && err.name !== 'AbortError') {
-        alert("Fehler beim Erstellen/Teilen der Einladung.");
+        toast.error("Fehler beim Erstellen/Teilen der Einladung.");
       }
     }
   };
@@ -135,8 +137,9 @@ export default function TeamsPage() {
       await api.teams.update(renameTeam.id, newName.trim());
       setRenameTeam(null);
       await loadTeams();
+      toast.success("Team erfolgreich umbenannt.");
     } catch (err: unknown) {
-      alert("Fehler beim Umbenennen.");
+      toast.error("Fehler beim Umbenennen.");
     } finally {
       setIsRenaming(false);
     }
@@ -149,8 +152,9 @@ export default function TeamsPage() {
       await api.teams.delete(deleteTeam.id);
       setDeleteTeam(null);
       await loadTeams();
+      toast.success("Team gelöscht.");
     } catch (err: unknown) {
-      alert("Fehler beim Löschen.");
+      toast.error("Fehler beim Löschen.");
     } finally {
       setIsDeleting(false);
     }
@@ -163,7 +167,18 @@ export default function TeamsPage() {
   };
 
   if (isLoading) {
-    return <div className="p-8 text-center animate-pulse">Lade Teams…</div>;
+    return (
+      <div className="mx-auto max-w-2xl px-4 pt-6 pb-20 md:pb-6 space-y-8">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-40" />
+        </div>
+        <Skeleton className="h-32 w-full rounded-xl" />
+        <div className="space-y-4">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
+      </div>
+    );
   }
 
   return (

@@ -59,6 +59,11 @@ export default function OnboardingPage() {
         let defaultName = "";
         let defaultEmail = "";
         
+        if (user.name && !user.name.startsWith("+49") && user.email) {
+          window.location.href = "/tournaments";
+          return;
+        }
+
         if (user.name && !user.name.startsWith("+49")) {
           defaultName = user.name;
         }
@@ -84,7 +89,7 @@ export default function OnboardingPage() {
       const redirectUrl = searchParams.get("redirect");
       
       if (redirectUrl) {
-        router.push(redirectUrl);
+        window.location.href = redirectUrl;
       } else {
         setStep("team");
       }
@@ -100,7 +105,7 @@ export default function OnboardingPage() {
     setApiError(null);
     try {
       await api.teams.create(values.teamName.trim());
-      router.push("/tournaments");
+      window.location.href = "/tournaments";
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : "Fehler beim Erstellen des Teams");
     } finally {
@@ -127,7 +132,7 @@ export default function OnboardingPage() {
         <CardContent>
           {step === "profile" ? (
             <Form {...profileForm}>
-              <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+              <form key="profile-form" onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
                 <FormField
                   control={profileForm.control}
                   name="name"
@@ -136,7 +141,7 @@ export default function OnboardingPage() {
                       <FormLabel>Dein Name</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                           <Input
                             placeholder="Wie sollen wir dich nennen?"
                             disabled={isSaving}
@@ -180,7 +185,7 @@ export default function OnboardingPage() {
             </Form>
           ) : (
             <Form {...teamForm}>
-              <form onSubmit={teamForm.handleSubmit(onTeamSubmit)} className="space-y-4">
+              <form key="team-form" onSubmit={teamForm.handleSubmit(onTeamSubmit)} className="space-y-4">
                 <FormField
                   control={teamForm.control}
                   name="teamName"
@@ -189,11 +194,12 @@ export default function OnboardingPage() {
                       <FormLabel>Team Name</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Users className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Users className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                           <Input
                             placeholder="Name deines Teams"
                             disabled={isSaving}
                             className="pl-9"
+                            autoFocus
                             {...field}
                           />
                         </div>
@@ -213,7 +219,7 @@ export default function OnboardingPage() {
                   type="button" 
                   variant="ghost" 
                   className="w-full text-muted-foreground mt-2" 
-                  onClick={() => router.push("/tournaments")}
+                  onClick={() => window.location.href = "/tournaments"}
                   disabled={isSaving}
                 >
                   Später erstellen
