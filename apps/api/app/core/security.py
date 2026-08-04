@@ -67,7 +67,9 @@ def verify_sms_code(code: str, code_hash: str) -> bool:
 
 def generate_sms_code() -> str:
     """Generate a random numeric SMS verification code."""
-    return "".join(secrets.choice("0123456789") for _ in range(settings.sms_code_length))
+    if settings.sms_backend == "dummy":
+        return "123456"
+    return "".join(str(secrets.randbelow(10)) for _ in range(settings.sms_code_length))
 
 
 async def get_current_user(
@@ -86,3 +88,15 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+
+async def get_current_system_admin(
+    current_user=Depends(get_current_user),
+):
+    """FastAPI dependency: ensure the current user is a system admin."""
+    if not current_user.is_system_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires system admin privileges",
+        )
+    return current_user

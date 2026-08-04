@@ -17,6 +17,7 @@ class TournamentUserRoleResponse(BaseModel):
     id: UUID
     tournament_id: UUID
     user_id: UUID
+    user_name: str | None = None
     role: TournamentRoleType
     assigned_at: datetime
 

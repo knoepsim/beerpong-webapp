@@ -1,0 +1,164 @@
+// ── Auth ──────────────────────────────────────────────
+export interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
+
+// ── User ──────────────────────────────────────────────
+export interface User {
+  id: string;
+  phone_number: string;
+  name: string;
+  email: string | null;
+  is_system_admin: boolean;
+  created_at: string;
+}
+
+// ── Team ──────────────────────────────────────────────
+export interface TeamMember {
+  user_id: string;
+  name: string;
+  joined_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  max_size: number;
+  members: TeamMember[];
+  is_complete: boolean;
+  is_deletable: boolean;
+  is_renamable: boolean;
+  created_at: string;
+}
+
+export interface TournamentTeam extends Team {
+  is_checked_in: boolean;
+}
+
+export interface TeamInvite {
+  id: string;
+  team_id: string;
+  token: string;
+  created_at: string;
+}
+
+export interface TeamInviteDetails {
+  team_name: string;
+  inviter_name: string;
+}
+
+// ── Tournament ────────────────────────────────────────
+export enum TournamentMode {
+  SINGLE_ELIMINATION = "single_elimination",
+}
+
+export enum TournamentVisibility {
+  PRIVATE = "private",
+  PUBLIC_LISTED = "public_listed",
+  PUBLIC_UNLISTED = "public_unlisted",
+}
+
+export interface TournamentInvite {
+  token: string;
+}
+
+export interface Tournament {
+  id: string;
+  name: string;
+  location: string | null;
+  description: string | null;
+  start_time: string | null;
+  registration_end_time: string | null;
+  checkin_start_time: string | null;
+  started_at: string | null;
+  table_count: number;
+  mode: TournamentMode;
+  visibility: TournamentVisibility;
+  is_deleted: boolean;
+  created_by_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TournamentCreateRequest {
+  name: string;
+  location?: string | null;
+  description?: string | null;
+  start_time: string;
+  registration_end_time?: string | null;
+  checkin_start_time?: string | null;
+  table_count?: number;
+  mode?: TournamentMode;
+  visibility?: TournamentVisibility;
+}
+
+// ── Match & Bracket ───────────────────────────────────
+export interface ParticipatingTournament {
+  tournament: Tournament;
+  team: Team;
+}
+
+export interface ManagedTournament {
+  tournament: Tournament;
+  role: TournamentRoleType;
+}
+
+export interface MyTournamentsResponse {
+  participating: ParticipatingTournament[];
+  managing: ManagedTournament[];
+}
+
+export interface Match {
+  id: string;
+  tournament_id: string;
+  round: number;
+  position: number;
+  team_a_id: string | null;
+  team_b_id: string | null;
+  next_match_id: string | null;
+  next_match_slot: string | null;
+  table_number: number | null;
+  created_at: string;
+}
+
+export interface Bracket {
+  tournament_id: string;
+  total_rounds: number;
+  matches: Match[];
+}
+
+// ── Result ────────────────────────────────────────────
+export enum ResultType {
+  CREATED = "created",
+  MODIFIED = "modified",
+  DELETED = "deleted",
+}
+
+export interface Result {
+  id: string;
+  match_id: string;
+  type: ResultType;
+  winner_team_id: string | null;
+  cups_left: number | null;
+  reported_by_user_id: string;
+  reported_by_username?: string;
+  created_at: string;
+}
+
+// ── Roles ─────────────────────────────────────────────
+export enum TournamentRoleType {
+  ADMIN = "admin",
+  MANAGER = "manager",
+  REFEREE = "referee",
+}
+
+export interface TournamentUserRole {
+  id: string;
+  tournament_id: string;
+  user_id: string;
+  user_name?: string;
+  role: TournamentRoleType;
+  assigned_at: string;
+}

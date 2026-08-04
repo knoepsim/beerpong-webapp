@@ -1,16 +1,18 @@
 FROM node:22-alpine AS base
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+ENV CI=true
 RUN corepack enable
 
 # 1. Install dependencies only when needed
 FROM base AS deps
+# Cache buster to force fresh install without PNPM_HOME
+ENV CACHE_BUSTER=1
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy the whole workspace config to install correctly
 COPY package.json pnpm-lock.yaml ./
+RUN echo "node-linker=hoisted" > .npmrc
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # 2. Rebuild the source code only when needed
@@ -22,7 +24,7 @@ COPY . .
 # Next.js telemetry is disabled
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN pnpm run build
+RUN npx next build
 
 # 3. Production image, copy all the files and run next
 FROM base AS runner

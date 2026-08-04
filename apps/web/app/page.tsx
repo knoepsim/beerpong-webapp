@@ -1,55 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { BeerpongTable } from "@/components/BeerpongTable";
-import { Slider } from "@/components/ui/slider";
+import { useCurrentUser } from "@/components/user-provider";
 
 export default function Home() {
-  const [leftCups, setLeftCups] = useState(10);
-  const [rightCups, setRightCups] = useState(10);
+  const { user, isLoading } = useCurrentUser();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8 gap-12">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight">Beerpong Table</h1>
-        <p className="text-muted-foreground">Adjust the sliders to change the number of cups.</p>
-      </div>
+    <div className="min-h-screen flex flex-col">
+      <header className="w-full h-16 flex items-center justify-between px-6 border-b">
+        <div className="font-bold text-xl flex items-center gap-2">
+          <span>🏓</span>
+          <span>Bierpong</span>
+        </div>
+        {!isLoading && (
+          <Link href={user ? "/tournaments" : "/login"}>
+            <Button variant={user ? "default" : "outline"}>
+              {user ? "Zum Dashboard" : "Anmelden"}
+            </Button>
+          </Link>
+        )}
+      </header>
 
-      <BeerpongTable leftCups={leftCups} rightCups={rightCups} />
-
-      <div className="flex flex-col md:flex-row gap-12 w-full max-w-2xl bg-card p-8 rounded-xl border shadow-sm">
-        <div className="flex-1 space-y-4">
-          <div className="flex justify-between items-center">
-            <label htmlFor="red-cups" className="text-sm font-medium">Red Team Cups</label>
-            <span className="text-sm font-bold bg-red-100 text-red-600 px-2 py-1 rounded-md dark:bg-red-900/30 dark:text-red-400">
-              {leftCups}
-            </span>
+      <main className="flex-1 flex flex-col items-center justify-center p-6 space-y-12">
+        <div className="text-center max-w-2xl space-y-4">
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight">
+            {user ? `Willkommen zurück, ${user.name}!` : "Das ultimative Turnier-Tool"}
+          </h1>
+          <p className="text-lg sm:text-xl text-muted-foreground">
+            Organisiere deine Bierpong-Turniere, erstelle Teams und verfolge den KO-Baum live.
+          </p>
+          <div className="pt-4 flex items-center justify-center gap-4">
+            <Link href={user ? "/tournaments" : "/login"}>
+              <Button size="lg" className="h-12 px-8 text-base">
+                {user ? "Zu deinen Turnieren" : "Jetzt loslegen"}
+              </Button>
+            </Link>
           </div>
-          <Slider 
-            id="red-cups"
-            value={[leftCups]} 
-            onValueChange={(val) => setLeftCups(val[0])} 
-            max={10} 
-            step={1} 
-          />
         </div>
 
-        <div className="flex-1 space-y-4">
-          <div className="flex justify-between items-center">
-            <label htmlFor="blue-cups" className="text-sm font-medium">Blue Team Cups</label>
-            <span className="text-sm font-bold bg-blue-100 text-blue-600 px-2 py-1 rounded-md dark:bg-blue-900/30 dark:text-blue-400">
-              {rightCups}
-            </span>
-          </div>
-          <Slider 
-            id="blue-cups"
-            value={[rightCups]} 
-            onValueChange={(val) => setRightCups(val[0])} 
-            max={10} 
-            step={1} 
-          />
+        <div className="w-full max-w-4xl">
+          <BeerpongTable leftCups={10} rightCups={10} />
         </div>
-      </div>
+      </main>
+
+      <footer className="w-full py-6 text-center text-sm text-muted-foreground border-t">
+        Bierpong Turnier-App &copy; {new Date().getFullYear()}
+      </footer>
     </div>
   );
 }

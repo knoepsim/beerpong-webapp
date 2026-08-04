@@ -29,7 +29,7 @@ jobs:
         run: |
           corepack enable pnpm
           pnpm install --frozen-lockfile --ignore-scripts
-          pnpm run test:coverage
+          npm run test:coverage
 
       - name: Install Playwright Browsers
         working-directory: ./apps/web

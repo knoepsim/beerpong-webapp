@@ -4,12 +4,8 @@ test('has title and renders beerpong table', async ({ page }) => {
   await page.goto('/');
 
   // Expect a title "to contain" a substring.
-  await expect(page.getByRole('heading', { name: 'Beerpong Table' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Das ultimative Turnier-Tool|Willkommen zurück/ })).toBeVisible();
 
-  // Expect to find sliders for adjusting cups
-  const redCupsSlider = page.locator('#red-cups');
-  const blueCupsSlider = page.locator('#blue-cups');
-  
-  await expect(redCupsSlider).toBeVisible();
-  await expect(blueCupsSlider).toBeVisible();
+  // Expect the Beerpong logo/title to be visible
+  await expect(page.getByText('Bierpong', { exact: true })).toBeVisible();
 });

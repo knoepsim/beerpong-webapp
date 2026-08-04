@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -13,7 +14,8 @@ from app.models.result import Result, ResultType
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
 from app.schemas.result import ResultCreate, ResultResponse
-from app.services import bracket_service, role_service
+from app.services.bracket_service import BracketService
+from app.services.role_service import RoleService
 
 router = APIRouter(prefix="/matches/{match_id}/results", tags=["Results"])
 
@@ -42,10 +44,9 @@ async def create_result(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
-    await role_service.require_role(
-        db, match.tournament_id, current_user.id, TournamentRoleType.REFEREE
+    await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
     )
-    return await bracket_service.report_result(db, match_id, body, current_user.id)
+    return await BracketService(db).report_result(match_id, body, current_user.id)
 
 
 @router.patch(
@@ -61,22 +62,13 @@ async def modify_result(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
-    await role_service.require_role(
-        db, match.tournament_id, current_user.id, TournamentRoleType.REFEREE
+    await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
     )
 
     if body.winner_team_id is None:
         raise ResultRequiresWinnerError()
 
-    result_entry = Result(
-        match_id=match_id,
-        type=ResultType.MODIFIED,
-        winner_team_id=body.winner_team_id,
-        cups_left=body.cups_left,
-        reported_by_user_id=current_user.id,
-    )
-    db.add(result_entry)
-    return result_entry
+    return await BracketService(db).modify_result(match_id, body, current_user.id)
 
 
 @router.delete(
@@ -91,19 +83,10 @@ async def delete_result(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
-    await role_service.require_role(
-        db, match.tournament_id, current_user.id, TournamentRoleType.REFEREE
+    await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
     )
 
-    result_entry = Result(
-        match_id=match_id,
-        type=ResultType.DELETED,
-        winner_team_id=None,
-        cups_left=None,
-        reported_by_user_id=current_user.id,
-    )
-    db.add(result_entry)
-    return result_entry
+    return await BracketService(db).delete_result(match_id, current_user.id)
 
 
 @router.get(
@@ -121,7 +104,21 @@ async def list_results(
     await _get_match(db, match_id)
     result = await db.execute(
         select(Result)
+        .options(joinedload(Result.reported_by_user))
         .where(Result.match_id == match_id)
         .order_by(Result.created_at)
     )
-    return list(result.scalars().all())
+    results = result.scalars().all()
+    return [
+        ResultResponse(
+            id=r.id,
+            match_id=r.match_id,
+            type=r.type,
+            winner_team_id=r.winner_team_id,
+            cups_left=r.cups_left,
+            reported_by_user_id=r.reported_by_user_id,
+            reported_by_username=r.reported_by_user.name if r.reported_by_user else None,
+            created_at=r.created_at
+        )
+        for r in results
+    ]
