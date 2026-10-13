@@ -1,15 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test('has title and renders beerpong table', async ({ page }) => {
+test('redirects unauthenticated visitors from root to login', async ({ page }) => {
   await page.goto('/');
 
-  // Expect a title "to contain" a substring.
-  await expect(page.getByRole('heading', { name: 'Beerpong Table' })).toBeVisible();
-
-  // Expect to find sliders for adjusting cups
-  const redCupsSlider = page.locator('#red-cups');
-  const blueCupsSlider = page.locator('#blue-cups');
-  
-  await expect(redCupsSlider).toBeVisible();
-  await expect(blueCupsSlider).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+  await expect(page.getByText('Bierpong Turnier', { exact: true })).toBeVisible();
+  await expect(page.locator('input[type="tel"]')).toBeVisible();
 });

@@ -20,6 +20,7 @@ class ResultResponse(BaseModel):
     winner_team_id: UUID | None
     cups_left: int | None
     reported_by_user_id: UUID
+    reported_by_username: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

@@ -68,11 +68,19 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
         # 3. Create Tournament
         resp = await async_client.post(
             "/tournaments",
-            json={"name": "Grand Championship", "max_teams": 8, "location": "Berlin", "date": "2026-12-31T20:00:00Z"},
+            json={"name": "Grand Championship", "table_count": 2, "location": "Berlin", "start_time": "2026-12-31T20:00:00Z"},
             headers=auth_header(0) # User 1 creates it
         )
         assert resp.status_code == 201
         tournament_id = resp.json()["id"]
+
+        # Generate Tournament Invite
+        resp = await async_client.post(
+            f"/tournaments/{tournament_id}/invite",
+            headers=auth_header(0)
+        )
+        assert resp.status_code == 201
+        tourney_invite = resp.json()["token"]
 
         # 4. Join Tournament
         # User 1 (Team 1), User 3 (Team 2), User 5 (Team 3)
@@ -80,17 +88,24 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
             creator_idx = i * 2
             resp = await async_client.post(
                 f"/tournaments/{tournament_id}/join",
-                json={"team_id": team_id},
+                json={"team_id": team_id, "invite_token": tourney_invite},
                 headers=auth_header(creator_idx)
             )
             assert resp.status_code == 201
             
-        # 5. Start Tournament
+        # 5. Generate Bracket
+        resp = await async_client.post(
+            f"/tournaments/{tournament_id}/generate-bracket",
+            headers=auth_header(0) # User 1 is Admin
+        )
+        assert resp.status_code == 200
+
+        # Start Tournament
         resp = await async_client.post(
             f"/tournaments/{tournament_id}/start",
             headers=auth_header(0) # User 1 is Admin
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 204
         
         # 6. Fetch Bracket and Play Matches
         # We simulate playing until all rounds are done

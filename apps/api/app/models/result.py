@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
@@ -29,3 +29,9 @@ class Result(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    reported_by_user = relationship("User", foreign_keys=[reported_by_user_id])
+
+    @property
+    def reported_by_username(self) -> str | None:
+        return self.reported_by_user.name if self.reported_by_user else None
