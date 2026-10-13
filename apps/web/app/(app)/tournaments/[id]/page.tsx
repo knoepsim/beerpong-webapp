@@ -554,92 +554,56 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 });
 
                 const now = new Date();
+                
+                // Determine states
+                const regEnd = tournament.registration_end_time ? new Date(tournament.registration_end_time) : null;
+                const isRegClosed = regEnd ? now >= regEnd : !!tournament.started_at;
+                
+                const checkinStart = tournament.checkin_start_time ? new Date(tournament.checkin_start_time) : null;
+                const isCheckinStarted = checkinStart ? now >= checkinStart : !!tournament.started_at;
+                
+                const hasStarted = !!tournament.started_at;
+                const isCompleted = hasStarted && !!tournamentWinnerTeamId;
 
-                // Build steps with phase start/end for progress calculation
+                // Build steps
                 const steps = [
                   {
                     key: "registration",
                     icon: "📋",
                     label: "Anmeldung",
-                    desc: tournament.registration_end_time
-                      ? `Bis ${fmt(tournament.registration_end_time)}`
-                      : "Offen bis Turnierbeginn",
-                    step: 1,
-                    phaseEnd: tournament.checkin_start_time
-                      ? new Date(tournament.checkin_start_time)
-                      : tournament.start_time
-                        ? new Date(tournament.start_time)
-                        : null,
+                    desc: isRegClosed ? "Geschlossen" : (regEnd ? `Bis ${fmt(tournament.registration_end_time!)}` : "Geöffnet"),
+                    done: isRegClosed,
+                    active: !isRegClosed,
                   },
-                  ...(tournament.checkin_start_time ? [{
+                  {
                     key: "checkin",
                     icon: "✅",
                     label: "Check-in",
-                    desc: `Ab ${fmt(tournament.checkin_start_time)}`,
-                    step: 2,
-                    phaseEnd: tournament.start_time ? new Date(tournament.start_time) : null,
-                  }] : []),
+                    desc: hasStarted ? "Geschlossen" : (isCheckinStarted ? "Geöffnet" : (checkinStart ? `Ab ${fmt(tournament.checkin_start_time!)}` : "Vor Turnierstart")),
+                    done: hasStarted,
+                    active: isCheckinStarted && !hasStarted,
+                  },
                   {
                     key: "active",
                     icon: "🏓",
-                    label: "Spielphase",
-                    desc: tournament.start_time
-                      ? `Ab ${fmt(tournament.start_time)}`
-                      : "Nach dem Check-in",
-                    step: tournament.checkin_start_time ? 3 : 2,
-                    phaseEnd: null,
-                  },
-                  {
-                    key: "done",
-                    icon: "🏆",
-                    label: "Abgeschlossen",
-                    desc: "Sieger werden gekrönt",
-                    step: tournament.checkin_start_time ? 4 : 3,
-                    phaseEnd: null,
+                    label: "Spiel",
+                    desc: isCompleted ? "Beendet" : (hasStarted ? "Turnier läuft" : "Warten auf Start"),
+                    done: isCompleted,
+                    active: hasStarted && !isCompleted,
                   },
                 ];
-
-                // Calculate progress fill % for the connector line leaving step i
-                // The line *after* step i goes from step i's phaseEnd to step i+1's start
-                // We use: if step i is done → 100%, if step i is active → time-based %, else → 0%
-                const getLineProgress = (i: number): number => {
-                  const s = steps[i];
-                  const nextS = steps[i + 1];
-                  if (!nextS) return 0;
-                  const isDone = timelineStep > s.step;
-                  const isActive = timelineStep === s.step;
-                  if (isDone) return 100;
-                  if (isActive && s.phaseEnd) {
-                    // Find phase start: previous step's phaseEnd or tournament start
-                    const prevPhaseEnd = i > 0 ? steps[i - 1].phaseEnd : null;
-                    const phaseStart = prevPhaseEnd ?? (tournament.registration_end_time ? new Date(tournament.registration_end_time) : null);
-                    if (phaseStart) {
-                      const total = s.phaseEnd.getTime() - phaseStart.getTime();
-                      if (total <= 0) return 100; // Overlapping or instantaneous phases
-                      const elapsed = now.getTime() - phaseStart.getTime();
-                      return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
-                    }
-                    return 50; // fallback mid-progress
-                  }
-                  return 0;
-                };
 
                 return (
                   <div className="flex flex-col sm:flex-row w-full mt-2">
                     {steps.map((s, i) => {
-                      let done = timelineStep > s.step;
-                      let active = timelineStep === s.step;
-
-                      // UX rule: Anmeldung is visually 'done' ONLY when its deadline is reached
-                      // If no deadline is defined, it uses the default timelineStep logic
-                      if (s.key === "registration" && tournament.registration_end_time) {
-                        const isClosed = now >= new Date(tournament.registration_end_time);
-                        done = isClosed;
-                        active = !isClosed;
-                      }
-
+                      const done = s.done;
+                      const active = s.active;
                       const isLast = i === steps.length - 1;
-                      const lineProgress = getLineProgress(i); // 0–100
+                      
+                      // For a simple 3-step timeline, progress is either 0 or 100 between steps
+                      // Step 1 -> 2 is 100 if step 1 is done
+                      // Step 2 -> 3 is 100 if step 2 is done
+                      const lineProgress = done ? 100 : 0;
 
                       return (
                         <div key={s.key} className="flex sm:flex-col flex-row flex-1 items-start sm:items-stretch min-w-0">
@@ -652,7 +616,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                 <div className="flex-1 h-1 bg-border overflow-hidden">
                                   <div
                                     className="h-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ width: `${Math.max(0, (getLineProgress(i - 1) - 50) * 2)}%` }}
+                                    style={{ width: `${Math.max(0, ((steps[i - 1].done ? 100 : 0) - 50) * 2)}%` }}
                                   />
                                 </div>
                               ) : (
@@ -689,7 +653,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                                 <div className="w-1 flex-1 min-h-[1.5rem] bg-border overflow-hidden">
                                   <div
                                     className="w-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ height: `${Math.max(0, (getLineProgress(i - 1) - 50) * 2)}%` }}
+                                    style={{ height: `${Math.max(0, ((steps[i - 1].done ? 100 : 0) - 50) * 2)}%` }}
                                   />
                                 </div>
                               ) : (
