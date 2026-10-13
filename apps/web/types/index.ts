@@ -77,6 +77,8 @@ export interface Tournament {
   table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
+  kiosk_enabled: boolean;
+  kiosk_token: string | null;
   is_deleted: boolean;
   created_by_id: string;
   created_at: string;
@@ -93,6 +95,7 @@ export interface TournamentCreateRequest {
   table_count?: number;
   mode?: TournamentMode;
   visibility?: TournamentVisibility;
+  kiosk_enabled?: boolean;
 }
 
 // ── Match & Bracket ───────────────────────────────────

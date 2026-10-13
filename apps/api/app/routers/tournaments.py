@@ -2,8 +2,11 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
+import json
+from sse_starlette.sse import EventSourceResponse
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -289,3 +292,82 @@ async def start_tournament(
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.ADMIN)
     await TournamentService(db).start_tournament(tournament_id)
     await db.commit()
+
+
+class KioskTokenResponse(BaseModel):
+    token: str
+
+@router.post(
+    "/{tournament_id}/kiosk/token",
+    response_model=KioskTokenResponse,
+    status_code=201,
+    summary="Kiosk-Token generieren",
+    description="Generiert ein neues Kiosk-Token für das Turnier. Nur für Manager/Admin.",
+)
+async def generate_kiosk_token(
+    tournament_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    token = await TournamentService(db).generate_kiosk_token(tournament_id)
+    await db.commit()
+    return KioskTokenResponse(token=token)
+
+@router.get(
+    "/{tournament_id}/kiosk/stream",
+    summary="Kiosk Event Stream",
+    description="Liefert Live-Updates für das Kiosk-Dashboard via SSE.",
+)
+async def kiosk_stream(
+    tournament_id: UUID,
+    token: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    tournament = await TournamentService(db).get_tournament(tournament_id)
+    if not tournament.kiosk_enabled or tournament.kiosk_token != token:
+        raise HTTPException(status_code=403, detail="Invalid token or Kiosk mode disabled.")
+
+    async def event_generator():
+        last_updated = None
+        while True:
+            # Re-fetch tournament to check updated_at
+            # Instead of heavy queries every 2s, we can just fetch the tournament updated_at
+            # and maybe the bracket updated_at if we add one. For now, tournament.updated_at
+            # changes when matches are modified (if we touch the tournament, but we don't always).
+            # To be safe, we fetch tournament and bracket data.
+            # In a real app we'd use pg_notify or similar.
+            try:
+                curr_tournament = await TournamentService(db).get_tournament(tournament_id)
+                if not curr_tournament.kiosk_enabled or curr_tournament.kiosk_token != token:
+                    break # exit stream if token changes or kiosk disabled
+                
+                # Fetch bracket
+                from app.services.bracket_service import BracketService
+                bracket = await BracketService(db).get_bracket(tournament_id)
+                
+                # Fetch teams
+                from app.routers.tournaments import get_teams
+                # We can't easily call router functions directly if they need deps, but we can use the service
+                teams_data = await TournamentService(db).get_tournament_teams(tournament_id)
+                teams = [{"id": str(t.id), "name": t.name, "is_checked_in": c} for t, c in teams_data]
+
+                # We could calculate a simple hash or just stringify to check for changes
+                data_dict = {
+                    "tournament": TournamentResponse.model_validate(curr_tournament).model_dump(mode="json"),
+                    "bracket": bracket.model_dump(mode="json") if bracket else None,
+                    "teams": teams
+                }
+                data_str = json.dumps(data_dict)
+                
+                if data_str != last_updated:
+                    yield {"data": data_str}
+                    last_updated = data_str
+                    
+            except Exception as e:
+                # If error, yield error and maybe break
+                yield {"event": "error", "data": str(e)}
+                
+            await asyncio.sleep(2)
+            
+    return EventSourceResponse(event_generator())

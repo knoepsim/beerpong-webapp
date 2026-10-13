@@ -4,15 +4,16 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import type { Result } from "@/types";
 import { ResultType } from "@/types";
-import { History } from "lucide-react";
+import { History, Play, Clock, Hash, Trophy } from "lucide-react";
 import { BeerpongTable } from "@/components/BeerpongTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -107,7 +108,6 @@ export function MatchResultDialog({
       }
       onSuccess();
       onOpenChange(false);
-      // Reset form
       setWinnerId(null);
       setCupsLeft("");
     } catch (err: unknown) {
@@ -143,41 +143,91 @@ export function MatchResultDialog({
     rightCups = cupsLeft ? parseInt(cupsLeft, 10) : 10;
   }
 
-  const hasChanges = !existingResult || 
-    existingResult.winner_team_id !== winnerId || 
+  const hasChanges = !existingResult ||
+    existingResult.winner_team_id !== winnerId ||
     (existingResult.cups_left?.toString() || "") !== cupsLeft.trim();
-    
+
   const isValid = winnerId !== null && cupsLeft.trim() !== "";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ergebnis eintragen</DialogTitle>
-          <DialogDescription>
-            Wähle den Gewinner aus und trage die verbleibenden Becher ein.
-          </DialogDescription>
+      <DialogContent className="sm:max-w-md">
+        {/* Custom Header with team colors */}
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="sr-only">Ergebnis eintragen</DialogTitle>
+
+          {/* Meta badges row */}
+          <div className="flex items-center justify-center gap-2">
+            <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
+              <Hash className="w-3 h-3" />
+              Tisch 12
+            </Badge>
+            <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              12:34
+            </Badge>
+          </div>
+
+          {/* VS Header */}
+          <div className="flex items-center gap-3">
+            {/* Team A */}
+            <div className="flex-1 text-right">
+              <div className="flex items-center justify-end gap-2">
+                <span className="font-semibold text-sm truncate">{teamA.name}</span>
+                <div className="w-3 h-3 rounded-full bg-red-500 shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
+              </div>
+            </div>
+
+            {/* Score display */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-2xl font-bold tabular-nums text-red-500">10</span>
+              <span className="text-lg text-muted-foreground font-light">:</span>
+              <span className="text-2xl font-bold tabular-nums text-blue-500">10</span>
+            </div>
+
+            {/* Team B */}
+            <div className="flex-1 text-left">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+                <span className="font-semibold text-sm truncate">{teamB.name}</span>
+              </div>
+            </div>
+          </div>
         </DialogHeader>
-        <div className="pt-2">
+
+        <Separator />
+
+        <div>
           {isLoadingPrevious ? (
             <div className="flex justify-center p-4">
               <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
             </div>
           ) : (
             <>
+              {/* Spiel starten button */}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mb-3 gap-2 border-green-600/30 text-green-700 dark:text-green-400 hover:bg-green-500/10 hover:border-green-500/50"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                Spiel starten
+              </Button>
+
+              {/* History toggle */}
               {allResults.length > 0 && (
-                <div className="mb-2">
-                  <Button 
+                <div className="mb-3">
+                  <Button
                     type="button"
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setShowHistory(!showHistory)} 
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHistory(!showHistory)}
                     className="w-full text-muted-foreground flex justify-between items-center bg-muted/20 hover:bg-muted/40"
                   >
                     <span>{showHistory ? "Verlauf ausblenden" : "Verlauf anzeigen"}</span>
                     <History className="w-4 h-4" />
                   </Button>
-                  
+
                   {showHistory && (
                     <div className="mt-2 space-y-2 max-h-[150px] overflow-y-auto pr-2 border rounded-md p-2 bg-muted/10 animate-in fade-in zoom-in-95 duration-200">
                       {allResults.map((r) => (
@@ -202,15 +252,18 @@ export function MatchResultDialog({
                   )}
                 </div>
               )}
+
+              {/* Lock warning */}
               {nextMatchHasResult && existingResult && (
-                <div className="bg-destructive/10 p-3 rounded-md text-sm mb-2 border border-destructive/20 text-destructive">
+                <div className="bg-destructive/10 p-3 rounded-md text-sm mb-3 border border-destructive/20 text-destructive">
                   <p className="font-semibold">Bearbeiten gesperrt</p>
                   <p className="mt-1">
-                    Für das darauffolgende Spiel liegt bereits ein Ergebnis vor. Bitte lösche zuerst das Ergebnis des Folgespiels, um dieses Ergebnis bearbeiten oder löschen zu können.
+                    Für das darauffolgende Spiel liegt bereits ein Ergebnis vor. Bitte lösche zuerst das Ergebnis des Folgespiels.
                   </p>
                 </div>
               )}
 
+              {/* Beerpong Table */}
               <div className="flex justify-center">
                 <BeerpongTable
                   leftCups={leftCups}
@@ -220,9 +273,11 @@ export function MatchResultDialog({
                 />
               </div>
 
+              {/* Team selection cards */}
               <div className="space-y-3">
                 <Label className="text-base">Wer hat gewonnen?</Label>
                 <div className="grid grid-cols-2 gap-3">
+                  {/* Team A card */}
                   <button
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamA.id ? "border-red-500 bg-red-500/5 ring-1 ring-red-500" : "border-border bg-card hover:bg-accent/50"
@@ -255,6 +310,7 @@ export function MatchResultDialog({
                     )}
                   </button>
 
+                  {/* Team B card */}
                   <button
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamB.id ? "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500" : "border-border bg-card hover:bg-accent/50"
@@ -289,8 +345,9 @@ export function MatchResultDialog({
                 </div>
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
+              {/* Action buttons */}
               <div className="flex flex-col gap-2 mt-6">
                 <div className="flex gap-2 w-full">
                   <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">

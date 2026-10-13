@@ -31,6 +31,7 @@ class TournamentUpdate(BaseModel):
     checkin_start_time: datetime | None = None
     table_count: int | None = None
     visibility: TournamentVisibility | None = None
+    kiosk_enabled: bool | None = None
 
 
 class TournamentResponse(BaseModel):
@@ -46,6 +47,8 @@ class TournamentResponse(BaseModel):
     table_count: int
     mode: TournamentMode
     visibility: TournamentVisibility
+    kiosk_enabled: bool
+    kiosk_token: str | None
     is_deleted: bool
     created_by_id: UUID
     created_at: datetime
