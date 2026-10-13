@@ -8,10 +8,11 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     globals: true,
-    exclude: ['node_modules/**', 'tests/**'],
+    include: ['**/*.test.ts', '**/*.test.tsx'],
+    exclude: ['node_modules/**', '.next/**', 'tests/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: ['text', 'json', 'html', ['lcov', { projectRoot: path.resolve(__dirname, '../..') }]],
       exclude: [
         'node_modules/**',
         'components/ui/**', // Exclude shadcn/ui components as per request
