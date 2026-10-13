@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { getRedirectParam } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -85,8 +86,7 @@ export default function OnboardingPage() {
     try {
       await api.users.updateMe({ name: values.name.trim(), email: values.email.trim() });
       
-      const searchParams = new URLSearchParams(window.location.search);
-      const redirectUrl = searchParams.get("redirect");
+      const redirectUrl = getRedirectParam();
       
       if (redirectUrl) {
         window.location.href = redirectUrl;

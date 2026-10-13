@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { setTokens } from "@/lib/auth";
+import { getRedirectParam, setTokens } from "@/lib/auth";
 import { RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,7 @@ export default function LoginPage() {
       setTokens(result.access_token, result.refresh_token);
       
       const user = await api.users.me();
-      const redirectUrl = new URLSearchParams(window.location.search).get("redirect");
+      const redirectUrl = getRedirectParam();
       
       if (!user.email || !user.name || user.name === user.phone_number) {
         setStep("new_user");
@@ -245,7 +245,7 @@ export default function LoginPage() {
                 <Button 
                   className="w-full" 
                   onClick={() => {
-                    const redirectUrl = new URLSearchParams(window.location.search).get("redirect");
+                    const redirectUrl = getRedirectParam();
                     let path = "/onboarding";
                     if (redirectUrl) path += `?redirect=${encodeURIComponent(redirectUrl)}`;
                     window.location.href = path;
