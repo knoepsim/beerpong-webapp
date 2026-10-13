@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const SoloCup = ({ color = "red", className }: { color?: "red" | "blue", className?: string }) => {
-  const baseColor = color === "red" ? "#e93338" : "#1d47c1";
+  const baseColor = color === "red" ? "var(--team-red)" : "var(--team-blue)";
 
   return (
     <svg viewBox="0 0 100 120" className={className} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
@@ -92,9 +92,12 @@ interface BeerpongTableProps {
   readonly leftCups: number;
   readonly rightCups: number;
   readonly className?: string;
+  readonly compact?: boolean;
 }
 
-export function BeerpongTable({ leftCups, rightCups, className }: BeerpongTableProps) {
+export function BeerpongTable({ leftCups, rightCups, className, compact = false }: BeerpongTableProps) {
+  const aspectClass = compact ? "aspect-[22/10]" : "aspect-[33/10]";
+  const widthFactor = compact ? 1.5 : 1.0;
   const leftCupPositions = [
     // Base column (4 cups)
     { x: 6.7, y: 21.5 },
@@ -129,86 +132,99 @@ export function BeerpongTable({ leftCups, rightCups, className }: BeerpongTableP
     { x: 78.3, y: 50 },
   ];
 
+  // Adjust X coordinates for compact mode
+  const processCups = (cups: typeof leftCupPositions, side: "left" | "right", activeCount: number) => {
+    return cups.slice(0, Math.min(10, Math.max(0, activeCount))).map((p, i) => {
+      let x = p.x;
+      if (compact) {
+        x = side === "left" ? p.x * widthFactor : 100 - ((100 - p.x) * widthFactor);
+      }
+      return { ...p, x, side, logicalIndex: i };
+    });
+  };
+
   // Get active cups and sort them by Y to ensure correct 3D depth rendering
   const activeCups = [
-    ...leftCupPositions.slice(0, Math.min(10, Math.max(0, leftCups))).map((p, i) => ({ ...p, side: "left", logicalIndex: i })),
-    ...rightCupPositions.slice(0, Math.min(10, Math.max(0, rightCups))).map((p, i) => ({ ...p, side: "right", logicalIndex: i }))
+    ...processCups(leftCupPositions, "left", leftCups),
+    ...processCups(rightCupPositions, "right", rightCups)
   ].sort((a, b) => a.y - b.y);
 
   return (
     <div
-      className={cn("w-full max-w-5xl mx-auto p-4 md:p-12", className)}
+      className={cn("w-full max-w-5xl mx-auto p-2  overflow-x-auto no-scrollbar", className)}
       style={{ perspective: "1000px" }}
     >
-      <div
-        className="relative w-full aspect-[33/10] bg-zinc-900 border-[12px] border-zinc-800 rounded-xl shadow-2xl"
-        style={{
-          transform: "rotateX(60deg)",
-          transformStyle: "preserve-3d",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
-        }}
-      >
-        {/* Center line */}
-        <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-zinc-700 -translate-x-1/2" />
+      <div className="w-full mx-auto">
+        <div
+          className={`relative w-full ${aspectClass} bg-zinc-900 border-[8px] border-zinc-800 rounded-xl shadow-2xl transition-all`}
+          style={{
+            transform: "rotateX(60deg)",
+            transformStyle: "preserve-3d",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+          }}
+        >
+          {/* Center line */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-zinc-700 -translate-x-1/2" />
 
-        {/* Render all active cups */}
-        <AnimatePresence>
-          {activeCups.map((cup) => (
-            <motion.div
-              key={`${cup.side}-${cup.logicalIndex}`}
-              className="absolute"
-              style={{
-                left: `${cup.x}%`,
-                top: `${cup.y}%`,
-                width: '5.7%',
-                height: '24%',
-                transformStyle: "preserve-3d"
-              }}
-              initial={{ x: "-50%", y: "-100%", scale: 0 }}
-              animate={{ x: "-50%", y: "-50%", scale: 1 }}
-              exit={{ 
-                x: "-50%", 
-                y: "-50%", 
-                scale: 0, 
-                transition: { type: "tween", ease: "circIn", duration: 0.2, delay: (9 - cup.logicalIndex) * 0.06 } 
-              }}
-              transition={{ 
-                type: "tween", 
-                ease: "circOut",
-                duration: 0.35,
-                delay: cup.logicalIndex * 0.05 
-              }}
-            >
-              {/* Flat shadow on the table */}
-              <div 
-                className="absolute bg-black/60 rounded-full blur-[3px]"
-                style={{
-                  left: '50%',
-                  top: '50%',
-                  width: '100%',
-                  height: '79.16%',
-                  transform: "translate(-50%, -50%) translateZ(1px)",
-                }}
-              />
-
-              {/* Upright 3D Cup */}
-              <div 
+          {/* Render all active cups */}
+          <AnimatePresence>
+            {activeCups.map((cup) => (
+              <motion.div
+                key={`${cup.side}-${cup.logicalIndex}`}
                 className="absolute"
                 style={{
-                  left: '50%',
-                  top: '50%',
-                  width: '100%', 
-                  height: '100%', 
-                  // Rotate against the table tilt so the cup stands upright
-                  transform: "translate(-50%, -92%) rotateX(-60deg) translateZ(1px)",
-                  transformOrigin: "bottom center",
+                  left: `${cup.x}%`,
+                  top: `${cup.y}%`,
+                  width: `${5.7 * widthFactor}%`,
+                  height: '24%',
+                  transformStyle: "preserve-3d"
+                }}
+                initial={{ x: "-50%", y: "-100%", scale: 0 }}
+                animate={{ x: "-50%", y: "-50%", scale: 1 }}
+                exit={{
+                  x: "-50%",
+                  y: "-50%",
+                  scale: 0,
+                  transition: { type: "tween", ease: "circIn", duration: 0.2, delay: (9 - cup.logicalIndex) * 0.06 }
+                }}
+                transition={{
+                  type: "tween",
+                  ease: "circOut",
+                  duration: 0.35,
+                  delay: cup.logicalIndex * 0.05
                 }}
               >
-                <SoloCup color={cup.side === "left" ? "red" : "blue"} className="w-full h-full" />
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+                {/* Flat shadow on the table */}
+                <div
+                  className="absolute bg-black/60 rounded-full blur-[3px]"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: '100%',
+                    height: '79.16%',
+                    transform: "translate(-50%, -50%) translateZ(1px)",
+                  }}
+                />
+
+                {/* Upright 3D Cup */}
+                <div
+                  className="absolute"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: '100%',
+                    height: '100%',
+                    // Rotate against the table tilt so the cup stands upright
+                    transform: "translate(-50%, -92%) rotateX(-60deg) translateZ(1px)",
+                    transformOrigin: "bottom center",
+                  }}
+                >
+                  <SoloCup color={cup.side === "left" ? "red" : "blue"} className="w-full h-full" />
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
