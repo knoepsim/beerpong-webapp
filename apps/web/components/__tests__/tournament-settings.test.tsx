@@ -1,0 +1,459 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { TournamentSettings } from '../tournament-settings';
+import { api } from '@/lib/api';
+import { TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
+import type { Tournament, TournamentUserRole, User } from '@/types';
+
+const push = vi.fn();
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('sonner', () => ({ toast }));
+vi.mock('react-markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div data-testid="markdown">{children}</div> }));
+vi.mock('remark-gfm', () => ({ default: () => {} }));
+vi.mock('@/lib/api', () => ({
+  api: {
+    tournaments: { update: vi.fn(), generateInvite: vi.fn(), delete: vi.fn() },
+    users: { search: vi.fn() },
+    roles: { assign: vi.fn(), revoke: vi.fn() },
+  },
+}));
+
+// Popover based primitives are replaced by flat equivalents; the component logic stays real.
+vi.mock('@/components/ui/select', () => {
+  const Ctx = createContext<(v: string) => void>(() => {});
+  return {
+    Select: ({ onValueChange, children }: { onValueChange: (v: string) => void; children: ReactNode }) => (
+      <Ctx.Provider value={onValueChange}><div>{children}</div></Ctx.Provider>
+    ),
+    SelectTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    SelectValue: () => null,
+    SelectContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    SelectItem: ({ value, children }: { value: string; children: ReactNode }) => {
+      const onValueChange = useContext(Ctx);
+      return <button type="button" onClick={() => onValueChange(value)}>{children}</button>;
+    },
+  };
+});
+vi.mock('@/components/ui/tabs', () => {
+  const Ctx = createContext<{ value: string; set: (v: string) => void }>({ value: '', set: () => {} });
+  return {
+    Tabs: ({ defaultValue, children }: { defaultValue: string; children: ReactNode }) => {
+      const [value, set] = useState(defaultValue);
+      return <Ctx.Provider value={{ value, set }}><div>{children}</div></Ctx.Provider>;
+    },
+    TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    TabsTrigger: ({ value, children }: { value: string; children: ReactNode }) => {
+      const ctx = useContext(Ctx);
+      return <button type="button" onClick={() => ctx.set(value)}>{children}</button>;
+    },
+    TabsContent: ({ value, children }: { value: string; children: ReactNode }) =>
+      useContext(Ctx).value === value ? <div>{children}</div> : null,
+  };
+});
+vi.mock('@/components/ui/alert-dialog', () => {
+  const Ctx = createContext<(open: boolean) => void>(() => {});
+  return {
+    AlertDialog: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (o: boolean) => void; children: ReactNode }) =>
+      open ? <Ctx.Provider value={onOpenChange}><div role="alertdialog">{children}</div></Ctx.Provider> : null,
+    AlertDialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    AlertDialogHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    AlertDialogFooter: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    AlertDialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+    AlertDialogDescription: ({ children }: { children: ReactNode }) => <p>{children}</p>,
+    AlertDialogCancel: ({ children }: { children: ReactNode }) => {
+      const onOpenChange = useContext(Ctx);
+      return <button onClick={() => onOpenChange(false)}>{children}</button>;
+    },
+    AlertDialogAction: ({ children, onClick }: { children: ReactNode; onClick: () => void }) => {
+      const onOpenChange = useContext(Ctx);
+      return <button onClick={() => { onClick(); onOpenChange(false); }}>{children}</button>;
+    },
+  };
+});
+
+const mocked = {
+  update: vi.mocked(api.tournaments.update),
+  invite: vi.mocked(api.tournaments.generateInvite),
+  remove: vi.mocked(api.tournaments.delete),
+  search: vi.mocked(api.users.search),
+  assign: vi.mocked(api.roles.assign),
+  revoke: vi.mocked(api.roles.revoke),
+};
+
+const tournament: Tournament = {
+  id: 't1',
+  name: 'Summer Cup',
+  location: 'Garden',
+  description: 'Rules',
+  start_time: '2026-07-01T18:00:00',
+  registration_end_time: '2026-06-30T18:00:00',
+  checkin_start_time: null,
+  started_at: null,
+  table_count: 4,
+  mode: TournamentMode.SINGLE_ELIMINATION,
+  visibility: TournamentVisibility.PUBLIC_LISTED,
+  is_deleted: false,
+  created_by_id: 'u0',
+  created_at: '',
+  updated_at: '',
+};
+
+const roles: TournamentUserRole[] = [
+  { id: 'r1', tournament_id: 't1', user_id: 'u1', user_name: 'Alice Admin', role: TournamentRoleType.ADMIN, assigned_at: '' },
+  { id: 'r2', tournament_id: 't1', user_id: 'u2', user_name: 'Ref Reese', role: TournamentRoleType.REFEREE, assigned_at: '' },
+  { id: 'r3', tournament_id: 't1', user_id: 'u3', role: TournamentRoleType.MANAGER, assigned_at: '' },
+];
+
+const onReload = vi.fn();
+
+function setup(
+  userRole: TournamentRoleType | null,
+  overrides: Partial<Tournament> = {},
+) {
+  return render(
+    <TournamentSettings
+      tournament={{ ...tournament, ...overrides }}
+      status="registration"
+      roles={roles}
+      userRole={userRole}
+      teamCount={2}
+      onGenerateBracket={vi.fn()}
+      onReload={onReload}
+    />,
+  );
+}
+
+const saveButton = () => screen.getByRole('button', { name: /Änderungen speichern|Gespeichert|Speichern\.\.\./ });
+const nameInput = () => screen.getByDisplayValue('Summer Cup');
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  onReload.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
+});
+afterEach(() => cleanup());
+
+describe('visibility per role', () => {
+  it('shows everything to admins', () => {
+    setup(TournamentRoleType.ADMIN);
+    expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
+    expect(screen.getByText('Gefahrenzone')).toBeInTheDocument();
+    expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(3);
+    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument(); // not private
+  });
+
+  it('lets managers edit details but only revoke referees', () => {
+    setup(TournamentRoleType.MANAGER);
+    expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
+    expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(1);
+  });
+
+  it.each([TournamentRoleType.REFEREE, null])('shows only the role list to %s', (role) => {
+    setup(role);
+    expect(screen.queryByText('Turnier-Details bearbeiten')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
+    expect(screen.getByText('Rollen & Berechtigungen')).toBeInTheDocument();
+    expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+    expect(screen.getByText('u3')).toBeInTheDocument(); // falls back to the user id
+  });
+});
+
+describe('editing the tournament details', () => {
+  it('starts clean and enables saving after a change', () => {
+    setup(TournamentRoleType.ADMIN);
+    const name = nameInput();
+    expect(saveButton()).toHaveTextContent('Gespeichert');
+    expect(saveButton()).toBeDisabled();
+
+    fireEvent.change(name, { target: { value: 'Winter Cup' } });
+    expect(saveButton()).toHaveTextContent('Änderungen speichern');
+    expect(saveButton()).toBeEnabled();
+
+    fireEvent.change(name, { target: { value: '  ' } });
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it.each([
+    ['location', () => screen.getByDisplayValue('Garden'), 'Beach'],
+    ['table count', () => screen.getByDisplayValue('4'), '6'],
+    ['start time', () => screen.getByDisplayValue('2026-07-01T18:00'), '2026-07-02T18:00'],
+    ['registration end', () => screen.getByDisplayValue('2026-06-30T18:00'), '2026-06-29T18:00'],
+  ])('marks %s changes as dirty', (_name, field, value) => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(field(), { target: { value } });
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('marks a new check-in time, description and visibility as dirty', () => {
+    setup(TournamentRoleType.ADMIN);
+    const checkin = document.querySelectorAll('input[type="datetime-local"]')[2] as HTMLInputElement;
+    fireEvent.change(checkin, { target: { value: '2026-07-01T17:00' } });
+    expect(saveButton()).toBeEnabled();
+    fireEvent.change(checkin, { target: { value: '' } });
+    expect(saveButton()).toBeDisabled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'New rules' } });
+    expect(saveButton()).toBeEnabled();
+    fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'Rules' } });
+    expect(saveButton()).toBeDisabled();
+
+    fireEvent.click(screen.getByText('Versteckt (nur mit Link)'));
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('saves the converted values and reloads', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
+    fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
+    fireEvent.change(screen.getByDisplayValue('4'), { target: { value: '' } });
+    fireEvent.click(screen.getByText('Privat (nur mit Link/Einladung)'));
+    fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(onReload).toHaveBeenCalled());
+    expect(mocked.update).toHaveBeenCalledWith('t1', {
+      name: 'Winter Cup',
+      location: undefined,
+      description: 'Rules',
+      table_count: 1,
+      visibility: 'private',
+      start_time: new Date('2026-07-01T18:00').toISOString(),
+      registration_end_time: null,
+      checkin_start_time: null,
+    });
+    expect(toast.success).toHaveBeenCalledWith('Turnier-Details erfolgreich gespeichert!');
+  });
+
+  it('omits an emptied start time and description', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN, { description: null });
+    fireEvent.change(screen.getByDisplayValue('2026-07-01T18:00'), { target: { value: '' } });
+    fireEvent.change(nameInput(), { target: { value: 'X' } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
+    expect(mocked.update.mock.calls[0][1]).toMatchObject({ start_time: undefined, description: undefined });
+  });
+
+  it('shows the saving state and reports failures', async () => {
+    let reject!: (e: unknown) => void;
+    mocked.update.mockReturnValue(new Promise((_, r) => (reject = r)));
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Speichern...')).toBeDisabled();
+    reject(new Error('x'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Speichern der Turnier-Details'));
+  });
+
+  it('previews the description as markdown', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(screen.getByText('Vorschau'));
+    expect(screen.getByTestId('markdown')).toHaveTextContent('Rules');
+    fireEvent.click(screen.getByText('Bearbeiten'));
+    expect(screen.getByPlaceholderText(/Turnier-Regeln/)).toBeInTheDocument();
+  });
+
+  it('previews an empty description with a placeholder', () => {
+    setup(TournamentRoleType.ADMIN, { description: null });
+    fireEvent.click(screen.getByText('Vorschau'));
+    expect(screen.getByText('Keine Beschreibung...')).toBeInTheDocument();
+  });
+});
+
+describe('invite link for private tournaments', () => {
+  const privateTournament = { visibility: TournamentVisibility.PRIVATE };
+
+  it('is only offered to organisers', () => {
+    setup(TournamentRoleType.REFEREE, privateTournament);
+    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument();
+  });
+
+  it('generates, shows and copies the link, then resets the label', async () => {
+    mocked.invite.mockResolvedValue({ token: 'tok' });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      setup(TournamentRoleType.MANAGER, privateTournament);
+      fireEvent.click(screen.getByText('Link generieren & kopieren'));
+
+      const link = `${window.location.origin}/tournaments/t1?invite=tok`;
+      expect(await screen.findByText(link)).toBeInTheDocument();
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link);
+      expect(screen.getByText('Kopiert')).toBeInTheDocument();
+      expect(toast.success).toHaveBeenCalledWith('Link kopiert!');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      expect(screen.getByText('Link generieren & kopieren')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows progress and reports failures', async () => {
+    let reject!: (e: unknown) => void;
+    mocked.invite.mockReturnValue(new Promise((_, r) => (reject = r)));
+    setup(TournamentRoleType.ADMIN, privateTournament);
+    fireEvent.click(screen.getByText('Link generieren & kopieren'));
+    expect(await screen.findByText('Generiere...')).toBeDisabled();
+    reject(new Error('x'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Generieren des Einladungslinks'));
+  });
+});
+
+describe('role management', () => {
+  const alice = { id: 'u9', name: 'Zed Zimmer' } as User;
+  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen...');
+  const searchButton = () => document.querySelector('.lucide-search')!.closest('button')!;
+
+  it('requires two characters before searching', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(searchInput(), { target: { value: 'z' } });
+    expect(searchButton()).toBeDisabled();
+    fireEvent.keyDown(searchInput(), { key: 'Enter' });
+    expect(mocked.search).not.toHaveBeenCalled();
+  });
+
+  it('searches via button and via Enter, ignoring other keys', async () => {
+    mocked.search.mockResolvedValue([alice]);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(searchInput(), { target: { value: 'ze' } });
+    fireEvent.keyDown(searchInput(), { key: 'a' });
+    expect(mocked.search).not.toHaveBeenCalled();
+
+    fireEvent.click(searchButton());
+    expect(await screen.findByText('Zed Zimmer')).toBeInTheDocument();
+
+    fireEvent.keyDown(searchInput(), { key: 'Enter' });
+    await waitFor(() => expect(mocked.search).toHaveBeenCalledTimes(2));
+  });
+
+  it('reports search failures', async () => {
+    mocked.search.mockRejectedValue(new Error('x'));
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(searchInput(), { target: { value: 'ze' } });
+    fireEvent.click(searchButton());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler bei der Suche'));
+  });
+
+  it('assigns the chosen role to the chosen user', async () => {
+    mocked.search.mockResolvedValue([alice]);
+    mocked.assign.mockResolvedValue(roles[0]);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(searchInput(), { target: { value: 'ze' } });
+    fireEvent.click(searchButton());
+    await screen.findByText('Zed Zimmer');
+
+    const assign = screen.getByRole('button', { name: /Zuweisen/ });
+    expect(assign).toBeDisabled();
+    fireEvent.click(screen.getByText('Zed Zimmer'));
+    expect(assign).toBeEnabled();
+    fireEvent.click(screen.getByText('Manager'));
+    fireEvent.click(assign);
+
+    await waitFor(() => expect(mocked.assign).toHaveBeenCalledWith('t1', 'u9', 'manager'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle erfolgreich zugewiesen!'));
+    expect(onReload).toHaveBeenCalled();
+    expect(screen.queryByText('Zed Zimmer')).not.toBeInTheDocument(); // search reset
+  });
+
+  it('assigns the default referee role and offers only the allowed roles', async () => {
+    mocked.search.mockResolvedValue([alice]);
+    mocked.assign.mockResolvedValue(roles[1]);
+    setup(TournamentRoleType.MANAGER);
+    fireEvent.change(searchInput(), { target: { value: 'ze' } });
+    fireEvent.click(searchButton());
+    await screen.findByText('Zed Zimmer');
+
+    expect(within(document.body).queryByText('Admin')).not.toBeInTheDocument();
+    expect(screen.queryByText('Manager')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Zed Zimmer'));
+    fireEvent.click(screen.getByText('Schiedsrichter'));
+    fireEvent.click(screen.getByRole('button', { name: /Zuweisen/ }));
+    await waitFor(() => expect(mocked.assign).toHaveBeenCalledWith('t1', 'u9', 'referee'));
+  });
+
+  it.each([
+    [new Error('Schon vergeben'), 'Schon vergeben'],
+    ['boom', 'Fehler'],
+  ])('reports assignment failures (%s)', async (error, message) => {
+    mocked.search.mockResolvedValue([alice]);
+    mocked.assign.mockRejectedValue(error);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(searchInput(), { target: { value: 'ze' } });
+    fireEvent.click(searchButton());
+    await screen.findByText('Zed Zimmer');
+    fireEvent.click(screen.getByText('Zed Zimmer'));
+    fireEvent.click(screen.getByRole('button', { name: /Zuweisen/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+  });
+
+  const revokeButtons = () =>
+    screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'));
+
+  it('revokes a role after confirmation', async () => {
+    mocked.revoke.mockResolvedValue(undefined);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(revokeButtons()[1]);
+    expect(screen.getByText('Rolle wirklich entziehen?')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Bestätigen'));
+
+    await waitFor(() => expect(mocked.revoke).toHaveBeenCalledWith('t1', 'r2'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle erfolgreich entzogen.'));
+    expect(onReload).toHaveBeenCalled();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('can cancel the confirmation', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(revokeButtons()[0]);
+    fireEvent.click(screen.getByText('Abbrechen'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(mocked.revoke).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [new Error('Nicht erlaubt'), 'Nicht erlaubt'],
+    ['boom', 'Fehler'],
+  ])('reports revoke failures (%s)', async (error, message) => {
+    mocked.revoke.mockRejectedValue(error);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(revokeButtons()[0]);
+    fireEvent.click(screen.getByText('Bestätigen'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+  });
+});
+
+describe('deleting the tournament', () => {
+  const open = () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(screen.getByText('Turnier endgültig löschen'));
+  };
+
+  it('deletes after confirmation and leaves the page', async () => {
+    mocked.remove.mockResolvedValue(undefined);
+    open();
+    expect(screen.getByText(/unwiderruflich löschen/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Bestätigen'));
+
+    await waitFor(() => expect(mocked.remove).toHaveBeenCalledWith('t1'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/tournaments'));
+    expect(toast.success).toHaveBeenCalledWith('Turnier gelöscht.');
+  });
+
+  it('re-enables the button when deleting fails', async () => {
+    mocked.remove.mockRejectedValue(new Error('x'));
+    open();
+    fireEvent.click(screen.getByText('Bestätigen'));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Löschen des Turniers'));
+    expect(screen.getByText('Turnier endgültig löschen').closest('button')).toBeEnabled();
+    expect(push).not.toHaveBeenCalled();
+  });
+});

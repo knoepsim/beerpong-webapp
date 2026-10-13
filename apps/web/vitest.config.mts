@@ -12,10 +12,13 @@ export default defineConfig({
     exclude: ['node_modules/**', '.next/**', 'tests/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
+      // Report untested files too, matching what SonarQube counts as new code.
+      include: ['components/**', 'lib/**', 'hooks/**', 'types/**', 'proxy.ts'],
       reporter: ['text', 'json', 'html', ['lcov', { projectRoot: path.resolve(__dirname, '../..') }]],
       exclude: [
         'node_modules/**',
         'components/ui/**', // Exclude shadcn/ui components as per request
+        'components/reui/**', // Vendored ReUI timeline primitives
         '.next/**',
         '**/*.config.*',
         'playwright.config.ts',
