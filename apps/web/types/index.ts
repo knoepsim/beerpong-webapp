@@ -45,6 +45,7 @@ export interface TeamInvite {
 }
 
 export interface TeamInviteDetails {
+  team_id: string;
   team_name: string;
   inviter_name: string;
 }
