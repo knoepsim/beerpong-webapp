@@ -91,7 +91,7 @@ export function MatchResultDialog({
         }
       };
 
-      loadPrevious();
+      void loadPrevious();
     }
   }, [open, matchId, nextMatchId]);
 
@@ -290,7 +290,7 @@ export function MatchResultDialog({
                       <span className="font-semibold text-center leading-tight">{teamA.name}</span>
                     </div>
                     {winnerId === teamA.id && (
-                      <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                      <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                         <Label htmlFor="cups_left_a" className="text-xs text-red-600 dark:text-red-400 font-medium">Übrige Becher *</Label>
                         <Input
                           id="cups_left_a"
@@ -323,7 +323,7 @@ export function MatchResultDialog({
                       <span className="font-semibold text-center leading-tight">{teamB.name}</span>
                     </div>
                     {winnerId === teamB.id && (
-                      <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                      <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                         <Label htmlFor="cups_left_b" className="text-xs text-blue-600 dark:text-blue-400 font-medium">Übrige Becher *</Label>
                         <Input
                           id="cups_left_b"

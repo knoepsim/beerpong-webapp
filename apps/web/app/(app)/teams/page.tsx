@@ -65,7 +65,7 @@ export default function TeamsPage() {
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    loadTeams();
+    void loadTeams();
   }, []);
 
   const loadTeams = async () => {
@@ -359,7 +359,7 @@ export default function TeamsPage() {
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                handleDelete();
+                void handleDelete();
               }}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

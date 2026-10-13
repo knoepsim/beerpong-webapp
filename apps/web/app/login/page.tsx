@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { getRedirectParam, setTokens } from "@/lib/auth";
+import { clearTokens, getRedirectParam, setTokens } from "@/lib/auth";
 import { RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -257,7 +257,7 @@ export default function LoginPage() {
                   variant="outline" 
                   className="w-full" 
                   onClick={() => {
-                    import("@/lib/auth").then((m) => m.clearTokens());
+                    clearTokens();
                     setStep("phone");
                     setCurrentPhone("");
                     phoneForm.reset();

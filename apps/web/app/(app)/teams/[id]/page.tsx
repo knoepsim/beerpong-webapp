@@ -28,7 +28,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    loadTeam();
+    void loadTeam();
   }, [teamId]);
 
   const loadTeam = async () => {
@@ -56,12 +56,16 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!inviteToken) return;
     const url = `${window.location.origin}/teams/join/${inviteToken}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Link konnte nicht kopiert werden");
+    }
   };
 
   if (isLoading) {

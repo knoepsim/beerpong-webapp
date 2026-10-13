@@ -24,7 +24,7 @@ COPY . .
 # Next.js telemetry is disabled
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npx next build
+RUN pnpm run build
 
 # 3. Production image, copy all the files and run next
 FROM base AS runner

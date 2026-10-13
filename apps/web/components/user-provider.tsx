@@ -41,7 +41,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   return (

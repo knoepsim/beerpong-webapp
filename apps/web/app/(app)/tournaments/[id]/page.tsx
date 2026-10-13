@@ -154,7 +154,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   };
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [tournamentId]);
 
   const teamsMap = useMemo(() => {

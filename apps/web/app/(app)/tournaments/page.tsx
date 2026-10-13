@@ -80,7 +80,7 @@ export default function TournamentsPage() {
   });
 
   useEffect(() => {
-    loadTournaments();
+    void loadTournaments();
   }, []);
 
   const loadTournaments = async () => {
