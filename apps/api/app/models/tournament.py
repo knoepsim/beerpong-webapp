@@ -34,8 +34,6 @@ class Tournament(Base):
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
     invite_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
-    kiosk_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
-    kiosk_token: Mapped[str | None] = mapped_column(String(6), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

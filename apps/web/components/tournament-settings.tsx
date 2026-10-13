@@ -7,9 +7,8 @@ import type { Tournament, TournamentUserRole, User } from "@/types";
 import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert, Link, Copy, Check, RefreshCw } from "lucide-react";
+import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert, Link, Copy, Check } from "lucide-react";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -89,7 +88,6 @@ export function TournamentSettings({
   const [editStartTime, setEditStartTime] = useState(toLocalDatetime(tournament.start_time));
   const [editRegEndTime, setEditRegEndTime] = useState(toLocalDatetime(tournament.registration_end_time));
   const [editCheckinStartTime, setEditCheckinStartTime] = useState(toLocalDatetime(tournament.checkin_start_time));
-  const [editKioskEnabled, setEditKioskEnabled] = useState(tournament.kiosk_enabled || false);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isDirty =
@@ -100,8 +98,7 @@ export function TournamentSettings({
     editVisibility !== tournament.visibility ||
     editStartTime !== toLocalDatetime(tournament.start_time) ||
     editRegEndTime !== toLocalDatetime(tournament.registration_end_time) ||
-    editCheckinStartTime !== toLocalDatetime(tournament.checkin_start_time) ||
-    editKioskEnabled !== tournament.kiosk_enabled;
+    editCheckinStartTime !== toLocalDatetime(tournament.checkin_start_time);
 
   const handleUpdateTournament = async () => {
     setIsUpdating(true);
@@ -115,7 +112,6 @@ export function TournamentSettings({
         start_time: editStartTime ? new Date(editStartTime).toISOString() : undefined,
         registration_end_time: editRegEndTime ? new Date(editRegEndTime).toISOString() : null,
         checkin_start_time: editCheckinStartTime ? new Date(editCheckinStartTime).toISOString() : null,
-        kiosk_enabled: editKioskEnabled,
       });
       await onReload();
       toast.success("Turnier-Details erfolgreich gespeichert!");
@@ -406,50 +402,6 @@ export function TournamentSettings({
           </div>
         </CardContent>
       </Card>
-
-      {(userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Kiosk Ansicht (Projektor)</CardTitle>
-            <CardDescription>Aktiviere einen Live-View für Beamer, auf den ohne Login zugegriffen werden kann.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch id="kiosk-mode" checked={editKioskEnabled} onCheckedChange={setEditKioskEnabled} />
-              <Label htmlFor="kiosk-mode">Kiosk-Modus aktivieren</Label>
-            </div>
-            {tournament.kiosk_enabled && tournament.kiosk_token && (
-              <div className="mt-4 p-4 border rounded-lg bg-muted/20 space-y-3">
-                <Label>Live-Ansicht URL</Label>
-                <div className="flex gap-2">
-                  <Input readOnly value={`${window.location.origin}/tournaments/${tournament.id}/kiosk?token=${tournament.kiosk_token}`} />
-                  <Button variant="secondary" onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/tournaments/${tournament.id}/kiosk?token=${tournament.kiosk_token}`);
-                    toast.success("Link kopiert!");
-                  }}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" onClick={async () => {
-                    try {
-                      await api.tournaments.generateKioskToken(tournament.id);
-                      await onReload();
-                      toast.success("Neuer Token generiert!");
-                    } catch(e) {
-                      toast.error("Fehler beim Generieren");
-                    }
-                  }}>
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">Jeder mit diesem Link kann den Live-Status des Turniers einsehen.</p>
-              </div>
-            )}
-            {editKioskEnabled && !tournament.kiosk_enabled && (
-              <p className="text-sm text-muted-foreground mt-2">Speichere die Turnier-Details, um den Kiosk-Modus vollständig zu aktivieren und einen Link zu erhalten.</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {userRole === TournamentRoleType.ADMIN && (
         <Card className="border-destructive/50 bg-destructive/5">

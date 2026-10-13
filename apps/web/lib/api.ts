@@ -216,10 +216,6 @@ export const api = {
       request<{token: string}>(`/tournaments/${tournamentId}/invite`, {
         method: "POST",
       }),
-    generateKioskToken: (tournamentId: string) =>
-      request<{token: string}>(`/tournaments/${tournamentId}/kiosk/token`, {
-        method: "POST",
-      }),
   },
 
   roles: {

@@ -191,17 +191,6 @@ class TournamentService:
         return token
 
 
-    async def generate_kiosk_token(self, tournament_id: UUID) -> str:
-        """Generate a new 6-character alphanumeric kiosk token."""
-        tournament = await self.get_tournament(tournament_id)
-        alphabet = string.ascii_letters + string.digits
-        token = "".join(secrets.choice(alphabet) for _ in range(6))
-        
-        tournament.kiosk_token = token
-        self.db.add(tournament)
-        return token
-
-
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
         """Withdraw a team from a tournament before it starts."""
