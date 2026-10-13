@@ -10,6 +10,7 @@ from app.core.exceptions import (
     NotFoundError,
     PlayerAlreadyInTournamentError,
     TeamNotCompleteError,
+    TournamentAlreadyStartedError,
     TournamentDeletedError,
 )
 from app.models.team import Team, TeamMember
@@ -140,7 +141,9 @@ class TournamentService:
     ) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""
         tournament = await self.get_tournament(tournament_id)
-        
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+
         from app.models.tournament import TournamentVisibility
         if tournament.visibility == TournamentVisibility.PRIVATE:
             if not tournament.invite_token or invite_token != tournament.invite_token:
@@ -194,7 +197,8 @@ class TournamentService:
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
         """Withdraw a team from a tournament before it starts."""
-        await self.get_tournament(tournament_id)
+        if (await self.get_tournament(tournament_id)).is_started:
+            raise TournamentAlreadyStartedError()
 
         team_q = (
             select(Team)
@@ -220,8 +224,9 @@ class TournamentService:
         )
 
     async def remove_team(self, tournament_id: UUID, team_id: UUID) -> None:
-        """Remove a specific team from a tournament (Admin action)."""
-        await self.get_tournament(tournament_id)
+        """Remove a specific team from a tournament (Admin action, only before it starts)."""
+        if (await self.get_tournament(tournament_id)).is_started:
+            raise TournamentAlreadyStartedError()
         result = await self.db.execute(
             delete(TournamentTeam)
             .where(
@@ -241,8 +246,8 @@ class TournamentService:
         from fastapi import HTTPException
         
         tournament = await self.get_tournament(tournament_id)
-        if tournament.started_at is not None:
-            raise HTTPException(status_code=400, detail="Tournament is already started.")
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
             
         res = await self.db.execute(select(Match).where(Match.tournament_id == tournament_id))
         if not res.scalars().first():

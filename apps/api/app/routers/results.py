@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError, ResultRequiresWinnerError
+from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user
 from app.models.match import Match
 from app.models.result import Result, ResultType
@@ -64,9 +64,6 @@ async def modify_result(
     match = await _get_match(db, match_id)
     await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
     )
-
-    if body.winner_team_id is None:
-        raise ResultRequiresWinnerError()
 
     return await BracketService(db).modify_result(match_id, body, current_user.id)
 
