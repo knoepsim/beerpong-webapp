@@ -180,7 +180,7 @@ async def leave_tournament(
     summary="Turnier starten",
     description="Generiert das KO-Bracket mit zufälliger Team-Zuordnung und Freilos-Handling. Nur Admin.",
 )
-async def start_tournament(
+async def generate_bracket(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
