@@ -57,21 +57,6 @@ async def update_tournament(
     return await TournamentService(db).update_tournament(tournament_id, body)
 
 
-@router.delete(
-    "/{tournament_id}/roles/{role_id}",
-    status_code=204,
-    summary="Rolle entziehen",
-    description="Entfernt eine Rolle von einem User. Erfordert hierarchische Berechtigung.",
-)
-async def remove_role(
-    tournament_id: UUID,
-    role_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    await RoleService(db).remove_role(tournament_id, role_id, current_user.id)
-
-
 @router.post(
     "/{tournament_id}/invite",
     response_model=TournamentInviteResponse,
