@@ -1,132 +1,155 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { BracketView } from '../bracket-view';
-import type { Bracket, Match, Team } from '@/types';
+import { fiveTeamBracket, fiveTeams, makeMatch } from '@/lib/test-fixtures/bracket';
+import type { Bracket } from '@/types';
 
-const team = (id: string, name: string) => ({ id, name }) as Team;
-const teamsMap: Record<string, Team> = {
-  a: team('a', 'Alpha'),
-  b: team('b', 'Bravo'),
-  c: team('c', 'Charlie'),
-  d: team('d', 'Delta'),
-};
-
-const match = (overrides: Partial<Match> & Pick<Match, 'id' | 'round' | 'position'>): Match => ({
-  tournament_id: 't',
-  team_a_id: null,
-  team_b_id: null,
-  next_match_id: null,
-  next_match_slot: null,
-  table_number: null,
-  created_at: '',
-  status: 'waiting',
-  winner_team_id: null,
-  cups_left: null,
-  ...overrides,
-});
-
-// Semi-final A vs B is decided (Alpha won with 4 cups left), C vs D is ready, the final waits for C/D.
-const bracket: Bracket = {
-  tournament_id: 't',
-  total_rounds: 2,
-  champion_team_id: null,
-  matches: [
-    match({ id: 'm2', round: 1, position: 1, team_a_id: 'c', team_b_id: 'd', next_match_id: 'f', status: 'ready' }),
-    match({
-      id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f',
-      status: 'finished', winner_team_id: 'a', cups_left: 4,
-    }),
-    match({ id: 'f', round: 2, position: 0, team_a_id: 'a', team_b_id: null }),
-  ],
-};
+const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: cups });
 
 describe('BracketView', () => {
-  it('labels the rounds and shows team names', () => {
-    render(<BracketView bracket={bracket} teamsMap={teamsMap} />);
+  it('draws every round as a column with its name', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
 
-    expect(screen.getByText('Halbfinale')).toBeInTheDocument();
-    expect(screen.getByText('Finale')).toBeInTheDocument();
-    expect(screen.getAllByText('Alpha')).toHaveLength(2); // semi-final and final slot
-    expect(screen.getByText('Delta')).toBeInTheDocument();
+    const columns = screen.getAllByRole('region');
+    expect(columns.map((c) => c.getAttribute('aria-label'))).toEqual(['Viertelfinale', 'Halbfinale', 'Finale']);
+    expect(screen.queryByText(/beendet/)).not.toBeInTheDocument(); // no progress counter in the headers
   });
 
-  it('names earlier rounds in larger brackets', () => {
-    render(<BracketView bracket={{ ...bracket, total_rounds: 3 }} teamsMap={teamsMap} />);
-    expect(screen.getByText('Viertelfinale')).toBeInTheDocument();
-    expect(screen.getByText('Halbfinale')).toBeInTheDocument();
+  it('shows byes as their own card in round one', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    const round1 = screen.getByRole('region', { name: 'Viertelfinale' });
+
+    expect(within(round1).getAllByText('Freilos')).toHaveLength(3);
+    expect(within(round1).getByRole('article', { name: /Team 1, Freilos/ })).toBeInTheDocument();
   });
 
-  it('shows TBD for open slots and a fallback for unknown teams', () => {
-    render(<BracketView bracket={bracket} teamsMap={{ a: teamsMap.a }} />);
+  it('names where an open slot comes from instead of "TBD"', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+
+    expect(screen.getByText('Sieger Spiel 1')).toBeInTheDocument(); // semi-final, slot b
+    expect(screen.getByText('Sieger Spiel 2')).toBeInTheDocument(); // final
+    expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument();
+  });
+
+  it('numbers the matches', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    ['Spiel 1', 'Spiel 2', 'Spiel 3', 'Spiel 4'].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+  });
+
+  it('falls back to "Unbekannt" for a team that is not in the map', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={{}} />);
     expect(screen.getAllByText('Unbekannt').length).toBeGreaterThan(0);
-    expect(screen.getByText('TBD')).toBeInTheDocument();
   });
 
-  it('renders invisible placeholders for missing matches', () => {
-    const sparse: Bracket = {
-      ...bracket,
-      matches: [match({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready' })],
-    };
-    const { container } = render(<BracketView bracket={sparse} teamsMap={teamsMap} />);
-    expect(container.querySelectorAll('.invisible').length).toBeGreaterThan(0);
+  it('always shows every round, also when the first ones are played, and has no round chips', () => {
+    const bracket = fiveTeamBracket({ m1: finished('t4') });
+    render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
+
+    expect(screen.getAllByRole('region').map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Viertelfinale',
+      'Halbfinale',
+      'Finale',
+    ]);
+    expect(screen.queryByRole('group', { name: 'Erste angezeigte Runde' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
-  it('keeps matches of rounds beyond total_rounds', () => {
-    const odd: Bracket = {
-      ...bracket,
-      total_rounds: 1,
-      matches: [match({ id: 'x', round: 3, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready' })],
-    };
-    render(<BracketView bracket={odd} teamsMap={teamsMap} />);
-    expect(screen.getByText('Runde 3')).toBeInTheDocument();
+  it('shows the table only of matches that can be played, not of played or waiting ones', () => {
+    const bracket = fiveTeamBracket({ m1: finished('t4') });
+    render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
+
+    // only match 3 is ready; match 1 is played, match 2 and the final wait for their teams
+    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1);
+  });
+
+  it('scrolls sideways only', () => {
+    const { container } = render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    const scroller = container.querySelector('.overflow-x-auto')!;
+    expect(scroller.className).not.toContain('overflow-auto');
+    expect(scroller.className).not.toContain('max-h');
+  });
+
+  it('highlights every round that has matches that can be played', () => {
+    // match 1 (first round) and match 3 (semi-final) are both ready: two active rounds
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    expect(within(screen.getByRole('region', { name: 'Viertelfinale' })).getByText('Aktuell')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Finale' })).queryByText('Aktuell')).not.toBeInTheDocument();
+  });
+
+  it('highlights only the round that is still active once the first one is played', () => {
+    render(<BracketView bracket={fiveTeamBracket({ m1: finished('t4') })} teamsMap={fiveTeams} />);
+    expect(screen.getAllByText('Aktuell')).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
+  });
+
+  it('draws the lines of teams that moved on dark and the others light', () => {
+    const lines = (container: HTMLElement, state: 'done' | 'pending') =>
+      container.querySelectorAll(`[data-line="${state}"]`).length;
+
+    // fresh: the three byes have moved on, everything else is still open
+    const fresh = render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    expect(lines(fresh.container, 'done')).toBeGreaterThan(0);
+    expect(lines(fresh.container, 'pending')).toBeGreaterThan(0);
+    fresh.unmount();
+
+    // a semi-final has a winner now: its line to the final turns dark as well
+    const played = fiveTeamBracket({ m1: finished('t4'), m3: finished('t2') });
+    const { container } = render(<BracketView bracket={played} teamsMap={fiveTeams} />);
+    expect(lines(container, 'done')).toBeGreaterThan(0);
+  });
+
+  it('puts the whole tree on one surface instead of alternating columns', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    const columns = screen.getAllByRole('region');
+    expect(columns.some((c) => c.className.includes('bg-muted'))).toBe(false);
+    expect(columns[0].closest('.bg-muted')).not.toBeNull();
+  });
+
+  it('shows the trophy only in the final', () => {
+    const decided = fiveTeamBracket({
+      m1: finished('t4'),
+      m2: finished('t1'),
+      m3: finished('t2'),
+      m4: { team_a_id: 't1', team_b_id: 't2', ...finished('t1') },
+    });
+    render(<BracketView bracket={{ ...decided, champion_team_id: 't1' }} teamsMap={fiveTeams} />);
+
+    expect(screen.getAllByLabelText('Turniersieger')).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Finale' })).getByLabelText('Turniersieger')).toBeInTheDocument();
+  });
+
+  it('highlights the matches of the own team', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} highlightTeamId="t4" />);
+
+    const mine = screen.getByRole('article', { name: /Spiel 1,/ });
+    expect(mine.className).toContain('ring-primary');
+    expect(screen.getByRole('article', { name: /Spiel 3,/ }).className).not.toContain('ring-primary');
+  });
+
+  it('highlights the own team when it has a bye', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} highlightTeamId="t2" />);
+    expect(screen.getByRole('article', { name: /Team 2, Freilos/ }).className).toContain('ring-primary');
   });
 
   it('reports clicks on a match', () => {
     const onMatchClick = vi.fn();
-    render(<BracketView bracket={bracket} teamsMap={teamsMap} onMatchClick={onMatchClick} />);
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} onMatchClick={onMatchClick} />);
 
-    fireEvent.click(within(screen.getByText('Charlie').closest('button')!).getByText('Delta'));
-    expect(onMatchClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'm2' }));
+    fireEvent.click(screen.getByRole('button', { name: /Spiel 1,/ }));
+    expect(onMatchClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }));
   });
 
-  it('shows the trophy only in the final, not in earlier matches of the champion', () => {
-    const decided: Bracket = {
-      ...bracket,
-      champion_team_id: 'a',
-      matches: [
-        match({
-          id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f',
-          status: 'finished', winner_team_id: 'a', cups_left: 4,
-        }),
-        match({
-          id: 'm2', round: 1, position: 1, team_a_id: 'c', team_b_id: 'd', next_match_id: 'f',
-          status: 'finished', winner_team_id: 'c', cups_left: 1,
-        }),
-        match({
-          id: 'f', round: 2, position: 0, team_a_id: 'a', team_b_id: 'c', status: 'finished',
-          winner_team_id: 'a', cups_left: 2,
-        }),
-      ],
-    };
-    render(<BracketView bracket={decided} teamsMap={teamsMap} />);
-    expect(screen.getAllByLabelText('Turniersieger')).toHaveLength(1);
-    expect(screen.getAllByLabelText('Gewinner')).toHaveLength(2); // winners of the two semi-finals
+  it('is not clickable without a handler', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    expect(screen.queryByRole('button', { name: /Spiel 1,/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('article', { name: /Spiel 1,/ })).toBeInTheDocument();
   });
 
-  it('shows the trophy for the champion of the final', () => {
-    const final: Bracket = {
-      ...bracket,
-      total_rounds: 1,
-      champion_team_id: 'b',
-      matches: [
-        match({ id: 'f', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'finished', winner_team_id: 'b', cups_left: 2 }),
-      ],
-    };
-    const { container, rerender } = render(<BracketView bracket={final} teamsMap={teamsMap} />);
-    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(1);
-    expect(screen.getByLabelText('Turniersieger')).toBeInTheDocument();
-
-    rerender(<BracketView bracket={{ ...final, champion_team_id: null }} teamsMap={teamsMap} />);
-    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(0);
+  it('renders nothing without a bracket', () => {
+    const { container } = render(
+      <BracketView bracket={{ tournament_id: 't', total_rounds: 0, champion_team_id: null, matches: [] }} teamsMap={{}} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

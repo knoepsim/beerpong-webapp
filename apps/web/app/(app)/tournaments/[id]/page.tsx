@@ -11,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { BracketView } from "@/components/bracket-view";
-import { roundLabel } from "@/lib/utils";
+import { MatchList } from "@/components/match-list";
+import { MyMatches } from "@/components/my-matches";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
@@ -539,33 +540,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             <Card>
               <CardHeader>
                 <CardTitle>Was betrifft mich gerade?</CardTitle>
-                <CardDescription>Dein nächstes oder aktuelles Spiel</CardDescription>
+                <CardDescription>Deine anstehenden Spiele</CardDescription>
               </CardHeader>
               <CardContent>
-                {(() => {
-                  const myMatches = bracket.matches.filter(m => m.team_a_id === myTournamentTeam.id || m.team_b_id === myTournamentTeam.id);
-                  const currentMatch = myMatches.sort((a,b) => b.round - a.round)[0];
-                  if (!currentMatch) return <p className="text-muted-foreground">Du hast aktuell kein aktives Spiel.</p>;
-                  
-                  const opponentId = currentMatch.team_a_id === myTournamentTeam.id ? currentMatch.team_b_id : currentMatch.team_a_id;
-                  const opponent = opponentId ? teamsMap[opponentId] : null;
-                  
-                  return (
-                    <div className="flex flex-col gap-2">
-                      <p className="font-medium text-sm text-primary">{roundLabel(currentMatch.round, bracket.total_rounds)}</p>
-                      <div className="p-4 rounded-lg border bg-card flex items-center justify-between shadow-sm">
-                        <span className="font-bold truncate text-right flex-1">{myTournamentTeam.name}</span>
-                        <span className="text-muted-foreground mx-4 text-xs font-semibold">VS</span>
-                        <span className={`truncate text-left flex-1 ${opponent ? "font-bold" : "italic text-muted-foreground"}`}>{opponent ? opponent.name : "TBD"}</span>
-                      </div>
-                      {currentMatch.table_number && (
-                        <p className="text-sm text-muted-foreground mt-2 flex items-center gap-1">
-                          <Trophy className="h-4 w-4" /> Tisch {currentMatch.table_number}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
+                <MyMatches
+                  bracket={bracket}
+                  teamsMap={teamsMap}
+                  teamId={myTournamentTeam.id}
+                  onMatchClick={canReferee ? handleMatchClick : undefined}
+                />
               </CardContent>
             </Card>
           )}
@@ -594,27 +577,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </div>
               ) : (
                 <div className="space-y-8">
-                  <BracketView 
-                    bracket={bracket} 
-                    teamsMap={teamsMap} 
-                    onMatchClick={canReferee ? handleMatchClick : undefined} 
+                  <BracketView
+                    bracket={bracket}
+                    teamsMap={teamsMap}
+                    onMatchClick={canReferee ? handleMatchClick : undefined}
+                    highlightTeamId={myTournamentTeam?.id}
                   />
                   
                   <div className="border-t pt-6">
                     <h3 className="font-semibold mb-4">Alle Spiele</h3>
-                    <div className="space-y-2">
-                      {[...bracket.matches].sort((a,b) => a.round - b.round || a.position - b.position).map(m => {
-                        const tA = m.team_a_id ? teamsMap[m.team_a_id] : null;
-                        const tB = m.team_b_id ? teamsMap[m.team_b_id] : null;
-                        return (
-                          <div key={m.id} className="p-3 border rounded-lg flex items-center justify-between text-sm">
-                            <div className="flex-1 text-right truncate font-medium">{tA ? tA.name : "TBD"}</div>
-                            <div className="px-4 text-[10px] uppercase font-bold text-muted-foreground">{roundLabel(m.round, bracket.total_rounds)}</div>
-                            <div className="flex-1 text-left truncate font-medium">{tB ? tB.name : "TBD"}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <MatchList
+                      bracket={bracket}
+                      teamsMap={teamsMap}
+                      highlightTeamId={myTournamentTeam?.id}
+                      onMatchClick={canReferee ? handleMatchClick : undefined}
+                    />
                   </div>
                 </div>
               )}

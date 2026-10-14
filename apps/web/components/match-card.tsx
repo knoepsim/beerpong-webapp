@@ -1,115 +1,100 @@
-import { Check, Clock, Hash, Trophy } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { TeamLabel } from "@/components/team-label";
+import type { MatchSlot } from "@/lib/bracket-layout";
+import { describeSides, matchSummary, sideTone, statusLabel, tableLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
-interface TeamRowProps {
-  name: string;
-  isWinner: boolean;
-  isChampion: boolean;
-  isDecided: boolean;
-  tone: "red" | "blue";
-}
-
-const TONES = {
-  red: { stripe: "bg-red-500", stripeMuted: "bg-red-500/30", winnerBg: "bg-red-500/5" },
-  blue: { stripe: "bg-blue-500", stripeMuted: "bg-blue-500/30", winnerBg: "bg-blue-500/5" },
-};
-
-function TeamRow({ name, isWinner, isChampion, isDecided, tone }: TeamRowProps) {
-  const colors = TONES[tone];
-  const emphasis = isChampion
-    ? "bg-primary/10 font-bold text-foreground"
-    : isWinner
-      ? `${colors.winnerBg} font-semibold text-foreground`
-      : isDecided
-        ? "text-muted-foreground"
-        : "text-foreground";
-
-  return (
-    <div className={`flex items-center h-[40px] transition-colors ${emphasis}`}>
-      <div className={`w-1 h-full shrink-0 ${isWinner ? colors.stripe : colors.stripeMuted}`} />
-      <div className="flex items-center justify-between flex-1 px-2.5 min-w-0">
-        <span className="truncate pr-2 text-sm">{name}</span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {isChampion && <Trophy className="w-3.5 h-3.5 text-amber-500" aria-label="Turniersieger" />}
-          {isWinner && !isChampion && (
-            <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" aria-label="Gewinner" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 interface MatchCardProps {
-  match: Match;
+  slot: MatchSlot;
   teamsMap: Record<string, Team>;
+  /** Only set for the final: the trophy belongs there. */
   championTeamId?: string | null;
+  /** The team of the logged-in user, highlighted wherever it plays. */
+  highlightTeamId?: string | null;
   onClick?: (match: Match) => void;
 }
 
-const teamName = (teamsMap: Record<string, Team>, id: string | null) =>
-  id ? teamsMap[id]?.name || "Unbekannt" : "TBD";
+/** One match in the bracket: number, table, status and both teams. The state comes from the API. */
+export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchCardProps>) {
+  const { match, number } = slot;
+  const sides = describeSides(slot, teamsMap, championTeamId);
+  const table = tableLabel(match);
+  const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
-/** One match with the real state from the API: status, winner, cups left and table. */
-export function MatchCard({ match, teamsMap, championTeamId, onClick }: MatchCardProps) {
-  const isFinished = match.status === "finished";
-  const showMeta = match.status !== "waiting";
-  const isChampion = (id: string | null) => !!id && id === championTeamId;
-
-  return (
-    <div className="relative flex flex-col justify-center py-2">
-      {showMeta && (
-        <div className="flex items-center justify-between px-1 mb-1 gap-1">
-          <div>
-            {match.table_number != null && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-0.5 font-normal text-muted-foreground">
-                <Hash className="w-2.5 h-2.5" aria-hidden="true" />
-                Tisch {match.table_number}
-              </Badge>
-            )}
-          </div>
-          {isFinished ? (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 gap-0.5 font-normal">
-              <Check className="w-2.5 h-2.5" aria-hidden="true" />
-              Beendet
-              {match.cups_left != null && (
-                <span title="Becher, die dem Sieger übrig blieben"> · {match.cups_left} Becher</span>
-              )}
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 gap-0.5 font-normal text-muted-foreground">
-              <Clock className="w-2.5 h-2.5" aria-hidden="true" />
-              Bereit
-            </Badge>
+  const className = cn(
+    "block w-full rounded-lg border bg-card text-left shadow-xs overflow-hidden",
+    // what can be played right now stands out
+    match.status === "ready" && "border-primary/50",
+    mine && "ring-2 ring-primary/60",
+    onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow",
+  );
+  const content = (
+    <>
+      <div className="px-2 pt-1 pb-1 text-xs leading-4 text-muted-foreground">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate">Spiel {number}</span>
+          {match.status === "ready" && (
+            <span className="inline-flex items-center gap-1 shrink-0 font-medium text-primary">
+              <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+              {statusLabel(match)}
+            </span>
+          )}
+          {match.status === "finished" && (
+            <span className="shrink-0" title="Becher, die dem Sieger übrig blieben">
+              {statusLabel(match)}
+            </span>
           )}
         </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => onClick?.(match)}
-        className={`w-full flex flex-col text-left rounded-lg border overflow-hidden text-sm bg-card transition-all shadow-sm ${
-          onClick ? "hover:border-primary/50 hover:shadow-md cursor-pointer" : "cursor-default"
-        }`}
-      >
-        <div className="border-b">
-          <TeamRow
-            name={teamName(teamsMap, match.team_a_id)}
-            isWinner={isFinished && match.winner_team_id === match.team_a_id}
-            isChampion={isChampion(match.team_a_id)}
-            isDecided={isFinished}
-            tone="red"
-          />
+        {table && <div className="truncate">{table}</div>}
+      </div>
+      {sides.map((side) => (
+        <div
+          key={side.side}
+          className={cn(
+            "flex items-center gap-1 min-h-8 px-1.5 py-1 border-t text-[13px] leading-tight",
+            sideTone(side, !!highlightTeamId && side.id === highlightTeamId),
+          )}
+        >
+          <TeamLabel side={side} />
         </div>
-        <TeamRow
-          name={teamName(teamsMap, match.team_b_id)}
-          isWinner={isFinished && match.winner_team_id === match.team_b_id}
-          isChampion={isChampion(match.team_b_id)}
-          isDecided={isFinished}
-          tone="blue"
-        />
-      </button>
-    </div>
+      ))}
+    </>
+  );
+  const summary = matchSummary(slot, sides, teamsMap);
+
+  return onClick ? (
+    <button type="button" className={className} aria-label={summary} onClick={() => onClick(match)}>
+      {content}
+    </button>
+  ) : (
+    <article className={className} aria-label={summary}>
+      {content}
+    </article>
+  );
+}
+
+/** A team that skips round one. It has no match, so it gets a slim card of its own. */
+export function ByeCard({
+  teamId,
+  teamsMap,
+  highlightTeamId,
+}: Readonly<{
+  teamId: string;
+  teamsMap: Record<string, Team>;
+  highlightTeamId?: string | null;
+}>) {
+  const mine = !!highlightTeamId && teamId === highlightTeamId;
+  const name = teamsMap[teamId]?.name || "Unbekannt";
+  return (
+    <article
+      className={cn(
+        "w-full rounded-lg border border-dashed bg-card/60 px-2 py-1.5 text-[13px] leading-none",
+        mine && "ring-2 ring-primary/60 bg-primary/10",
+      )}
+      aria-label={`${name}, Freilos: ohne Spiel direkt in der nächsten Runde`}
+    >
+      <p className="text-xs leading-4 text-muted-foreground">Freilos</p>
+      <p className="truncate font-medium pt-1">{name}</p>
+    </article>
   );
 }
