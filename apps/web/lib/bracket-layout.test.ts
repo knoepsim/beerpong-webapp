@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildBracketLayout, currentRound, defaultFirstRound, isAdvanced } from './bracket-layout'
+import { allMatchSlots, buildBracketLayout, currentRound, isAdvanced, isMatchSlot } from './bracket-layout'
 import { fiveTeamBracket, makeMatch } from './test-fixtures/bracket'
 import type { Bracket } from '@/types'
 
@@ -77,29 +77,18 @@ describe('currentRound', () => {
   })
 })
 
-describe('defaultFirstRound', () => {
-  const finished = { status: 'finished' as const, winner_team_id: 't1' }
+describe('allMatchSlots', () => {
+  const layout = buildBracketLayout(fiveTeamBracket())
 
-  it('starts with the first round of a fresh bracket', () => {
-    expect(defaultFirstRound(buildBracketLayout(fiveTeamBracket()))).toBe(1)
+  it('lists the matches in the order of their numbers and leaves the byes out', () => {
+    const slots = allMatchSlots(layout)
+    expect(slots.map((s) => s.number)).toEqual([1, 2, 3, 4])
+    expect(slots.map((s) => s.match.id)).toEqual(['m1', 'm2', 'm3', 'm4'])
   })
 
-  it('skips rounds that are completely played', () => {
-    expect(defaultFirstRound(buildBracketLayout(fiveTeamBracket({ m1: finished })))).toBe(2)
-    expect(defaultFirstRound(buildBracketLayout(fiveTeamBracket({ m1: finished, m2: finished })))).toBe(2)
-    expect(defaultFirstRound(buildBracketLayout(fiveTeamBracket({ m1: finished, m2: finished, m3: finished })))).toBe(3)
-  })
-
-  it('shows the last two rounds of a finished tournament', () => {
-    const all = fiveTeamBracket({ m1: finished, m2: finished, m3: finished, m4: finished })
-    expect(defaultFirstRound(buildBracketLayout(all))).toBe(2)
-  })
-
-  it('never goes below round one', () => {
-    const single: Bracket = {
-      tournament_id: 't', total_rounds: 1, champion_team_id: 't1',
-      matches: [makeMatch({ id: 'f', round: 1, position: 0, team_a_id: 't1', team_b_id: 't2', ...finished })],
-    }
-    expect(defaultFirstRound(buildBracketLayout(single))).toBe(1)
+  it('tells match slots from byes', () => {
+    const [bye, match] = layout.rounds[0].slots
+    expect(isMatchSlot(bye)).toBe(false)
+    expect(isMatchSlot(match)).toBe(true)
   })
 })

@@ -102,12 +102,11 @@ export function currentRound(layout: BracketLayout): number | null {
   return round ? round.round : null;
 }
 
-/**
- * First round worth showing: the earliest one that is not completely played.
- * A finished tournament shows the last two rounds.
- */
-export function defaultFirstRound(layout: BracketLayout): number {
-  const open = layout.rounds.find((r) => r.finishedCount < r.matchCount);
-  if (open) return open.round;
-  return Math.max(1, layout.totalRounds - 1);
+export function isMatchSlot(slot: BracketSlot): slot is MatchSlot {
+  return slot.kind === "match";
+}
+
+/** All matches in the order of their numbers (round by round), without byes. */
+export function allMatchSlots(layout: BracketLayout): MatchSlot[] {
+  return layout.rounds.flatMap((r) => r.slots.filter(isMatchSlot));
 }

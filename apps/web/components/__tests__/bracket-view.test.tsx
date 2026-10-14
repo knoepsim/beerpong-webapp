@@ -41,46 +41,32 @@ describe('BracketView', () => {
     expect(screen.getAllByText('Unbekannt').length).toBeGreaterThan(0);
   });
 
-  it('hides rounds that are completely played and says so', () => {
+  it('always shows every round, also when the first ones are played, and has no round chips', () => {
     const bracket = fiveTeamBracket({ m1: finished('t4') });
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 
-    expect(screen.queryByRole('region', { name: 'Viertelfinale' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Halbfinale' })).toBeInTheDocument();
-    expect(screen.getByText('1 Spiel aus früheren Runden ausgeblendet.')).toBeInTheDocument();
-  });
-
-  it('brings hidden rounds back with the round chips', () => {
-    render(<BracketView bracket={fiveTeamBracket({ m1: finished('t4') })} teamsMap={fiveTeams} />);
-
-    const chips = screen.getByRole('group', { name: 'Erste angezeigte Runde' });
-    expect(within(chips).getByRole('button', { name: 'Halbfinale' })).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(within(chips).getByRole('button', { name: 'Viertelfinale' }));
-
-    expect(screen.getByRole('region', { name: 'Viertelfinale' })).toBeInTheDocument();
-    expect(within(chips).getByRole('button', { name: 'Viertelfinale' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('region').map((c) => c.getAttribute('aria-label'))).toEqual([
+      'Viertelfinale',
+      'Halbfinale',
+      'Finale',
+    ]);
+    expect(screen.queryByRole('group', { name: 'Erste angezeigte Runde' })).not.toBeInTheDocument();
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
-  it('offers no round chips for a bracket with two rounds or fewer', () => {
-    const final: Bracket = {
-      tournament_id: 't', total_rounds: 2, champion_team_id: null,
-      matches: [
-        makeMatch({ id: 'a', round: 1, position: 0, team_a_id: 't1', team_b_id: 't2', next_match_id: 'f', next_match_slot: 'a', status: 'ready' }),
-        makeMatch({ id: 'b', round: 1, position: 1, team_a_id: 't3', team_b_id: 't4', next_match_id: 'f', next_match_slot: 'b', status: 'ready' }),
-        makeMatch({ id: 'f', round: 2, position: 0 }),
-      ],
-    };
-    render(<BracketView bracket={final} teamsMap={fiveTeams} />);
-    expect(screen.queryByRole('group', { name: 'Erste angezeigte Runde' })).not.toBeInTheDocument();
-  });
-
-  it('marks the round that is being played', () => {
+  it('shows the table of every match that is still to be played, but not of played ones', () => {
     const bracket = fiveTeamBracket({ m1: finished('t4') });
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
-    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Finale' })).queryByText('Aktuell')).not.toBeInTheDocument();
+
+    // matches 2, 3 (semi-finals) and 4 (final) are not played yet
+    expect(screen.getAllByText('Tisch folgt')).toHaveLength(3);
+  });
+
+  it('scrolls sideways only', () => {
+    const { container } = render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    const scroller = container.querySelector('.overflow-x-auto')!;
+    expect(scroller.className).not.toContain('overflow-auto');
+    expect(scroller.className).not.toContain('max-h');
   });
 
   it('draws the lines of teams that moved on dark and the others light', () => {
@@ -93,10 +79,9 @@ describe('BracketView', () => {
     expect(lines(fresh.container, 'pending')).toBeGreaterThan(0);
     fresh.unmount();
 
-    // a semi-final has a winner now: its line to the final turns dark as well (round one is hidden here)
+    // a semi-final has a winner now: its line to the final turns dark as well
     const played = fiveTeamBracket({ m1: finished('t4'), m3: finished('t2') });
     const { container } = render(<BracketView bracket={played} teamsMap={fiveTeams} />);
-    expect(screen.queryByRole('region', { name: 'Viertelfinale' })).not.toBeInTheDocument();
     expect(lines(container, 'done')).toBeGreaterThan(0);
   });
 

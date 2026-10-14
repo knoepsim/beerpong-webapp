@@ -18,12 +18,12 @@ const slot = (overrides: Partial<Match> = {}, sources: MatchSlot['sources'] = { 
 });
 
 describe('MatchCard', () => {
-  it('shows the number and a ready match as ready, without made-up score, timer or table', () => {
+  it('shows the number and a ready match as ready, without made-up score or timer', () => {
     render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.getByText('Spiel 7')).toBeInTheDocument();
     expect(screen.getByText('Bereit')).toBeInTheDocument();
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
     expect(screen.queryByText('12:34')).not.toBeInTheDocument();
+    expect(screen.queryByText('10')).not.toBeInTheDocument();
   });
 
   it('names the matches whose winners are still missing', () => {
@@ -42,9 +42,24 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the table only when one is assigned', () => {
-    render(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Spiel 7 · Tisch 3')).toBeInTheDocument();
+  it('shows the table of matches that are ready or still waiting, with a placeholder until one is assigned', () => {
+    const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
+    expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Tisch 3')).toBeInTheDocument();
+    expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument();
+  });
+
+  it('shows no table for a finished match unless one was recorded', () => {
+    const { rerender } = render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_number: 2 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Tisch 2')).toBeInTheDocument();
   });
 
   it('marks the winner with an icon and text, not only a color, and shows the cups left', () => {
