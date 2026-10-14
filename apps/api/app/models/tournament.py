@@ -45,6 +45,8 @@ class Tournament(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # set while the final has a result: the tournament is over
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set when an organizer opens check-in ahead of the planned time; this also closes the registration
+    checkin_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
@@ -62,9 +64,13 @@ class Tournament(Base):
         return self.started_at is not None
 
     @property
+    def _checkin_opened_manually(self) -> bool:
+        return self.checkin_enabled and self.checkin_opened_at is not None
+
+    @property
     def registration_open(self) -> bool:
-        """Teams can join until the registration deadline (if any) and before the start."""
-        if self.is_started:
+        """Teams can join until the registration deadline (if any), before check-in was opened and before the start."""
+        if self.is_started or self._checkin_opened_manually:
             return False
         deadline = _aware(self.registration_end_time)
         return deadline is None or datetime.now(UTC) < deadline
@@ -73,11 +79,13 @@ class Tournament(Base):
     def checkin_open(self) -> bool:
         """Check-in only exists if enabled and ends at the start.
 
-        It opens at checkin_start_time, otherwise when the registration closes, without any
-        deadline it is open right away.
+        It opens when an organizer opens it, otherwise at checkin_start_time, otherwise when the
+        registration closes, without any deadline it is open right away.
         """
         if not self.checkin_enabled or self.is_started:
             return False
+        if self._checkin_opened_manually:
+            return True
         opens_at = _aware(self.checkin_start_time or self.registration_end_time)
         return opens_at is None or datetime.now(UTC) >= opens_at
 

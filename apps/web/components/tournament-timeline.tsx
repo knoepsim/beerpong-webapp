@@ -1,14 +1,7 @@
 import type { Tournament } from "@/types";
 import { checkinOpensAt } from "@/lib/tournament-phase";
+import { formatWhen } from "@/lib/format-when";
 
-const formatDateTime = (iso: string) =>
-  new Date(iso).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 interface Step {
   key: string;
@@ -30,7 +23,7 @@ function buildSteps(tournament: Tournament): Step[] {
       description: !tournament.registration_open
         ? "Geschlossen"
         : tournament.registration_end_time
-          ? `Bis ${formatDateTime(tournament.registration_end_time)}`
+          ? `Bis ${formatWhen(tournament.registration_end_time)}`
           : "Offen bis zum Start",
       done: !tournament.registration_open,
       active: tournament.phase === "registration",
@@ -48,7 +41,7 @@ function buildSteps(tournament: Tournament): Step[] {
         : tournament.checkin_open
           ? "Geöffnet"
           : checkinOpensAt(tournament)
-            ? `Ab ${formatDateTime(checkinOpensAt(tournament)!)}`
+            ? `Ab ${formatWhen(checkinOpensAt(tournament)!)}`
             : "Vor dem Start",
       done: started,
       active: tournament.phase === "checkin",
