@@ -48,57 +48,55 @@ jobs:
 
   api-tests:
     name: API Tests
-    # Self-hosted runner (runs as a container). A container job puts the job and its services on the
-    # same Docker network, so PostgreSQL is reachable as host "postgres" instead of localhost.
+    # Self-hosted runner. It runs as a container with the host's Docker socket (Docker-out-of-Docker),
+    # so neither `container:` jobs (the runner's /__e mount does not exist on the host) nor `services:`
+    # (reachable via localhost) work. PostgreSQL is started by hand and the runner container is
+    # attached to its network, which makes it reachable by container name.
     runs-on: [self-hosted, Linux, X64]
     permissions:
       contents: read
-    container:
-      image: ghcr.io/astral-sh/uv:python3.12-bookworm
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_USER: beerpong
-          POSTGRES_PASSWORD: beerpong_ci
-          POSTGRES_DB: beerpong
-        options: >-
-          --health-cmd "pg_isready -U beerpong"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     defaults:
       run:
         working-directory: ./apps/api
     env:
-      DATABASE_URL: postgresql+asyncpg://beerpong:beerpong_ci@postgres:5432/beerpong
+      PG_NAME: pg-${{ github.run_id }}-${{ github.run_attempt }}
+      DATABASE_URL: postgresql+asyncpg://beerpong:beerpong_ci@pg-${{ github.run_id }}-${{ github.run_attempt }}:5432/beerpong
       # Scratch database for the concurrency tests that need real row locks (tables are dropped)
-      TEST_POSTGRES_URL: postgresql+asyncpg://beerpong:beerpong_ci@postgres:5432/beerpong_test
+      TEST_POSTGRES_URL: postgresql+asyncpg://beerpong:beerpong_ci@pg-${{ github.run_id }}-${{ github.run_attempt }}:5432/beerpong_test
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Start PostgreSQL
+        run: |
+          docker network create "$PG_NAME"
+          docker run -d --name "$PG_NAME" --network "$PG_NAME"             -e POSTGRES_USER=beerpong -e POSTGRES_PASSWORD=beerpong_ci -e POSTGRES_DB=beerpong             postgres:17-alpine
+          docker network connect "$PG_NAME" "$(hostname)"
+          for i in $(seq 1 30); do
+            docker exec "$PG_NAME" pg_isready -U beerpong && break
+            sleep 1
+          done
+          docker exec "$PG_NAME" psql -U beerpong -d beerpong -c "CREATE DATABASE beerpong_test"
+
       - name: Install dependencies
         run: uv sync --frozen
-
-      - name: Create scratch database
-        run: |
-          uv run python - <<'EOF'
-          import asyncio
-          import asyncpg
-
-          async def main():
-              conn = await asyncpg.connect("postgresql://beerpong:beerpong_ci@postgres:5432/beerpong")
-              await conn.execute("CREATE DATABASE beerpong_test")
-              await conn.close()
-
-          asyncio.run(main())
-          EOF
 
       - name: Run migrations on an empty database
         run: uv run alembic upgrade head
 
       - name: Run API tests
         run: uv run pytest -v
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: |
+          docker network disconnect "$PG_NAME" "$(hostname)" || true
+          docker rm -f "$PG_NAME" || true
+          docker network rm "$PG_NAME" || true
 
   docker-build-check:
     name: Docker Build Check
