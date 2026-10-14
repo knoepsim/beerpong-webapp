@@ -74,7 +74,7 @@ async def list_my_teams(
     "/{team_id}",
     response_model=TeamResponse,
     summary="Team-Details abrufen",
-    description="Gibt die Details eines Teams inklusive aller Mitglieder zurück.",
+    description="Gibt die Details eines Teams inklusive aller Mitglieder zurück. Nur für Teammitglieder.",
 )
 async def get_team(
     team_id: UUID,
@@ -82,6 +82,7 @@ async def get_team(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     team = await TeamService(db).get_team(team_id)
+    await _ensure_is_member(db, team_id, current_user.id)
     members = await TeamService(db).get_team_members_with_names(team.id)
     is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
     return TeamResponse(

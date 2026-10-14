@@ -18,6 +18,14 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UserPublic(BaseModel):
+    """Minimal user info for other users (search results): no phone number, no e-mail."""
+    id: UUID
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 class UserUpdate(BaseModel):
     """Request body for updating user profile."""
     name: str | None = None

@@ -15,6 +15,9 @@ export interface User {
   created_at: string;
 }
 
+/** What other users get to see: no phone number, no e-mail. */
+export type PublicUser = Pick<User, "id" | "name">;
+
 // ── Team ──────────────────────────────────────────────
 export interface TeamMember {
   user_id: string;
