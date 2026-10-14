@@ -3,7 +3,16 @@ import { cn } from "@/lib/utils";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import type { Team } from "@/types";
 
+/** Team colors of a match: slot a plays red, slot b plays blue. */
+const SIDES = {
+  a: { label: "rot", stripe: "border-l-red-500", stripeMuted: "border-l-red-500/30", winnerBg: "bg-red-500/10" },
+  b: { label: "blau", stripe: "border-l-blue-500", stripeMuted: "border-l-blue-500/30", winnerBg: "bg-blue-500/10" },
+} as const;
+
+type Side = keyof typeof SIDES;
+
 interface TeamRowProps {
+  side: Side;
   name: string | null;
   /** Shown while the team is not known yet: where it comes from. */
   placeholder: string;
@@ -13,12 +22,15 @@ interface TeamRowProps {
   isMine: boolean;
 }
 
-function TeamRow({ name, placeholder, isWinner, isChampion, isLoser, isMine }: TeamRowProps) {
+function TeamRow({ side, name, placeholder, isWinner, isChampion, isLoser, isMine }: TeamRowProps) {
+  const colors = SIDES[side];
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 min-h-8 px-2 py-1 border-t text-[13px] leading-tight",
-        isMine && "bg-primary/10",
+        "flex items-center gap-1.5 min-h-8 pl-1.5 pr-2 py-1 border-t border-l-4 text-[13px] leading-tight",
+        // the stripe stays strong until the match is decided, then only the winner keeps it
+        isLoser || name === null ? colors.stripeMuted : colors.stripe,
+        isMine ? "bg-primary/10" : isWinner && colors.winnerBg,
         isLoser && "text-muted-foreground",
       )}
     >
@@ -59,10 +71,13 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
   const finished = match.status === "finished";
   const mine = !!highlightTeamId && (match.team_a_id === highlightTeamId || match.team_b_id === highlightTeamId);
 
-  const sides = [
-    { id: match.team_a_id, source: sources.a },
-    { id: match.team_b_id, source: sources.b },
-  ].map(({ id, source }) => ({
+  const sides = (
+    [
+      { side: "a", id: match.team_a_id, source: sources.a },
+      { side: "b", id: match.team_b_id, source: sources.b },
+    ] as const
+  ).map(({ side, id, source }) => ({
+    side,
     id,
     name: teamName(teamsMap, id),
     placeholder: placeholderFor(source),
@@ -72,7 +87,8 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
 
   const summary = [
     `Spiel ${number}`,
-    `${sides[0].name ?? sides[0].placeholder} gegen ${sides[1].name ?? sides[1].placeholder}`,
+    // the colors are part of the information, so they are spoken as well
+    sides.map((s) => `${s.name ?? s.placeholder} (${SIDES[s.side].label})`).join(" gegen "),
     match.status === "ready" ? "bereit" : null,
     finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
     finished && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
@@ -108,6 +124,7 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
       {sides.map((side, i) => (
         <TeamRow
           key={i}
+          side={side.side}
           name={side.name}
           placeholder={side.placeholder}
           isWinner={side.isWinner}

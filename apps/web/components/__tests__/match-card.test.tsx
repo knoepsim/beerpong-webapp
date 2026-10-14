@@ -68,8 +68,27 @@ describe('MatchCard', () => {
   it('describes the whole match for screen readers', () => {
     render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2, table_number: 4 })} teamsMap={teamsMap} />);
     expect(
-      screen.getByRole('group', { name: 'Spiel 7, Alpha gegen Bravo, beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
+      screen.getByRole('group', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
     ).toBeInTheDocument();
+  });
+
+  it('colors the first team red and the second blue, and fades the stripe of the loser', () => {
+    const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
+    const row = (name: string) => screen.getByText(name).closest('div')!;
+
+    expect(row('Alpha').className).toContain('border-l-red-500');
+    expect(row('Alpha').className).not.toContain('border-l-red-500/30');
+    expect(row('Bravo').className).toContain('border-l-blue-500');
+
+    rerender(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
+    expect(row('Alpha').className).toContain('bg-red-500/10');
+    expect(row('Bravo').className).toContain('border-l-blue-500/30');
+    expect(row('Bravo').className).not.toContain('bg-blue-500/10');
+  });
+
+  it('keeps the colors on open slots, but faded', () => {
+    render(<MatchCard slot={slot({ status: 'waiting', team_b_id: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Sieger Spiel 3').closest('div')!.className).toContain('border-l-blue-500/30');
   });
 
   it('becomes a button with a handler', () => {
