@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useCurrentUser } from "@/components/user-provider";
 import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam } from "@/types";
-import { TournamentRoleType, ResultType, TournamentVisibility } from "@/types";
+import { TournamentRoleType, TournamentVisibility } from "@/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -93,7 +93,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [isStartingTournament, setIsStartingTournament] = useState(false);
 
   
-  const [tournamentWinnerTeamId, setTournamentWinnerTeamId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -112,20 +111,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         const bData = await api.tournaments.getBracket(tournamentId, inviteToken);
         if (bData && bData.matches.length > 0) {
           setBracket(bData);
-          
-          // U25: Determine tournament winner if finals are played
-          const finalsMatch = bData.matches.find(m => m.round === bData.total_rounds);
-          if (finalsMatch) {
-            try {
-              const results = await api.results.list(finalsMatch.id, inviteToken);
-              const latestWin = [...results].reverse().find(r => r.type !== ResultType.DELETED);
-              if (latestWin && latestWin.winner_team_id) {
-                setTournamentWinnerTeamId(latestWin.winner_team_id);
-              }
-            } catch {
-              // Ignore if we can't fetch finals result
-            }
-          }
         }
       } catch {
         // Bracket not generated yet
@@ -345,7 +330,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
               <Badge variant={tournament.phase === "running" ? "default" : "secondary"}>
-                {phaseLabel(tournament.phase, !!tournamentWinnerTeamId)}
+                {phaseLabel(tournament.phase, !!bracket?.champion_team_id)}
               </Badge>
               {tournament.start_time && (
                 <span className="flex items-center gap-1">
@@ -531,7 +516,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <CardTitle>Turnier-Ablauf</CardTitle>
             </CardHeader>
             <CardContent>
-              <TournamentTimeline tournament={tournament} hasWinner={!!tournamentWinnerTeamId} />
+              <TournamentTimeline tournament={tournament} hasWinner={!!bracket?.champion_team_id} />
             </CardContent>
           </Card>
 
@@ -612,7 +597,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <BracketView 
                     bracket={bracket} 
                     teamsMap={teamsMap} 
-                    tournamentWinnerTeamId={tournamentWinnerTeamId}
                     onMatchClick={canReferee ? handleMatchClick : undefined} 
                   />
                   
