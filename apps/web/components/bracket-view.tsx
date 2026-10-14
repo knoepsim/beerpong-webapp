@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Check, Clock, Trophy, Hash } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Bracket, Match, Team } from "@/types";
+import { roundLabel } from "@/lib/utils";
 
 interface BracketViewProps {
   bracket: Bracket;
@@ -45,11 +46,7 @@ export function BracketView({ bracket, teamsMap, tournamentWinnerTeamId, onMatch
           return (
             <div key={round} className="flex flex-col min-w-[220px]">
               <h3 className="text-sm font-semibold text-center mb-4 text-muted-foreground uppercase tracking-wider">
-                {round === bracket.total_rounds
-                  ? "Finale"
-                  : round === bracket.total_rounds - 1
-                    ? "Halbfinale"
-                    : `Runde ${round}`}
+                {roundLabel(round, bracket.total_rounds)}
               </h3>
 
               <div className="flex flex-col justify-around flex-1">
