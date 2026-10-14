@@ -39,6 +39,11 @@ describe('ApiError', () => {
     expect(err.status).toBe(422);
   });
 
+  it('hides the validation prefix from users', () => {
+    const err = new ApiError(422, { detail: [{ msg: 'Value error, Nur deutsche Handynummern' }] });
+    expect(err.message).toBe('Nur deutsche Handynummern');
+  });
+
   it('falls back to a generic message', () => {
     expect(new ApiError(500, {}).message).toBe('Ein Fehler ist aufgetreten');
   });
@@ -191,6 +196,8 @@ describe('api endpoints', () => {
     ['tournaments.create', () => api.tournaments.create(tournamentBody as never), 'POST', '/tournaments', tournamentBody],
     ['tournaments.update', () => api.tournaments.update('x', tournamentBody as never), 'PATCH', '/tournaments/x', tournamentBody],
     ['tournaments.delete', () => api.tournaments.delete('x'), 'DELETE', '/tournaments/x', undefined],
+    ['tournaments.getBracket (invite)', () => api.tournaments.getBracket('x', 'inv'), 'GET', '/tournaments/x/bracket?invite=inv', undefined],
+    ['tournaments.getTeams (invite)', () => api.tournaments.getTeams('x', 'inv'), 'GET', '/tournaments/x/teams?invite=inv', undefined],
     ['tournaments.join', () => api.tournaments.join('x', 't1', 'inv'), 'POST', '/tournaments/x/join', { team_id: 't1', invite_token: 'inv' }],
     ['tournaments.leave', () => api.tournaments.leave('x'), 'DELETE', '/tournaments/x/leave', undefined],
     ['tournaments.removeTeam', () => api.tournaments.removeTeam('x', 't1'), 'DELETE', '/tournaments/x/teams/t1', undefined],

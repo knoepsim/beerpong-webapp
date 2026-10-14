@@ -10,6 +10,7 @@ from app.core.exceptions import (
     NotFoundError,
     PlayerAlreadyInTournamentError,
     TeamNotCompleteError,
+    TournamentAlreadyStartedError,
     TournamentDeletedError,
 )
 from app.models.team import Team, TeamMember
@@ -21,6 +22,8 @@ from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 
 
 class TournamentService:
@@ -140,7 +143,9 @@ class TournamentService:
     ) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""
         tournament = await self.get_tournament(tournament_id)
-        
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+
         from app.models.tournament import TournamentVisibility
         if tournament.visibility == TournamentVisibility.PRIVATE:
             if not tournament.invite_token or invite_token != tournament.invite_token:
@@ -194,7 +199,8 @@ class TournamentService:
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
         """Withdraw a team from a tournament before it starts."""
-        await self.get_tournament(tournament_id)
+        if (await self.get_tournament(tournament_id)).is_started:
+            raise TournamentAlreadyStartedError()
 
         team_q = (
             select(Team)
@@ -220,8 +226,9 @@ class TournamentService:
         )
 
     async def remove_team(self, tournament_id: UUID, team_id: UUID) -> None:
-        """Remove a specific team from a tournament (Admin action)."""
-        await self.get_tournament(tournament_id)
+        """Remove a specific team from a tournament (Admin action, only before it starts)."""
+        if (await self.get_tournament(tournament_id)).is_started:
+            raise TournamentAlreadyStartedError()
         result = await self.db.execute(
             delete(TournamentTeam)
             .where(
@@ -241,8 +248,8 @@ class TournamentService:
         from fastapi import HTTPException
         
         tournament = await self.get_tournament(tournament_id)
-        if tournament.started_at is not None:
-            raise HTTPException(status_code=400, detail="Tournament is already started.")
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
             
         res = await self.db.execute(select(Match).where(Match.tournament_id == tournament_id))
         if not res.scalars().first():
@@ -273,3 +280,17 @@ class TournamentService:
 def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TournamentService:
     return TournamentService(db)
 
+
+
+async def get_accessible_tournament(
+    tournament_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[TournamentService, Depends(get_tournament_service)],
+    invite: str | None = None,
+) -> Tournament:
+    """Dependency for every read endpoint of a tournament: enforces the visibility rules.
+
+    Private tournaments are only accessible to role holders, participants and holders of
+    the invite token (passed as ?invite=...).
+    """
+    return await service.get_tournament_for_user(tournament_id, current_user.id, invite)

@@ -2,11 +2,11 @@ import hashlib
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import InvalidCredentialsError, TokenRevokedError
+from app.core.exceptions import InvalidCredentialsError, TokenRevokedError, TooManyRequestsError
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -29,7 +29,20 @@ class AuthService:
         self.db = db
 
     async def request_sms_code(self, phone_number: str) -> None:
-        """Generate an SMS code, store its hash, and send it via the SMS service."""
+        """Generate an SMS code, store its hash, and send it via the SMS service.
+
+        Rate limited per phone number (cooldown between requests and a maximum per hour),
+        which also covers the phone number change flow.
+        """
+        await self._enforce_request_limits(phone_number)
+
+        # Only the newest code is valid: older ones must not give extra guesses
+        await self.db.execute(
+            update(SmsVerification)
+            .where(SmsVerification.phone_number == phone_number, SmsVerification.used == False)  # noqa: E712
+            .values(used=True)
+        )
+
         code = generate_sms_code()
         code_hash = hash_sms_code(code)
 
@@ -43,6 +56,26 @@ class AuthService:
 
         sms_service = get_sms_service()
         sms_service.send_code(phone_number, code)
+
+
+    async def _count_requests_since(self, phone_number: str, since: datetime) -> int:
+        result = await self.db.execute(
+            select(func.count())
+            .select_from(SmsVerification)
+            .where(SmsVerification.phone_number == phone_number, SmsVerification.created_at > since)
+        )
+        return result.scalar_one()
+
+
+    async def _enforce_request_limits(self, phone_number: str) -> None:
+        now = datetime.now(UTC)
+        cooldown = timedelta(seconds=settings.sms_resend_cooldown_seconds)
+        if await self._count_requests_since(phone_number, now - cooldown) > 0:
+            raise TooManyRequestsError(
+                f"Please wait {settings.sms_resend_cooldown_seconds} seconds before requesting a new code"
+            )
+        if await self._count_requests_since(phone_number, now - timedelta(hours=1)) >= settings.sms_max_requests_per_hour:
+            raise TooManyRequestsError("Too many codes requested for this number, please try again later")
 
 
     async def verify_sms_code_only(self, phone_number: str, code: str) -> None:
@@ -59,7 +92,15 @@ class AuthService:
         )
         verification = result.scalar_one_or_none()
 
-        if verification is None or not verify_sms_code(code, verification.code_hash):
+        if verification is None:
+            raise InvalidCredentialsError("Invalid or expired verification code")
+
+        if not verify_sms_code(code, verification.code_hash):
+            verification.failed_attempts += 1
+            if verification.failed_attempts >= settings.sms_max_verify_attempts:
+                verification.used = True  # burn the code, a new one has to be requested
+            # The request fails, so get_db would roll back: persist the attempt counter explicitly
+            await self.db.commit()
             raise InvalidCredentialsError("Invalid or expired verification code")
 
         # Mark code as used

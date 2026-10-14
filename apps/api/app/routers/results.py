@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotFoundError, ResultRequiresWinnerError
+from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user
 from app.models.match import Match
 from app.models.result import Result, ResultType
@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.result import ResultCreate, ResultResponse
 from app.services.bracket_service import BracketService
 from app.services.role_service import RoleService
+from app.services.tournament_service import TournamentService
 
 router = APIRouter(prefix="/matches/{match_id}/results", tags=["Results"])
 
@@ -65,9 +66,6 @@ async def modify_result(
     await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
     )
 
-    if body.winner_team_id is None:
-        raise ResultRequiresWinnerError()
-
     return await BracketService(db).modify_result(match_id, body, current_user.id)
 
 
@@ -100,8 +98,10 @@ async def list_results(
     match_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    invite: str | None = None,
 ):
-    await _get_match(db, match_id)
+    match = await _get_match(db, match_id)
+    await TournamentService(db).get_tournament_for_user(match.tournament_id, current_user.id, invite)
     result = await db.execute(
         select(Result)
         .options(joinedload(Result.reported_by_user))

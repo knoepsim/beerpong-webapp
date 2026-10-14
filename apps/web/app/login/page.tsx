@@ -22,6 +22,7 @@ import {
   InputOTPSeparator,
 } from "@/components/ui/input-otp";
 import { z } from "zod";
+import { phoneSchema, toE164, toNationalDigits } from "@/lib/phone";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -34,10 +35,6 @@ import {
 } from "@/components/ui/form";
 
 type Step = "phone" | "code" | "new_user";
-
-const phoneSchema = z.object({
-  phone: z.string().min(5, "Bitte gib eine gültige Telefonnummer ein.").regex(/^\d+$/, "Nur Zahlen erlaubt"),
-});
 
 const codeSchema = z.object({
   code: z.string().length(6, "Bitte gib den 6-stelligen Code ein."),
@@ -64,7 +61,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      await api.auth.requestCode(`+49${values.phone}`);
+      await api.auth.requestCode(toE164(values.phone));
       setCurrentPhone(values.phone);
       setStep("code");
     } catch (err: unknown) {
@@ -79,7 +76,7 @@ export default function LoginPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const result = await api.auth.verify(`+49${currentPhone}`, values.code);
+      const result = await api.auth.verify(toE164(currentPhone), values.code);
       setTokens(result.access_token, result.refresh_token);
       
       const user = await api.users.me();
@@ -131,7 +128,7 @@ export default function LoginPage() {
                             placeholder="151 12345678"
                             {...field}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                              const val = toNationalDigits(e.target.value);
                               field.onChange(val);
                             }}
                             disabled={isLoading}

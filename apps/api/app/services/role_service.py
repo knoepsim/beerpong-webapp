@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InsufficientRoleError, NotFoundError
 from app.models.tournament_role import ROLE_HIERARCHY, TournamentRoleType, TournamentUserRole
+from app.models.user import User
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
@@ -65,6 +66,9 @@ class RoleService:
         # Referee cannot assign any role
         if assigner_highest == TournamentRoleType.REFEREE:
             raise InsufficientRoleError("Referees cannot assign roles")
+
+        if await self.db.get(User, target_user_id) is None:
+            raise NotFoundError("User")
 
         # Check if role already exists
         existing = await self.db.execute(

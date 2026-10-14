@@ -41,6 +41,10 @@ class Tournament(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    @property
+    def is_started(self) -> bool:
+        return self.started_at is not None
+
 
 class TournamentTeam(Base):
     __tablename__ = "tournament_teams"

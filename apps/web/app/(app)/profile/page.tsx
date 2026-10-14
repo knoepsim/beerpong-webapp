@@ -38,6 +38,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { z } from "zod";
+import { phoneSchema, toE164, toNationalDigits } from "@/lib/phone";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogOut, Save, User as UserIcon, Monitor, Moon, Sun, Smartphone, RefreshCwIcon } from "lucide-react";
@@ -45,10 +46,6 @@ import { LogOut, Save, User as UserIcon, Monitor, Moon, Sun, Smartphone, Refresh
 const profileSchema = z.object({
   name: z.string().min(2, "Der Anzeigename muss mindestens 2 Zeichen lang sein."),
   email: z.string().email("Bitte gib eine gültige E-Mail Adresse ein.").or(z.literal("")).optional(),
-});
-
-const phoneSchema = z.object({
-  phone: z.string().min(5, "Bitte gib eine gültige Telefonnummer ein.").regex(/^\d+$/, "Nur Zahlen erlaubt"),
 });
 
 const codeSchema = z.object({
@@ -126,7 +123,7 @@ export default function ProfilePage() {
     setIsPhoneLoading(true);
     setPhoneApiError(null);
     try {
-      await api.users.requestPhoneChange(values.phone);
+      await api.users.requestPhoneChange(toE164(values.phone));
       setCurrentPhone(values.phone);
       setPhoneStep(2);
     } catch (err: any) {
@@ -140,7 +137,7 @@ export default function ProfilePage() {
     setIsPhoneLoading(true);
     setPhoneApiError(null);
     try {
-      await api.users.verifyPhoneChange(currentPhone, values.code);
+      await api.users.verifyPhoneChange(toE164(currentPhone), values.code);
       await reload();
       setIsPhoneDialogOpen(false);
       setSuccess(true);
@@ -357,7 +354,7 @@ export default function ProfilePage() {
                             placeholder="151 12345678"
                             {...field}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, '').replace(/^0+/, '');
+                              const val = toNationalDigits(e.target.value);
                               field.onChange(val);
                             }}
                             disabled={isPhoneLoading}
