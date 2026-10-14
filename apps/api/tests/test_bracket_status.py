@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.models.user import User
+from app.models.tournament import TournamentPhase
 from app.schemas.match import MatchStatus
 from app.schemas.result import ResultCreate
 from main import app
@@ -74,6 +75,37 @@ async def test_champion_is_the_winner_of_the_final():
         await service.report_result(final.id, ResultCreate(winner_team_id=final.team_b_id, cups_left=1), USER)
 
         assert (await service.get_bracket(tournament.id)).champion_team_id == final.team_b_id
+
+
+@pytest.mark.asyncio
+async def test_the_result_of_the_final_finishes_and_reopens_the_tournament():
+    async for db in app.dependency_overrides[get_db]():
+        service, tournament, _ = await generate_started_tournament(db, 2)
+        final = _by_round(await service.get_bracket(tournament.id), 1)[0]
+        assert tournament.finished_at is None
+        assert tournament.phase == TournamentPhase.RUNNING
+
+        await service.report_result(final.id, ResultCreate(winner_team_id=final.team_a_id, cups_left=3), USER)
+        assert tournament.finished_at is not None
+        assert tournament.phase == TournamentPhase.FINISHED
+
+        await service.modify_result(final.id, ResultCreate(winner_team_id=final.team_b_id, cups_left=1), USER)
+        assert tournament.phase == TournamentPhase.FINISHED, "a correction does not reopen it"
+
+        await service.delete_result(final.id, USER)
+        assert tournament.finished_at is None
+        assert tournament.phase == TournamentPhase.RUNNING
+
+
+@pytest.mark.asyncio
+async def test_a_result_before_the_final_does_not_finish_the_tournament():
+    async for db in app.dependency_overrides[get_db]():
+        service, tournament, _ = await generate_started_tournament(db, 4)
+        first = _by_round(await service.get_bracket(tournament.id), 1)[0]
+
+        await service.report_result(first.id, ResultCreate(winner_team_id=first.team_a_id), USER)
+
+        assert tournament.finished_at is None
 
 
 @pytest.mark.asyncio

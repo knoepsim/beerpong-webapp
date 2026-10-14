@@ -24,6 +24,7 @@ class TournamentPhase(str, enum.Enum):
     REGISTRATION_CLOSED = "registration_closed"
     CHECKIN = "checkin"
     RUNNING = "running"
+    FINISHED = "finished"
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -42,6 +43,8 @@ class Tournament(Base):
     registration_end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # set while the final has a result: the tournament is over
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
@@ -80,6 +83,8 @@ class Tournament(Base):
 
     @property
     def phase(self) -> TournamentPhase:
+        if self.finished_at is not None:
+            return TournamentPhase.FINISHED
         if self.is_started:
             return TournamentPhase.RUNNING
         if self.registration_open:

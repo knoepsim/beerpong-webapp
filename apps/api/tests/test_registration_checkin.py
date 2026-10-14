@@ -134,6 +134,7 @@ async def test_phase_follows_the_schedule(ctx: Ctx):
     await ctx.start(tid)
     started = await ctx.get(tid)
     assert (started["phase"], started["registration_open"], started["checkin_open"]) == ("running", False, False)
+    assert started["finished_at"] is None
 
 
 # --- check-in --------------------------------------------------------------------
