@@ -54,14 +54,5 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"
-  },
-  "pnpm": {
-    "overrides": {
-      "postcss-selector-parser@<7.1.6": "^7.1.6"
-    },
-    "onlyBuiltDependencies": [
-      "sharp",
-      "unrs-resolver"
-    ]
   }
 }

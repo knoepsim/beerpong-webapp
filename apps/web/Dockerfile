@@ -11,7 +11,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copy the whole workspace config to install correctly
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN echo "node-linker=hoisted" > .npmrc
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
