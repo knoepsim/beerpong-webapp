@@ -63,6 +63,8 @@ class UserService:
         await AuthService(self.db).verify_sms_code_only(new_phone_number, code)
 
         user.phone_number = new_phone_number
+        # The phone number is the login identity: sessions of the old number must not survive
+        await AuthService(self.db).revoke_all_user_tokens(user.id)
         await self.db.flush()
         return user
 
