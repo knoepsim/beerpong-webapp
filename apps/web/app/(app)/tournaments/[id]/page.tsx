@@ -505,7 +505,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">
-          {canAdmin && (
+          {canManage && (
             <Card className="border-primary/50 shadow-sm bg-primary/5">
               <CardHeader className="pb-3">
                 <CardTitle className="text-primary flex items-center gap-2">
