@@ -84,7 +84,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
               {/* Connector + circle: horizontal on desktop, vertical on mobile */}
               <div className="flex sm:flex-row flex-col items-center sm:w-full self-stretch sm:self-auto">
                 <div
-                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[0.75rem] ${i === 0 ? "opacity-0" : steps[i - 1].done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[1rem] ${i === 0 ? "opacity-0" : steps[i - 1].done ? "bg-primary" : "bg-border"}`}
                 />
                 <div
                   className={`relative z-10 flex items-center justify-center size-9 rounded-full border-2 shrink-0 text-base transition-colors ${
@@ -98,11 +98,11 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
                   <span aria-hidden="true">{step.done ? "✓" : step.icon}</span>
                 </div>
                 <div
-                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[0.75rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[1rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
                 />
               </div>
 
-              <div className="text-left sm:text-center pb-4 sm:pb-0 px-1 sm:px-2 flex-1 sm:flex-none sm:w-full">
+              <div className="text-left sm:text-center px-1 sm:px-2 flex-1 sm:flex-none sm:w-full self-center">
                 <p
                   className={`text-sm font-semibold leading-tight ${
                     step.active ? "text-primary" : step.done ? "text-foreground" : "text-muted-foreground"

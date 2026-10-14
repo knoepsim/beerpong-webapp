@@ -17,8 +17,9 @@ import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
 import { CheckinSummary } from "@/components/checkin-summary";
+import { TournamentTeamList } from "@/components/tournament-team-list";
 import { checkinOpensAt, phaseLabel, planStart } from "@/lib/tournament-phase";
-import { MapPin, Calendar, Users, Trophy, Trash2, Play, Share2 } from "lucide-react";
+import { MapPin, Calendar, Users, Trophy, Play, Share2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import {
   Dialog,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -91,6 +93,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
   const [isStartingTournament, setIsStartingTournament] = useState(false);
+  const [tab, setTab] = useState("overview");
 
   
 
@@ -432,18 +435,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
           <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
-          {canManage && (
-            <TabsTrigger value="admin" className="basis-full mt-1 h-9 border-t border-border/60 rounded-t-none">
-              <ShieldAlert className="size-4 mr-1.5" />
-              Einstellungen
-            </TabsTrigger>
-          )}
         </TabsList>
+        {canManage && (
+          <Button
+            variant="outline"
+            className={cn("mt-2 h-11 w-full", tab === "admin" && "border-primary bg-primary/10 text-primary")}
+            onClick={() => setTab("admin")}
+            aria-pressed={tab === "admin"}
+          >
+            <ShieldAlert aria-hidden="true" />
+            Turnier verwalten
+          </Button>
+        )}
 
         <TabsContent value="overview" className="mt-6 space-y-6">
           {canManage && (
@@ -590,102 +598,32 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </Card>
         </TabsContent>
 
-        <TabsContent value="teams" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Teilnehmer</CardTitle>
-              <CardDescription>Teams, die an diesem Turnier teilnehmen</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
-                <CheckinSummary teams={tournamentTeams} />
-              )}
-              {tournament.checkin_enabled && !tournament.started_at && !tournament.checkin_open && checkinOpensAt(tournament) && (
-                <p className="text-sm text-muted-foreground">
-                  Der Check-in beginnt am{" "}
-                  {new Date(checkinOpensAt(tournament)!).toLocaleString("de-DE", {
-                    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-                  })}{" "}
-                  Uhr.
-                </p>
-              )}
-              {tournamentTeams.length === 0 ? (
-                <p className="text-muted-foreground italic text-center py-8">
-                  Noch keine Teams beigetreten.
-                </p>
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {tournamentTeams.map((team) => {
-                    const isMyTeam = team.id === myTournamentTeam?.id;
-                    return (
-                    <div 
-                      key={team.id} 
-                      className={`relative flex flex-col p-3 border rounded-lg gap-2 ${
-                        isMyTeam ? "border-primary bg-primary/5" : "bg-muted/20"
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium truncate">{team.name}</p>
-                      </div>
-                      {team.members.length > 0 ? (
-                        <div className="text-sm text-muted-foreground flex gap-1.5 flex-wrap">
-                          {team.members.map(m => (
-                            <span key={m.user_id} className="bg-secondary/50 px-2 py-0.5 rounded-md text-xs">{m.name}</span>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground italic text-xs">
-                          Keine Spieler
-                        </div>
-                      )}
-                      
-                        <div className="absolute top-2 right-2 flex gap-1">
-                          {canManage && !tournament.started_at ? (
-                            <>
-                              {tournament.checkin_enabled && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className={`h-9 px-3 text-xs ${team.is_checked_in ? "border-green-700 bg-green-50 text-green-900 hover:bg-green-100 dark:border-green-500 dark:bg-green-950/40 dark:text-green-200" : ""}`}
-                                  onClick={() => handleCheckin(team.id, team.name, !team.is_checked_in)}
-                                  disabled={!tournament.checkin_open}
-                                  aria-pressed={team.is_checked_in}
-                                  aria-label={`${team.name} ${team.is_checked_in ? "ist eingecheckt, Check-in zurücknehmen" : "einchecken"}`}
-                                  title={
-                                    tournament.checkin_open
-                                      ? team.is_checked_in ? "Check-in zurücknehmen" : "Team einchecken"
-                                      : "Der Check-in hat noch nicht begonnen"
-                                  }
-                                >
-                                  {team.is_checked_in ? <><Check className="h-4 w-4 mr-1" /> Eingecheckt</> : "Einchecken"}
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => handleRemoveTeam(team.id, team.name)}
-                                title="Team entfernen"
-                                aria-label={`Team ${team.name} entfernen`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            team.is_checked_in && !tournament.started_at && (
-                              <div className="flex items-center h-8 px-2 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-md">
-                                <Check className="h-4 w-4 mr-1" /> Eingecheckt
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
-                  );
-                })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <TabsContent value="teams" className="mt-6 space-y-4">
+          {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
+            <CheckinSummary teams={tournamentTeams} />
+          )}
+          {tournament.checkin_enabled && !tournament.started_at && !tournament.checkin_open && checkinOpensAt(tournament) && (
+            <p className="text-sm text-muted-foreground">
+              Der Check-in beginnt am{" "}
+              {new Date(checkinOpensAt(tournament)!).toLocaleString("de-DE", {
+                day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+              })}{" "}
+              Uhr.
+            </p>
+          )}
+          {tournamentTeams.length === 0 ? (
+            <p className="py-8 text-center text-muted-foreground">Noch keine Teams angemeldet.</p>
+          ) : (
+            <TournamentTeamList
+              teams={tournamentTeams}
+              myTeamId={myTournamentTeam?.id}
+              showCheckin={tournament.checkin_enabled && !tournament.started_at}
+              checkinOpen={tournament.checkin_open}
+              canManage={canManage && !tournament.started_at}
+              onCheckin={(team, checkedIn) => handleCheckin(team.id, team.name, checkedIn)}
+              onRemove={(team) => handleRemoveTeam(team.id, team.name)}
+            />
+          )}
         </TabsContent>
 
         {canManage && (
