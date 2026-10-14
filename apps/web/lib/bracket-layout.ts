@@ -91,6 +91,17 @@ export function buildBracketLayout(bracket: Bracket): BracketLayout {
   return { totalRounds: total, rounds };
 }
 
+/** A slot whose team has already moved on: a finished match or a bye. */
+export function isAdvanced(slot: BracketSlot | undefined): boolean {
+  return slot?.kind === "bye" || (slot?.kind === "match" && slot.match.status === "finished");
+}
+
+/** The round that is being played right now: the first one with a match that is ready. */
+export function currentRound(layout: BracketLayout): number | null {
+  const round = layout.rounds.find((r) => r.slots.some((s) => s.kind === "match" && s.match.status === "ready"));
+  return round ? round.round : null;
+}
+
 /**
  * First round worth showing: the earliest one that is not completely played.
  * A finished tournament shows the last two rounds.

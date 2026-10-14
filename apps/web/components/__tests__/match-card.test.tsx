@@ -91,6 +91,14 @@ describe('MatchCard', () => {
     expect(screen.getByText('Sieger Spiel 3').closest('div')!.className).toContain('border-l-blue-500/30');
   });
 
+  it('stands out while it can be played and not afterwards', () => {
+    const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
+    expect(screen.getByRole('group').className).toContain('border-primary/50');
+
+    rerender(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
+    expect(screen.getByRole('group').className).not.toContain('border-primary/50');
+  });
+
   it('becomes a button with a handler', () => {
     const onClick = vi.fn();
     render(<MatchCard slot={slot()} teamsMap={teamsMap} onClick={onClick} />);

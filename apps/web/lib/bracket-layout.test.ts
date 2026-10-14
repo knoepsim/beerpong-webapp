@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildBracketLayout, defaultFirstRound } from './bracket-layout'
+import { buildBracketLayout, currentRound, defaultFirstRound, isAdvanced } from './bracket-layout'
 import { fiveTeamBracket, makeMatch } from './test-fixtures/bracket'
 import type { Bracket } from '@/types'
 
@@ -44,6 +44,36 @@ describe('buildBracketLayout', () => {
 
   it('is empty without rounds', () => {
     expect(buildBracketLayout({ tournament_id: 't', total_rounds: 0, champion_team_id: null, matches: [] }).rounds).toEqual([])
+  })
+})
+
+describe('isAdvanced', () => {
+  const layout = (overrides = {}) => buildBracketLayout(fiveTeamBracket(overrides)).rounds[0].slots
+
+  it('is true for byes and finished matches only', () => {
+    const [bye, match] = layout()
+    expect(isAdvanced(bye)).toBe(true)
+    expect(isAdvanced(match)).toBe(false) // ready, not played
+    expect(isAdvanced(layout({ m1: { status: 'finished', winner_team_id: 't4' } })[1])).toBe(true)
+    expect(isAdvanced(undefined)).toBe(false)
+  })
+})
+
+describe('currentRound', () => {
+  it('is the first round with a match that is ready', () => {
+    expect(currentRound(buildBracketLayout(fiveTeamBracket()))).toBe(1)
+    const played = fiveTeamBracket({ m1: { status: 'finished', winner_team_id: 't4' } })
+    expect(currentRound(buildBracketLayout(played))).toBe(2)
+  })
+
+  it('is null when nothing can be played', () => {
+    const done = fiveTeamBracket({
+      m1: { status: 'finished', winner_team_id: 't4' },
+      m3: { status: 'finished', winner_team_id: 't2' },
+    })
+    done.matches[1].status = 'finished'
+    done.matches[3].status = 'finished'
+    expect(currentRound(buildBracketLayout(done))).toBeNull()
   })
 })
 

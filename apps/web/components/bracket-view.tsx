@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ByeCard, MatchCard } from "@/components/match-card";
-import { buildBracketLayout, defaultFirstRound, type BracketSlot } from "@/lib/bracket-layout";
+import { buildBracketLayout, currentRound, defaultFirstRound, isAdvanced, type BracketSlot } from "@/lib/bracket-layout";
 import { cn, roundLabel } from "@/lib/utils";
 import type { Bracket, Match, Team } from "@/types";
 
@@ -12,7 +12,8 @@ const SLOT_HEIGHT = 112;
 /** Space between two columns, split in half for each side (the lines run through it). */
 const GUTTER = 20;
 const HALF_GUTTER = GUTTER / 2;
-const LINE = "border-muted-foreground/40";
+/** Lines of upcoming matches are light, lines of teams that have moved on are dark: the path reads like a story. */
+const lineColor = (done: boolean) => (done ? "border-foreground/50" : "border-muted-foreground/30");
 
 interface BracketViewProps {
   bracket: Bracket;
@@ -27,11 +28,17 @@ function Slot({
   position,
   hasNext,
   hasPrev,
+  advanced,
+  incomingAdvanced,
   children,
 }: {
   position: number;
   hasNext: boolean;
   hasPrev: boolean;
+  /** The team of this slot has moved on: its outgoing line is drawn dark. */
+  advanced: boolean;
+  /** At least one of the two slots feeding this match has moved on. */
+  incomingAdvanced: boolean;
   children: ReactNode;
 }) {
   return (
@@ -39,17 +46,28 @@ function Slot({
       <div className="relative w-full">
         {children}
         {hasPrev && (
-          <span aria-hidden="true" className={cn("absolute right-full top-1/2 border-t-2", LINE)} style={{ width: HALF_GUTTER }} />
+          <span
+            aria-hidden="true"
+            data-line={incomingAdvanced ? "done" : "pending"}
+            className={cn("absolute right-full top-1/2 border-t-2", lineColor(incomingAdvanced))}
+            style={{ width: HALF_GUTTER }}
+          />
         )}
         {hasNext && (
-          <span aria-hidden="true" className={cn("absolute left-full top-1/2 border-t-2", LINE)} style={{ width: HALF_GUTTER }} />
+          <span
+            aria-hidden="true"
+            data-line={advanced ? "done" : "pending"}
+            className={cn("absolute left-full top-1/2 border-t-2", lineColor(advanced))}
+            style={{ width: HALF_GUTTER }}
+          />
         )}
       </div>
       {hasNext && (
         // joins the stubs of the two slots that feed the same match: top child goes down, bottom child goes up
         <span
           aria-hidden="true"
-          className={cn("absolute right-0 h-1/2 border-r-2", LINE, position % 2 === 0 ? "top-1/2" : "top-0")}
+          data-line={advanced ? "done" : "pending"}
+          className={cn("absolute right-0 h-1/2 border-r-2", lineColor(advanced), position % 2 === 0 ? "top-1/2" : "top-0")}
         />
       )}
     </div>
@@ -98,6 +116,7 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
   const hidden = layout.rounds.filter((r) => r.round < firstRound);
   const hiddenMatches = hidden.reduce((sum, r) => sum + r.matchCount, 0);
   const treeHeight = 2 ** (layout.totalRounds - firstRound) * SLOT_HEIGHT;
+  const playing = currentRound(layout);
 
   return (
     <div className="space-y-3">
@@ -127,51 +146,65 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
         </div>
       )}
 
-      <div
-        // bleeds into the padding of the surrounding card so two columns fit on a phone
-        className="overflow-x-auto snap-x snap-proximity pb-2 -mx-4 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ ["--col" as string]: "clamp(130px, 38vw, 200px)" }}
-      >
-        <div className="flex w-max">
-          {visible.map((round) => {
-            const isFirstVisible = round.round === firstRound;
-            const isLast = round.round === layout.totalRounds;
-            return (
-              <section
-                key={round.round}
-                aria-label={roundLabel(round.round, layout.totalRounds)}
-                className={cn("snap-start shrink-0 flex flex-col rounded-lg", round.round % 2 === 0 && "bg-muted/60")}
-                style={{ width: `calc(var(--col) + ${GUTTER}px)` }}
-              >
-                <header className="h-14 flex flex-col justify-center px-3">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider">
-                    {roundLabel(round.round, layout.totalRounds)}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground">
-                    {round.finishedCount} von {round.matchCount} beendet
-                  </p>
-                </header>
-                <div className="flex flex-col" style={{ height: treeHeight }}>
-                  {round.slots.map((slot, position) => (
-                    <Slot
-                      key={position}
-                      position={position}
-                      hasNext={!isLast && slot.kind !== "empty"}
-                      hasPrev={!isFirstVisible && slot.kind === "match"}
-                    >
-                      <SlotContent
-                        slot={slot}
-                        teamsMap={teamsMap}
-                        championTeamId={isLast ? bracket.champion_team_id : null}
-                        highlightTeamId={highlightTeamId}
-                        onMatchClick={onMatchClick}
-                      />
-                    </Slot>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
+      {/* One grey surface behind the whole tree; the cards stand out in white and the lines show the structure.
+          Bleeds into the padding of the surrounding card so two columns fit on a phone. The viewer scrolls on
+          its own when the tree is tall, which keeps the round headers in view. */}
+      <div className="-mx-4 bg-muted">
+        <div
+          className="max-h-[calc(100dvh-9rem)] overflow-auto snap-x snap-proximity px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ ["--col" as string]: "clamp(130px, 38vw, 200px)" }}
+        >
+          <div className="flex w-max">
+            {visible.map((round, index) => {
+              const isFirstVisible = round.round === firstRound;
+              const isLast = round.round === layout.totalRounds;
+              const previous = index > 0 ? visible[index - 1] : undefined;
+              return (
+                <section
+                  key={round.round}
+                  aria-label={roundLabel(round.round, layout.totalRounds)}
+                  className="snap-start shrink-0 flex flex-col"
+                  style={{ width: `calc(var(--col) + ${GUTTER}px)` }}
+                >
+                  <header className="sticky top-0 z-10 h-14 flex flex-col justify-center px-3 bg-muted">
+                    <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider">
+                      {roundLabel(round.round, layout.totalRounds)}
+                      {round.round === playing && (
+                        <span className="rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium normal-case tracking-normal text-primary">
+                          Aktuell
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      {round.finishedCount} von {round.matchCount} beendet
+                    </p>
+                  </header>
+                  <div className="flex flex-col" style={{ height: treeHeight }}>
+                    {round.slots.map((slot, position) => (
+                      <Slot
+                        key={position}
+                        position={position}
+                        hasNext={!isLast && slot.kind !== "empty"}
+                        hasPrev={!isFirstVisible && slot.kind === "match"}
+                        advanced={isAdvanced(slot)}
+                        incomingAdvanced={
+                          !!previous && [2 * position, 2 * position + 1].some((i) => isAdvanced(previous.slots[i]))
+                        }
+                      >
+                        <SlotContent
+                          slot={slot}
+                          teamsMap={teamsMap}
+                          championTeamId={isLast ? bracket.champion_team_id : null}
+                          highlightTeamId={highlightTeamId}
+                          onMatchClick={onMatchClick}
+                        />
+                      </Slot>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

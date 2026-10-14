@@ -27,7 +27,7 @@ function TeamRow({ side, name, placeholder, isWinner, isChampion, isLoser, isMin
   return (
     <div
       className={cn(
-        "flex items-center gap-1.5 min-h-8 pl-1.5 pr-2 py-1 border-t border-l-4 text-[13px] leading-tight",
+        "flex items-center gap-1 min-h-8 px-1.5 py-1 border-t border-l-4 text-[13px] leading-tight",
         // the stripe stays strong until the match is decided, then only the winner keeps it
         isLoser || name === null ? colors.stripeMuted : colors.stripe,
         isMine ? "bg-primary/10" : isWinner && colors.winnerBg,
@@ -99,12 +99,14 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
 
   const className = cn(
     "w-full rounded-lg border bg-card text-left shadow-xs overflow-hidden",
+    // what can be played right now stands out
+    match.status === "ready" && "border-primary/50",
     mine && "ring-2 ring-primary/60",
     onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow",
   );
   const content = (
     <>
-      <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-1 text-[11px] leading-4 text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 px-2 pt-1 pb-1 text-xs leading-4 text-muted-foreground">
         <span className="truncate">
           Spiel {number}
           {match.table_number != null && ` · Tisch ${match.table_number}`}

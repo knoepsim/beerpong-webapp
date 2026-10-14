@@ -76,6 +76,37 @@ describe('BracketView', () => {
     expect(screen.queryByRole('group', { name: 'Erste angezeigte Runde' })).not.toBeInTheDocument();
   });
 
+  it('marks the round that is being played', () => {
+    const bracket = fiveTeamBracket({ m1: finished('t4') });
+    render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
+    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Finale' })).queryByText('Aktuell')).not.toBeInTheDocument();
+  });
+
+  it('draws the lines of teams that moved on dark and the others light', () => {
+    const lines = (container: HTMLElement, state: 'done' | 'pending') =>
+      container.querySelectorAll(`[data-line="${state}"]`).length;
+
+    // fresh: the three byes have moved on, everything else is still open
+    const fresh = render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    expect(lines(fresh.container, 'done')).toBeGreaterThan(0);
+    expect(lines(fresh.container, 'pending')).toBeGreaterThan(0);
+    fresh.unmount();
+
+    // a semi-final has a winner now: its line to the final turns dark as well (round one is hidden here)
+    const played = fiveTeamBracket({ m1: finished('t4'), m3: finished('t2') });
+    const { container } = render(<BracketView bracket={played} teamsMap={fiveTeams} />);
+    expect(screen.queryByRole('region', { name: 'Viertelfinale' })).not.toBeInTheDocument();
+    expect(lines(container, 'done')).toBeGreaterThan(0);
+  });
+
+  it('puts the whole tree on one surface instead of alternating columns', () => {
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    const columns = screen.getAllByRole('region');
+    expect(columns.some((c) => c.className.includes('bg-muted'))).toBe(false);
+    expect(columns[0].closest('.bg-muted')).not.toBeNull();
+  });
+
   it('shows the trophy only in the final', () => {
     const decided = fiveTeamBracket({
       m1: finished('t4'),
