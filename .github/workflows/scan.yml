@@ -76,11 +76,13 @@ jobs:
           docker network create "$PG_NAME"
           docker run -d --name "$PG_NAME" --network "$PG_NAME"             -e POSTGRES_USER=beerpong -e POSTGRES_PASSWORD=beerpong_ci -e POSTGRES_DB=beerpong             postgres:17-alpine
           docker network connect "$PG_NAME" "$(hostname)"
+          # -h 127.0.0.1: the temporary init server of the image only listens on the unix socket,
+          # so this only succeeds once the real server is up
           for i in $(seq 1 30); do
-            docker exec "$PG_NAME" pg_isready -U beerpong && break
+            docker exec "$PG_NAME" pg_isready -h 127.0.0.1 -U beerpong && break
             sleep 1
           done
-          docker exec "$PG_NAME" psql -U beerpong -d beerpong -c "CREATE DATABASE beerpong_test"
+          docker exec "$PG_NAME" psql -h 127.0.0.1 -U beerpong -d beerpong -c "CREATE DATABASE beerpong_test"
 
       - name: Install dependencies
         run: uv sync --frozen
