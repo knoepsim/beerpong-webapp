@@ -43,6 +43,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
+import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
+import { toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import ReactMarkdown from "react-markdown";
@@ -51,11 +53,17 @@ import remarkGfm from "remark-gfm";
 const createTournamentSchema = z.object({
   name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
   location: z.string().optional(),
-  start_time: z.string().min(1, "Bitte gib ein Startdatum und eine Startzeit an."),
   description: z.string().optional(),
   table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(20, "Maximal 20 Tische."),
   visibility: z.nativeEnum(TournamentVisibility),
 });
+
+const EMPTY_SCHEDULE: ScheduleValues = {
+  start_time: "",
+  registration_end_time: "",
+  checkin_enabled: false,
+  checkin_start_time: "",
+};
 
 export default function TournamentsPage() {
   const router = useRouter();
@@ -66,13 +74,16 @@ export default function TournamentsPage() {
 
   const [isCreating, setIsCreating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<ScheduleValues>(EMPTY_SCHEDULE);
+  const [showScheduleErrors, setShowScheduleErrors] = useState(false);
+  const scheduleErrors = validateSchedule(schedule);
+  const startMissing = showScheduleErrors && !schedule.start_time;
 
   const form = useForm<z.infer<typeof createTournamentSchema>>({
     resolver: zodResolver(createTournamentSchema as any),
     defaultValues: {
       name: "",
       location: "",
-      start_time: "",
       description: "",
       table_count: 1,
       visibility: TournamentVisibility.PRIVATE,
@@ -96,6 +107,8 @@ export default function TournamentsPage() {
   };
 
   const onSubmit = async (values: z.infer<typeof createTournamentSchema>) => {
+    setShowScheduleErrors(true);
+    if (!schedule.start_time || Object.keys(scheduleErrors).length > 0) return;
     setIsCreating(true);
     setApiError(null);
     try {
@@ -103,12 +116,17 @@ export default function TournamentsPage() {
         name: values.name.trim(),
         location: values.location?.trim() || undefined,
         description: values.description?.trim() || undefined,
-        start_time: new Date(values.start_time).toISOString(),
+        start_time: toIsoOrNull(schedule.start_time)!,
+        registration_end_time: toIsoOrNull(schedule.registration_end_time),
+        checkin_enabled: schedule.checkin_enabled,
+        checkin_start_time: schedule.checkin_enabled ? toIsoOrNull(schedule.checkin_start_time) : null,
         table_count: values.table_count,
         visibility: values.visibility,
       });
       setDialogOpen(false);
       form.reset();
+      setSchedule(EMPTY_SCHEDULE);
+      setShowScheduleErrors(false);
       router.push(`/tournaments/${t.id}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Fehler beim Erstellen";
@@ -346,6 +364,8 @@ export default function TournamentsPage() {
           setDialogOpen(open);
           if (!open) {
             form.reset();
+            setSchedule(EMPTY_SCHEDULE);
+            setShowScheduleErrors(false);
             setApiError(null);
           }
         }}>
@@ -353,7 +373,7 @@ export default function TournamentsPage() {
             <Plus className="mr-2 h-5 w-5" />
             Neues Turnier
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Turnier erstellen</DialogTitle>
               <DialogDescription>
@@ -376,34 +396,30 @@ export default function TournamentsPage() {
                   )}
                 />
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Ort</FormLabel>
-                        <FormControl>
-                          <Input placeholder="z.B. Garten, Keller, …" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="start_time"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Startdatum & -zeit *</FormLabel>
-                        <FormControl>
-                          <Input type="datetime-local" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ort</FormLabel>
+                      <FormControl>
+                        <Input placeholder="z.B. Garten, Keller, …" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <TournamentScheduleFields
+                  idPrefix="create"
+                  values={schedule}
+                  errors={{
+                    ...scheduleErrors,
+                    ...(startMissing ? { start_time: "Bitte gib ein Startdatum und eine Startzeit an." } : {}),
+                  }}
+                  onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))}
+                  disabled={isCreating}
+                />
 
                 <FormField
                   control={form.control}

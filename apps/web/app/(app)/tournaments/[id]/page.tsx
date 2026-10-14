@@ -14,6 +14,9 @@ import { BracketView } from "@/components/bracket-view";
 import { roundLabel } from "@/lib/utils";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
+import { TournamentTimeline } from "@/components/tournament-timeline";
+import { CheckinSummary } from "@/components/checkin-summary";
+import { checkinOpensAt, phaseLabel, planStart } from "@/lib/tournament-phase";
 import { MapPin, Calendar, Users, Trophy, Trash2, Play, Share2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -57,18 +60,6 @@ import {
 import { Check, X, RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const formatStatus = (status: string) => {
-  switch (status) {
-    case "SETUP": return "In Vorbereitung";
-    case "CHECKIN": return "Check-in offen";
-    case "ANMELDUNG_GESCHLOSSEN": return "Anmeldung geschlossen";
-    case "BRACKET_READY": return "Spielplan erstellt";
-    case "ACTIVE": return "Läuft";
-    case "COMPLETED": return "Abgeschlossen";
-    default: return status;
-  }
-};
-
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const tournamentId = resolvedParams.id;
@@ -99,7 +90,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
-  const [isGeneratingBracket, setIsGeneratingBracket] = useState(false);
   const [isStartingTournament, setIsStartingTournament] = useState(false);
 
   
@@ -174,36 +164,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const canManage = canAdmin || userRole === TournamentRoleType.MANAGER;
   const canReferee = canManage || userRole === TournamentRoleType.REFEREE;
 
-  // Deriving status based on dates and bracket
-  let status = "SETUP";
-  let timelineStep = 1;
-  
-  let isRegistrationOpen = true;
-
-  if (bracket && tournament?.started_at) {
-    status = "ACTIVE";
-    timelineStep = tournament.checkin_start_time ? 4 : 3;
-    isRegistrationOpen = false;
-  } else if (bracket) {
-    status = "BRACKET_READY";
-    timelineStep = tournament?.checkin_start_time ? 3 : 2;
-    isRegistrationOpen = false;
-  } else if (tournament) {
-    const now = new Date();
-    
-    if (tournament.registration_end_time && now >= new Date(tournament.registration_end_time)) {
-      isRegistrationOpen = false;
-    }
-
-    if (tournament.checkin_start_time && now >= new Date(tournament.checkin_start_time)) {
-      status = "CHECKIN";
-      timelineStep = 2;
-    } else if (!isRegistrationOpen) {
-      status = "ANMELDUNG_GESCHLOSSEN";
-      timelineStep = 1;
-    }
-  }
-
   const myTournamentTeam = useMemo(() => {
     if (!user || !tournamentTeams.length) return null;
     return tournamentTeams.find(team => team.members.some(m => m.user_id === user.id)) || null;
@@ -268,41 +228,32 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  const handleGenerateBracket = () => {
-    setConfirmState({
-      title: "Möchtest du den Spielplan jetzt generieren?",
-      description: "Achtung: Teams, die noch nicht eingecheckt sind, können nicht mehr teilnehmen. Dieser Schritt kann nicht rückgängig gemacht werden.",
-      action: async () => {
-        setIsGeneratingBracket(true);
-        try {
-          await api.tournaments.generateBracket(tournamentId);
-          await loadData();
-          toast.success("Spielplan generiert");
-        } catch (err: unknown) {
-          toast.error("Fehler beim Generieren des Spielplans");
-        } finally {
-          setIsGeneratingBracket(false);
-        }
-      }
-    });
-  };
-
   const handleStartTournament = () => {
+    if (!tournament) return;
+    const plan = planStart(tournament, tournamentTeams);
+    if (!plan.canStart) {
+      toast.error(plan.description);
+      return;
+    }
     setConfirmState({
-      title: "Möchtest du das Turnier jetzt offiziell starten?",
-      description: "Sobald das Turnier gestartet ist, können Ergebnisse für Matches eingetragen werden.",
+      title: "Turnier jetzt starten?",
+      description: plan.description,
       action: async () => {
         setIsStartingTournament(true);
         try {
-          await api.tournaments.startTournament(tournamentId);
+          const result = await api.tournaments.startTournament(tournamentId);
           await loadData();
-          toast.success("Turnier gestartet");
+          toast.success(
+            result.removed_team_ids.length > 0
+              ? `Turnier gestartet. ${result.removed_team_ids.length} Team(s) ohne Check-in entfernt.`
+              : "Turnier gestartet",
+          );
         } catch (err: unknown) {
-          toast.error("Fehler beim offiziellen Turnierstart");
+          toast.error(err instanceof Error ? err.message : "Fehler beim Turnierstart");
         } finally {
           setIsStartingTournament(false);
         }
-      }
+      },
     });
   };
 
@@ -393,7 +344,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               )}
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
-              <Badge variant={status === "SETUP" ? "secondary" : "default"}>{formatStatus(status)}</Badge>
+              <Badge variant={tournament.phase === "running" ? "default" : "secondary"}>
+                {phaseLabel(tournament.phase, !!tournamentWinnerTeamId)}
+              </Badge>
               {tournament.start_time && (
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" /> 
@@ -413,7 +366,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
           
-          {isRegistrationOpen && !myTournamentTeam && (
+          {!tournament.registration_open && !myTournamentTeam && (
+            <p className="text-sm text-muted-foreground">
+              {tournament.started_at ? "Das Turnier läuft bereits." : "Die Anmeldung ist geschlossen."}
+            </p>
+          )}
+
+          {tournament.registration_open && !myTournamentTeam && (
             <Dialog open={joinDialogOpen} onOpenChange={(open) => {
               setJoinDialogOpen(open);
               if (open) {
@@ -481,7 +440,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </Dialog>
           )}
 
-          {!bracket && myTournamentTeam && (
+          {!tournament.started_at && myTournamentTeam && (
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground hidden sm:inline">
                 Angemeldet mit <strong className="text-foreground">{myTournamentTeam.name}</strong>
@@ -514,30 +473,54 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   Turnier-Leitstand
                 </CardTitle>
                 <CardDescription>
-                  Führe das Turnier durch die nächsten Phasen.
+                  {tournament.started_at
+                    ? "Das Turnier läuft."
+                    : tournament.checkin_enabled
+                      ? "Checke die Teams vor Ort ein und starte dann das Turnier."
+                      : "Starte das Turnier, sobald alle Teams bereit sind."}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row gap-3">
-                {!bracket ? (
-                  <Button 
-                    onClick={handleGenerateBracket} 
-                    disabled={tournamentTeams.length < 2}
-                    className="w-full sm:w-auto"
-                  >
-                    Spielplan generieren
-                  </Button>
-                ) : !tournament.started_at ? (
-                  <Button 
-                    onClick={handleStartTournament} 
-                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    Turnier offiziell starten
-                  </Button>
-                ) : (
-                  <div className="text-sm font-medium text-green-600 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-600 animate-pulse" />
-                    Turnier läuft! Ergebnisse können im Spielplan eingetragen werden.
+              <CardContent className="space-y-4">
+                {tournament.started_at ? (
+                  <div className="text-sm font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-600 animate-pulse" aria-hidden="true" />
+                    Ergebnisse können im Spielplan eingetragen werden.
                   </div>
+                ) : (
+                  <>
+                    {tournament.checkin_enabled && <CheckinSummary teams={tournamentTeams} />}
+                    <Button
+                      onClick={handleStartTournament}
+                      disabled={isStartingTournament || !planStart(tournament, tournamentTeams).canStart}
+                      className="w-full sm:w-auto"
+                      size="lg"
+                    >
+                      Turnier starten
+                    </Button>
+                    {!planStart(tournament, tournamentTeams).canStart && (
+                      <p className="text-sm text-muted-foreground">
+                        {planStart(tournament, tournamentTeams).description}
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {myTournamentTeam && !tournament.started_at && tournament.checkin_enabled && (
+            <Card className={myTournamentTeam.is_checked_in ? "border-green-600/40 bg-green-50 dark:bg-green-950/20" : "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20"}>
+              <CardContent className="py-4 text-sm">
+                {myTournamentTeam.is_checked_in ? (
+                  <p className="font-medium flex items-center gap-2">
+                    <Check className="h-4 w-4 text-green-600" aria-hidden="true" />
+                    Dein Team ist eingecheckt.
+                  </p>
+                ) : (
+                  <p>
+                    <span className="font-medium">Dein Team ist noch nicht eingecheckt.</span>{" "}
+                    Melde dich vor Ort beim Orga-Team, sonst wirst du beim Start aus dem Turnier entfernt.
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -548,154 +531,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <CardTitle>Turnier-Ablauf</CardTitle>
             </CardHeader>
             <CardContent>
-              {(() => {
-                const fmt = (d: string) => new Date(d).toLocaleString("de-DE", {
-                  day: "2-digit", month: "2-digit", year: "numeric",
-                  hour: "2-digit", minute: "2-digit"
-                });
-
-                const now = new Date();
-                
-                // Determine states
-                const regEnd = tournament.registration_end_time ? new Date(tournament.registration_end_time) : null;
-                const isRegClosed = regEnd ? now >= regEnd : !!tournament.started_at;
-                
-                const checkinStart = tournament.checkin_start_time ? new Date(tournament.checkin_start_time) : null;
-                const isCheckinStarted = checkinStart ? now >= checkinStart : !!tournament.started_at;
-                
-                const hasStarted = !!tournament.started_at;
-                const isCompleted = hasStarted && !!tournamentWinnerTeamId;
-
-                // Build steps
-                const steps = [
-                  {
-                    key: "registration",
-                    icon: "📋",
-                    label: "Anmeldung",
-                    desc: isRegClosed ? "Geschlossen" : (regEnd ? `Bis ${fmt(tournament.registration_end_time!)}` : "Geöffnet"),
-                    done: isRegClosed,
-                    active: !isRegClosed,
-                  },
-                  {
-                    key: "checkin",
-                    icon: "✅",
-                    label: "Check-in",
-                    desc: hasStarted ? "Geschlossen" : (isCheckinStarted ? "Geöffnet" : (checkinStart ? `Ab ${fmt(tournament.checkin_start_time!)}` : "Vor Turnierstart")),
-                    done: hasStarted,
-                    active: isCheckinStarted && !hasStarted,
-                  },
-                  {
-                    key: "active",
-                    icon: "🏓",
-                    label: "Spiel",
-                    desc: isCompleted ? "Beendet" : (hasStarted ? "Turnier läuft" : "Warten auf Start"),
-                    done: isCompleted,
-                    active: hasStarted && !isCompleted,
-                  },
-                ];
-
-                return (
-                  <div className="flex flex-col sm:flex-row w-full mt-2">
-                    {steps.map((s, i) => {
-                      const done = s.done;
-                      const active = s.active;
-                      const isLast = i === steps.length - 1;
-                      
-                      // For a simple 3-step timeline, progress is either 0 or 100 between steps
-                      // Step 1 -> 2 is 100 if step 1 is done
-                      // Step 2 -> 3 is 100 if step 2 is done
-                      const lineProgress = done ? 100 : 0;
-
-                      return (
-                        <div key={s.key} className="flex sm:flex-col flex-row flex-1 items-start sm:items-stretch min-w-0">
-                          <div className="flex sm:flex-col flex-row items-center gap-3 sm:gap-1 flex-1 min-w-0 w-full">
-
-                            {/* ── Desktop: horizontal connector + circle ── */}
-                            <div className="hidden sm:flex items-center w-full mb-1">
-                              {/* Left progress bar (second half of previous segment) */}
-                              {i > 0 ? (
-                                <div className="flex-1 h-1 bg-border overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ width: `${Math.max(0, ((steps[i - 1].done ? 100 : 0) - 50) * 2)}%` }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex-1 opacity-0 h-1" />
-                              )}
-
-                              {/* Circle */}
-                              <div className={`relative z-10 flex items-center justify-center w-9 h-9 rounded-full border-2 shrink-0 text-base transition-all duration-300
-                                ${done
-                                  ? "bg-primary border-primary text-primary-foreground shadow-md"
-                                  : active
-                                    ? "bg-primary/10 border-primary text-primary ring-4 ring-primary/20 shadow-md"
-                                    : "bg-muted border-border text-muted-foreground"
-                                }`}>
-                                {done ? "✓" : s.icon}
-                              </div>
-
-                              {/* Right progress bar (first half of current segment) */}
-                              {!isLast ? (
-                                <div className="flex-1 h-1 bg-border overflow-hidden">
-                                  <div
-                                    className="h-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ width: `${Math.min(100, lineProgress * 2)}%` }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex-1 opacity-0 h-1" />
-                              )}
-                            </div>
-
-                            {/* ── Mobile: vertical connector + circle ── */}
-                            <div className="flex sm:hidden flex-col items-center self-stretch">
-                              {i > 0 ? (
-                                <div className="w-1 flex-1 min-h-[1.5rem] bg-border overflow-hidden">
-                                  <div
-                                    className="w-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ height: `${Math.max(0, ((steps[i - 1].done ? 100 : 0) - 50) * 2)}%` }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex-1 min-h-[1rem] opacity-0" />
-                              )}
-                              <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 shrink-0 text-sm transition-all duration-300
-                                ${done
-                                  ? "bg-primary border-primary text-primary-foreground shadow-md"
-                                  : active
-                                    ? "bg-primary/10 border-primary text-primary ring-4 ring-primary/20 shadow-md"
-                                    : "bg-muted border-border text-muted-foreground"
-                                }`}>
-                                {done ? "✓" : s.icon}
-                              </div>
-                              {!isLast ? (
-                                <div className="w-1 flex-1 min-h-[1.5rem] bg-border overflow-hidden">
-                                  <div
-                                    className="w-full bg-primary transition-all duration-700 ease-out"
-                                    style={{ height: `${Math.min(100, lineProgress * 2)}%` }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex-1 min-h-[1rem] opacity-0" />
-                              )}
-                            </div>
-
-                            {/* Text */}
-                            <div className="text-center sm:text-center text-left pb-4 sm:pb-0 px-1 sm:px-2 flex-1 sm:flex-none">
-                              <p className={`text-sm font-semibold leading-tight ${active ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"}`}>
-                                {s.label}
-                                {active && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle animate-pulse" />}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{s.desc}</p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+              <TournamentTimeline tournament={tournament} hasWinner={!!tournamentWinnerTeamId} />
             </CardContent>
           </Card>
 
@@ -768,8 +604,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               ) : !bracket ? (
                 <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
                   <Trophy className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="font-medium text-lg text-foreground">Der Spielplan wurde noch nicht erstellt.</p>
-                  <p className="mt-2 text-sm">Sobald der Admin das Turnier startet, findest du hier den Turnierbaum.</p>
+                  <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
+                  <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
                 </div>
               ) : (
                 <div className="space-y-8">
@@ -808,7 +644,19 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <CardTitle>Teilnehmer</CardTitle>
               <CardDescription>Teams, die an diesem Turnier teilnehmen</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
+                <CheckinSummary teams={tournamentTeams} />
+              )}
+              {tournament.checkin_enabled && !tournament.started_at && !tournament.checkin_open && checkinOpensAt(tournament) && (
+                <p className="text-sm text-muted-foreground">
+                  Der Check-in beginnt am{" "}
+                  {new Date(checkinOpensAt(tournament)!).toLocaleString("de-DE", {
+                    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  })}{" "}
+                  Uhr.
+                </p>
+              )}
               {tournamentTeams.length === 0 ? (
                 <p className="text-muted-foreground italic text-center py-8">
                   Noch keine Teams beigetreten.
@@ -839,34 +687,41 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         </div>
                       )}
                       
-                        {/* Design Decision (L9): Check-in buttons are intentionally hidden after bracket generation (BRACKET_READY/ACTIVE) because changing check-in status post-bracket would require regenerating the bracket, which disrupts the tournament flow. */}
                         <div className="absolute top-2 right-2 flex gap-1">
-                          {canManage && (status === "SETUP" || status === "CHECKIN" || status === "ANMELDUNG_GESCHLOSSEN") ? (
+                          {canManage && !tournament.started_at ? (
                             <>
-                              {tournament?.checkin_start_time && (
+                              {tournament.checkin_enabled && (
                                 <Button
-                                  variant="ghost"
+                                  variant="outline"
                                   size="sm"
-                                  className={`h-8 px-2 text-xs ${team.is_checked_in ? 'text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 dark:bg-green-950/30' : 'text-muted-foreground'}`}
+                                  className={`h-9 px-3 text-xs ${team.is_checked_in ? "border-green-700 bg-green-50 text-green-900 hover:bg-green-100 dark:border-green-500 dark:bg-green-950/40 dark:text-green-200" : ""}`}
                                   onClick={() => handleCheckin(team.id, team.name, !team.is_checked_in)}
-                                  title={team.is_checked_in ? "Check-out" : "Check-in"}
+                                  disabled={!tournament.checkin_open}
+                                  aria-pressed={team.is_checked_in}
+                                  aria-label={`${team.name} ${team.is_checked_in ? "ist eingecheckt, Check-in zurücknehmen" : "einchecken"}`}
+                                  title={
+                                    tournament.checkin_open
+                                      ? team.is_checked_in ? "Check-in zurücknehmen" : "Team einchecken"
+                                      : "Der Check-in hat noch nicht begonnen"
+                                  }
                                 >
-                                  {team.is_checked_in ? <><Check className="h-4 w-4 mr-1" /> Eingecheckt</> : "Check-in"}
+                                  {team.is_checked_in ? <><Check className="h-4 w-4 mr-1" /> Eingecheckt</> : "Einchecken"}
                                 </Button>
                               )}
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                className="h-9 w-9 text-destructive hover:bg-destructive/10 hover:text-destructive"
                                 onClick={() => handleRemoveTeam(team.id, team.name)}
                                 title="Team entfernen"
+                                aria-label={`Team ${team.name} entfernen`}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </>
                           ) : (
-                            team.is_checked_in && (
-                              <div className="flex items-center h-8 px-2 text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 rounded-md">
+                            team.is_checked_in && !tournament.started_at && (
+                              <div className="flex items-center h-8 px-2 text-xs font-medium text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-md">
                                 <Check className="h-4 w-4 mr-1" /> Eingecheckt
                               </div>
                             )
@@ -885,11 +740,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           <TabsContent value="admin" className="mt-6">
             <TournamentSettings 
               tournament={tournament}
-              status={status}
               roles={roles}
               userRole={userRole}
-              teamCount={tournamentTeams.length}
-              onGenerateBracket={handleGenerateBracket}
               onReload={loadData}
             />
           </TabsContent>
