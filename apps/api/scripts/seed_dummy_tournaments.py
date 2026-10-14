@@ -131,6 +131,20 @@ def tournament_name(teams: int, played: float | None, state: str | None) -> str:
     return f"{TOURNAMENT_PREFIX}{teams} Teams – {label}"
 
 
+def _schedule(state: str | None) -> dict:
+    """Registration deadline and check-in times that put the tournament into the given preparation phase."""
+    now = datetime.now(UTC)
+    if state == "registration":  # registration open, check-in planned for later (can be opened early)
+        return {
+            "registration_end_time": now + timedelta(hours=1),
+            "checkin_enabled": True,
+            "checkin_start_time": now + timedelta(hours=2),
+        }
+    if state == "checkin":  # registration closed, check-in open
+        return {"registration_end_time": now - timedelta(minutes=10), "checkin_enabled": True}
+    return {}
+
+
 async def create_tournament(
     db: AsyncSession,
     *,
@@ -157,9 +171,8 @@ async def create_tournament(
             name=name,
             location="Dummy-Garten",
             description=f"Testturnier mit {teams} Dummy-Teams, erzeugt mit scripts/seed_dummy_tournaments.py.",
-            start_time=datetime.now(UTC) + timedelta(hours=1),
-            registration_end_time=datetime.now(UTC) - timedelta(minutes=10) if state == "checkin" else None,
-            checkin_enabled=state == "checkin",
+            start_time=datetime.now(UTC) + timedelta(hours=4 if state == "registration" else 1),
+            **_schedule(state),
             table_count=8,
             visibility=TournamentVisibility.PUBLIC_LISTED,
         ),
