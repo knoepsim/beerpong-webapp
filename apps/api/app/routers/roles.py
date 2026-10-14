@@ -6,9 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.models.tournament import Tournament
 from app.models.user import User
 from app.schemas.tournament_role import RoleAssignRequest, TournamentUserRoleResponse
 from app.services.role_service import RoleService
+from app.services.tournament_service import get_accessible_tournament
 
 router = APIRouter(prefix="/tournaments/{tournament_id}/roles", tags=["Roles"])
 
@@ -54,8 +56,7 @@ async def revoke_role(
     description="Listet alle Rollenzuweisungen für ein Turnier auf.",
 )
 async def list_roles(
-    tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await RoleService(db).list_roles(tournament_id)
+    return await RoleService(db).list_roles(tournament.id)
