@@ -8,6 +8,7 @@ import type {
   TokenResponse,
   Tournament,
   TournamentCreateRequest,
+  TournamentStartResponse,
   TournamentUserRole,
   User,
   PublicUser,
@@ -204,10 +205,8 @@ export const api = {
       request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),
     removeTeam: (tournamentId: string, teamId: string) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}`, { method: "DELETE" }),
-    generateBracket: (id: string) =>
-      request<Bracket>(`/tournaments/${id}/generate-bracket`, { method: "POST" }),
     startTournament: (id: string) =>
-      request<void>(`/tournaments/${id}/start`, { method: "POST" }),
+      request<TournamentStartResponse>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string, inviteToken?: string | null) =>
       request<Bracket>(`/tournaments/${id}/bracket${inviteQuery(inviteToken)}`),
     getTeams: (id: string, inviteToken?: string | null) =>

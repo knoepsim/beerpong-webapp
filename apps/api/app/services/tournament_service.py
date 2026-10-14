@@ -9,6 +9,9 @@ import string
 from app.core.exceptions import (
     NotFoundError,
     PlayerAlreadyInTournamentError,
+    CheckinDisabledError,
+    CheckinNotOpenError,
+    RegistrationClosedError,
     TeamNotCompleteError,
     TournamentAlreadyStartedError,
     TournamentDeletedError,
@@ -18,6 +21,7 @@ from app.models.tournament import Tournament, TournamentTeam
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
 from app.schemas.tournament import TournamentCreate, TournamentUpdate
+from app.services.schedule import validate_schedule
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
@@ -32,7 +36,10 @@ class TournamentService:
 
     async def create_tournament(self, data: TournamentCreate, creator_id: UUID) -> Tournament:
         """Create a new tournament and assign the creator as Admin."""
+        validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = data.model_dump()
+        if not data.checkin_enabled:
+            obj_in["checkin_start_time"] = None
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
@@ -105,6 +112,20 @@ class TournamentService:
         if not update_data:
             return tournament
 
+        new_checkin_enabled = update_data.get("checkin_enabled", tournament.checkin_enabled)
+        if tournament.is_started and new_checkin_enabled != tournament.checkin_enabled:
+            raise TournamentAlreadyStartedError()
+
+        merged = {
+            field: update_data.get(field, getattr(tournament, field))
+            for field in ("start_time", "registration_end_time", "checkin_enabled", "checkin_start_time")
+        }
+        validate_schedule(
+            merged["start_time"], merged["registration_end_time"], merged["checkin_enabled"], merged["checkin_start_time"]
+        )
+        if not merged["checkin_enabled"]:
+            update_data["checkin_start_time"] = None
+
         return await tournament_repository.update(self.db, db_obj=tournament, obj_in=update_data)
 
 
@@ -149,6 +170,8 @@ class TournamentService:
         tournament = await self.get_tournament(tournament_id, for_update=True)
         if tournament.is_started:
             raise TournamentAlreadyStartedError()
+        if not tournament.registration_open:
+            raise RegistrationClosedError()
 
         from app.models.tournament import TournamentVisibility
         if tournament.visibility == TournamentVisibility.PRIVATE:
@@ -245,25 +268,15 @@ class TournamentService:
 
 
 
-    async def start_tournament(self, tournament_id: UUID) -> None:
-        from datetime import datetime, timezone
-        from sqlalchemy import select
-        from app.models.match import Match
-        from fastapi import HTTPException
-        
-        tournament = await self.get_tournament(tournament_id, for_update=True)
-        if tournament.is_started:
-            raise TournamentAlreadyStartedError()
-            
-        res = await self.db.execute(select(Match).where(Match.tournament_id == tournament_id))
-        if not res.scalars().first():
-            raise HTTPException(status_code=400, detail="Cannot start tournament without a bracket.")
-            
-        tournament.started_at = datetime.now(timezone.utc)
-
     async def checkin_team(self, tournament_id: UUID, team_id: UUID, is_checked_in: bool) -> None:
         """Update check-in status for a team in a tournament."""
-        await self.get_tournament(tournament_id)
+        tournament = await self.get_tournament(tournament_id)
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+        if not tournament.checkin_enabled:
+            raise CheckinDisabledError()
+        if not tournament.checkin_open:
+            raise CheckinNotOpenError()
         
         result = await self.db.execute(
             select(TournamentTeam)

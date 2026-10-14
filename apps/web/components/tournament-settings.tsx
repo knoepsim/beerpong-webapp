@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
+import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
+import { toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -36,19 +38,13 @@ import {
 
 export function TournamentSettings({
   tournament,
-  status,
   roles,
   userRole,
-  teamCount,
-  onGenerateBracket,
   onReload,
 }: {
   tournament: Tournament;
-  status: string;
   roles: TournamentUserRole[];
   userRole: TournamentRoleType | null;
-  teamCount: number;
-  onGenerateBracket: () => void;
   onReload: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -77,17 +73,14 @@ export function TournamentSettings({
   const [editDescription, setEditDescription] = useState(tournament.description || "");
   const [editTableCount, setEditTableCount] = useState(tournament.table_count.toString());
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
-  // Helper to format Date to YYYY-MM-DDThh:mm for local datetime-local inputs
-  const toLocalDatetime = (dateStr: string | null) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const initialSchedule: ScheduleValues = {
+    start_time: toLocalInput(tournament.start_time),
+    registration_end_time: toLocalInput(tournament.registration_end_time),
+    checkin_enabled: tournament.checkin_enabled,
+    checkin_start_time: toLocalInput(tournament.checkin_start_time),
   };
-
-  const [editStartTime, setEditStartTime] = useState(toLocalDatetime(tournament.start_time));
-  const [editRegEndTime, setEditRegEndTime] = useState(toLocalDatetime(tournament.registration_end_time));
-  const [editCheckinStartTime, setEditCheckinStartTime] = useState(toLocalDatetime(tournament.checkin_start_time));
+  const [schedule, setSchedule] = useState<ScheduleValues>(initialSchedule);
+  const scheduleErrors = validateSchedule(schedule);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isDirty =
@@ -96,9 +89,7 @@ export function TournamentSettings({
     editDescription !== (tournament.description || "") ||
     editTableCount !== tournament.table_count.toString() ||
     editVisibility !== tournament.visibility ||
-    editStartTime !== toLocalDatetime(tournament.start_time) ||
-    editRegEndTime !== toLocalDatetime(tournament.registration_end_time) ||
-    editCheckinStartTime !== toLocalDatetime(tournament.checkin_start_time);
+    (Object.keys(initialSchedule) as (keyof ScheduleValues)[]).some((k) => schedule[k] !== initialSchedule[k]);
 
   const handleUpdateTournament = async () => {
     setIsUpdating(true);
@@ -109,9 +100,10 @@ export function TournamentSettings({
         description: editDescription || undefined,
         table_count: parseInt(editTableCount) || 1,
         visibility: editVisibility,
-        start_time: editStartTime ? new Date(editStartTime).toISOString() : undefined,
-        registration_end_time: editRegEndTime ? new Date(editRegEndTime).toISOString() : null,
-        checkin_start_time: editCheckinStartTime ? new Date(editCheckinStartTime).toISOString() : null,
+        start_time: toIsoOrNull(schedule.start_time) ?? undefined,
+        registration_end_time: toIsoOrNull(schedule.registration_end_time),
+        checkin_enabled: schedule.checkin_enabled,
+        checkin_start_time: schedule.checkin_enabled ? toIsoOrNull(schedule.checkin_start_time) : null,
       });
       await onReload();
       toast.success("Turnier-Details erfolgreich gespeichert!");
@@ -242,19 +234,14 @@ export function TournamentSettings({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Startzeit (Erforderlich)</Label>
-                <Input type="datetime-local" value={editStartTime} onChange={e => setEditStartTime(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Anmeldeschluss (Optional)</Label>
-                <Input type="datetime-local" value={editRegEndTime} onChange={e => setEditRegEndTime(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Check-in Start (Optional)</Label>
-                <Input type="datetime-local" value={editCheckinStartTime} onChange={e => setEditCheckinStartTime(e.target.value)} />
-              </div>
             </div>
+            <TournamentScheduleFields
+              idPrefix="settings"
+              values={schedule}
+              errors={scheduleErrors}
+              onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))}
+              checkinLocked={!!tournament.started_at}
+            />
             <div className="space-y-2">
               <Label>Beschreibung (Markdown unterstützt)</Label>
               <Tabs defaultValue="edit" className="w-full">
@@ -283,7 +270,7 @@ export function TournamentSettings({
                 </TabsContent>
               </Tabs>
             </div>
-            <Button onClick={handleUpdateTournament} disabled={isUpdating || !editName.trim() || !isDirty}>
+            <Button onClick={handleUpdateTournament} disabled={isUpdating || !editName.trim() || !schedule.start_time || Object.keys(scheduleErrors).length > 0 || !isDirty}>
               {isUpdating ? "Speichern..." : (isDirty ? "Änderungen speichern" : "Gespeichert")}
             </Button>
           </CardContent>

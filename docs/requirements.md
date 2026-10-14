@@ -101,12 +101,28 @@
 
 ---
 
+## Anmeldung, Check-in und Turnierstart
+
+| Aspekt | Logik |
+| :-- | :-- |
+| Anmeldeschluss | Optional (`registrationEndTime`). Danach ist kein Beitritt mehr möglich (`REGISTRATION_CLOSED`); Abmelden bleibt bis zum Start möglich. Ohne Anmeldeschluss ist die Anmeldung bis zum Start offen |
+| Check-in | Pro Turnier ein- oder ausschaltbar (`checkinEnabled`, Standard: aus). Er klärt vor Ort: ist das Team da, spielt es mit? Eingecheckt wird durch Admin/Manager |
+| Check-in-Beginn | `checkinStartTime`; leer = mit dem Anmeldeschluss, ohne Anmeldeschluss sofort. Check-in ist bis zum Start möglich |
+| Ohne Check-in | Keine Check-in-Aktionen; beim Start spielen alle angemeldeten Teams |
+| Zeitliche Reihenfolge | Anmeldeschluss <= Check-in-Beginn <= Startzeit (validiert in API und Formular) |
+| Start (ein Schritt) | Admin/Manager startet das Turnier. Mit Check-in werden Teams ohne Check-in aus dem Turnier entfernt, aus den übrigen wird der K.-o.-Baum ausgelost, das Turnier gilt als gestartet. Alles in einer Transaktion. Weniger als 2 spielende Teams: Start abgelehnt, nichts wird verändert |
+| Bestätigung | Vor dem Start zeigt die UI, wie viele Teams spielen und welche entfernt werden |
+| Phase | Die API liefert `phase` (`registration`, `registration_closed`, `checkin`, `running`) sowie `registration_open` und `checkin_open`; das Frontend berechnet sie nicht selbst |
+| Nach dem Start | Beitritt, Austritt, Entfernen, Check-in und die Check-in-Einstellung sind gesperrt |
+
+---
+
 ## Turnierdurchführung: KO-Bracket
 
 | Aspekt | Logik |
 | :-- | :-- |
 | Team-Zuordnung Runde 1 | Alle teilnehmenden Teams werden zufällig gemischt (Shuffle) |
-| Ungerade Teilnehmerzahl | Ein Team erhält zufällig ein Freilos (Bye) für Runde 1 |
+| Freilose (Byes) | Freilose gibt es nur in Runde 1. Bei 2^k < N <= 2^(k+1) Teams spielt Runde 1 genau N - 2^k Matches, die übrigen Teams überspringen sie; ab Runde 2 ist es ein volles K.-o.-Bracket (z. B. 10 Teams: 2 Spiele + 6 Freilose, 14 Teams: 6 Spiele + 2 Freilose). Freilose werden zufällig vergeben und gleichmäßig über den Baum verteilt |
 | Bye-Handling | Für die Bye-"Begegnung" wird kein Match-Objekt erstellt; das Freilos-Team wird direkt als Teilnehmer in das (im Baum bereits existierende) Match der nächsten Runde eingetragen |
 | Bracket-Erzeugung | Bei Turnierstart wird die vollständige Baumstruktur aller Matches erzeugt (jede Runde, jede Position, Verknüpfung zum jeweils nachfolgenden Match) |
 | Team-Befüllung höherer Runden | Matches ab Runde 2 haben zunächst keine Teams zugewiesen; das Gewinnerteam eines abgeschlossenen Matches wird automatisch in das verknüpfte Folge-Match eingetragen |

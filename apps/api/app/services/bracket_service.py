@@ -3,7 +3,7 @@ import secrets
 import uuid
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -11,12 +11,10 @@ from app.core.exceptions import (
     MatchNotReadyError,
     NotFoundError,
     ResultConflictError,
-    TournamentAlreadyStartedError,
     TournamentNotStartedError,
 )
 from app.models.match import Match
 from app.models.result import Result, ResultType
-from app.models.tournament import TournamentTeam
 from app.schemas.match import BracketResponse, MatchResponse
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import round_one_pairings
@@ -30,29 +28,20 @@ class BracketService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def generate_bracket(self, tournament_id: UUID) -> list[Match]:
-        """Generate a single-elimination bracket for a tournament.
+    async def generate_bracket(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
+        """Draw a single-elimination bracket for the given teams.
 
-        - Shuffles all participating teams randomly
+        - Shuffles the teams randomly
         - Byes (non-power-of-2 team counts) get no match: the team is entered directly into its
           match of the next round; byes are spread evenly over the bracket (see bracket_layout)
         - Creates the full match tree with next_match references
+        Called when the tournament starts (see LifecycleService), never on its own.
         """
-        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
-        if tournament.is_started:
-            raise TournamentAlreadyStartedError()
-
-        # Regenerating before the start replaces the previous bracket
-        await self._delete_bracket(tournament_id)
-
-        result = await self.db.execute(
-            select(TournamentTeam).where(TournamentTeam.tournament_id == tournament_id)
-        )
-        team_ids = [e.team_id for e in result.scalars().all()]
+        shuffled = list(team_ids)
         # Für das Mischen der Teams reicht diese Zufallsverteilung aus und birgt kein Sicherheitsrisiko
-        secrets.SystemRandom().shuffle(team_ids)  # NOSONAR
+        secrets.SystemRandom().shuffle(shuffled)  # NOSONAR
 
-        matches = self._build_matches(tournament_id, round_one_pairings(team_ids))
+        matches = self._build_matches(tournament_id, round_one_pairings(shuffled))
         # Parents first: next_match_id is a foreign key to matches
         self.db.add_all(matches)
         await self.db.flush()

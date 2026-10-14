@@ -64,7 +64,7 @@ async def ctx(request, async_client: AsyncClient) -> Ctx:
             f"/tournaments/{tid}/join", json={"team_id": team_id, "invite_token": invite}, headers=headers[a]
         )
         assert resp.status_code == 201
-    await async_client.post(f"/tournaments/{tid}/generate-bracket", headers=headers["admin"])
+    assert (await async_client.post(f"/tournaments/{tid}/start", headers=headers["admin"])).status_code == 200
     match_id = (await async_client.get(f"/tournaments/{tid}/bracket", headers=headers["admin"])).json()["matches"][0]["id"]
 
     c = Ctx(async_client, headers, tid, match_id, invite)

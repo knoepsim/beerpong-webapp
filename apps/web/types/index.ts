@@ -68,6 +68,8 @@ export interface TournamentInvite {
   token: string;
 }
 
+export type TournamentPhase = "registration" | "registration_closed" | "checkin" | "running";
+
 export interface Tournament {
   id: string;
   name: string;
@@ -75,8 +77,13 @@ export interface Tournament {
   description: string | null;
   start_time: string | null;
   registration_end_time: string | null;
+  checkin_enabled: boolean;
   checkin_start_time: string | null;
   started_at: string | null;
+  /** Computed by the API from the schedule: registration -> registration_closed / checkin -> running */
+  phase: TournamentPhase;
+  registration_open: boolean;
+  checkin_open: boolean;
   table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
@@ -86,12 +93,18 @@ export interface Tournament {
   updated_at: string;
 }
 
+export interface TournamentStartResponse {
+  team_count: number;
+  removed_team_ids: string[];
+}
+
 export interface TournamentCreateRequest {
   name: string;
   location?: string | null;
   description?: string | null;
   start_time: string;
   registration_end_time?: string | null;
+  checkin_enabled?: boolean;
   checkin_start_time?: string | null;
   table_count?: number;
   mode?: TournamentMode;

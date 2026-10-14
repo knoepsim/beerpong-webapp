@@ -78,7 +78,7 @@ async def _generate(db, n: int):
         teams.append(team.id)
     await db.flush()
     service = BracketService(db)
-    await service.generate_bracket(tournament.id)
+    await service.generate_bracket(tournament.id, teams)
     tournament.started_at = datetime.now(UTC)
     await db.flush()
     return service, tournament, teams
@@ -109,11 +109,3 @@ async def test_bracket_can_be_played_to_the_end(n: int):
         assert winner in teams
 
 
-@pytest.mark.asyncio
-async def test_regenerating_replaces_the_bracket():
-    async for db in app.dependency_overrides[get_db]():
-        service, tournament, _ = await _generate(db, 5)
-        tournament.started_at = None
-        await db.flush()
-        await service.generate_bracket(tournament.id)
-        assert len((await service.get_bracket(tournament.id)).matches) == 4

@@ -98,6 +98,36 @@ class TournamentNotStartedError(AppException):
         super().__init__(409, "TOURNAMENT_NOT_STARTED", "The tournament has not been started yet")
 
 
+class RegistrationClosedError(AppException):
+    def __init__(self):
+        super().__init__(409, "REGISTRATION_CLOSED", "Die Anmeldung für dieses Turnier ist geschlossen.")
+
+
+class CheckinDisabledError(AppException):
+    def __init__(self):
+        super().__init__(409, "CHECKIN_DISABLED", "Für dieses Turnier gibt es keinen Check-in.")
+
+
+class CheckinNotOpenError(AppException):
+    def __init__(self):
+        super().__init__(409, "CHECKIN_NOT_OPEN", "Der Check-in hat noch nicht begonnen.")
+
+
+class NotEnoughTeamsError(AppException):
+    def __init__(self, checkin_enabled: bool):
+        detail = (
+            "Es müssen mindestens 2 Teams eingecheckt sein, um das Turnier zu starten."
+            if checkin_enabled
+            else "Es müssen mindestens 2 Teams angemeldet sein, um das Turnier zu starten."
+        )
+        super().__init__(409, "NOT_ENOUGH_TEAMS", detail)
+
+
+class InvalidScheduleError(AppException):
+    def __init__(self, detail: str):
+        super().__init__(422, "INVALID_SCHEDULE", detail)
+
+
 # --- Results ---
 
 class MatchNotReadyError(AppException):

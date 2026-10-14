@@ -90,8 +90,12 @@ const tournament: Tournament = {
   description: 'Rules',
   start_time: '2026-07-01T18:00:00',
   registration_end_time: '2026-06-30T18:00:00',
+  checkin_enabled: false,
   checkin_start_time: null,
   started_at: null,
+  phase: 'registration',
+  registration_open: true,
+  checkin_open: false,
   table_count: 4,
   mode: TournamentMode.SINGLE_ELIMINATION,
   visibility: TournamentVisibility.PUBLIC_LISTED,
@@ -116,11 +120,8 @@ function setup(
   return render(
     <TournamentSettings
       tournament={{ ...tournament, ...overrides }}
-      status="registration"
       roles={roles}
       userRole={userRole}
-      teamCount={2}
-      onGenerateBracket={vi.fn()}
       onReload={onReload}
     />,
   );
@@ -188,12 +189,14 @@ describe('editing the tournament details', () => {
     expect(saveButton()).toBeEnabled();
   });
 
-  it('marks a new check-in time, description and visibility as dirty', () => {
+  it('marks check-in, description and visibility changes as dirty', () => {
     setup(TournamentRoleType.ADMIN);
-    const checkin = document.querySelectorAll('input[type="datetime-local"]')[2] as HTMLInputElement;
-    fireEvent.change(checkin, { target: { value: '2026-07-01T17:00' } });
+    const checkinSwitch = screen.getByRole('switch');
+    fireEvent.click(checkinSwitch);
     expect(saveButton()).toBeEnabled();
-    fireEvent.change(checkin, { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-06-30T19:00' } });
+    expect(saveButton()).toBeEnabled();
+    fireEvent.click(checkinSwitch);
     expect(saveButton()).toBeDisabled();
 
     fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'New rules' } });
@@ -224,19 +227,50 @@ describe('editing the tournament details', () => {
       visibility: 'private',
       start_time: new Date('2026-07-01T18:00').toISOString(),
       registration_end_time: null,
+      checkin_enabled: false,
       checkin_start_time: null,
     });
     expect(toast.success).toHaveBeenCalledWith('Turnier-Details erfolgreich gespeichert!');
   });
 
-  it('omits an emptied start time and description', async () => {
+  it('omits an emptied description', async () => {
     mocked.update.mockResolvedValue(tournament);
     setup(TournamentRoleType.ADMIN, { description: null });
-    fireEvent.change(screen.getByDisplayValue('2026-07-01T18:00'), { target: { value: '' } });
     fireEvent.change(nameInput(), { target: { value: 'X' } });
     fireEvent.click(saveButton());
     await waitFor(() => expect(mocked.update).toHaveBeenCalled());
-    expect(mocked.update.mock.calls[0][1]).toMatchObject({ start_time: undefined, description: undefined });
+    expect(mocked.update.mock.calls[0][1]).toMatchObject({ description: undefined });
+  });
+
+  it('requires a start time', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(screen.getByDisplayValue('2026-07-01T18:00'), { target: { value: '' } });
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('explains an impossible schedule and blocks saving', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '2026-07-02T18:00' } });
+    expect(screen.getByText('Der Anmeldeschluss muss vor dem Turnierstart liegen.')).toBeInTheDocument();
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('saves check-in settings and drops the check-in time when it is switched off', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-07-01T17:00' } });
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
+    expect(mocked.update.mock.calls[0][1]).toMatchObject({
+      checkin_enabled: true,
+      checkin_start_time: new Date('2026-07-01T17:00').toISOString(),
+    });
+  });
+
+  it('keeps the check-in setting locked once the tournament has started', () => {
+    setup(TournamentRoleType.ADMIN, { started_at: '2026-07-01T18:05:00', phase: 'running' });
+    expect(screen.getByRole('switch')).toHaveAttribute('data-disabled');
   });
 
   it('shows the saving state and reports failures', async () => {

@@ -201,7 +201,6 @@ describe('api endpoints', () => {
     ['tournaments.join', () => api.tournaments.join('x', 't1', 'inv'), 'POST', '/tournaments/x/join', { team_id: 't1', invite_token: 'inv' }],
     ['tournaments.leave', () => api.tournaments.leave('x'), 'DELETE', '/tournaments/x/leave', undefined],
     ['tournaments.removeTeam', () => api.tournaments.removeTeam('x', 't1'), 'DELETE', '/tournaments/x/teams/t1', undefined],
-    ['tournaments.generateBracket', () => api.tournaments.generateBracket('x'), 'POST', '/tournaments/x/generate-bracket', undefined],
     ['tournaments.startTournament', () => api.tournaments.startTournament('x'), 'POST', '/tournaments/x/start', undefined],
     ['tournaments.getBracket', () => api.tournaments.getBracket('x'), 'GET', '/tournaments/x/bracket', undefined],
     ['tournaments.getTeams', () => api.tournaments.getTeams('x'), 'GET', '/tournaments/x/teams', undefined],
