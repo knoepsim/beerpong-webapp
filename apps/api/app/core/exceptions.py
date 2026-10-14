@@ -83,11 +83,31 @@ class InsufficientRoleError(AppException):
         super().__init__(403, "INSUFFICIENT_ROLE", detail)
 
 
+class TournamentAlreadyStartedError(AppException):
+    def __init__(self):
+        super().__init__(409, "TOURNAMENT_ALREADY_STARTED", "This action is not possible after the tournament has started")
+
+
+class TournamentNotStartedError(AppException):
+    def __init__(self):
+        super().__init__(409, "TOURNAMENT_NOT_STARTED", "The tournament has not been started yet")
+
+
 # --- Results ---
 
-class ResultRequiresWinnerError(AppException):
+class MatchNotReadyError(AppException):
     def __init__(self):
-        super().__init__(400, "WINNER_REQUIRED", "A winner must be specified for created or modified results")
+        super().__init__(409, "MATCH_NOT_READY", "Both teams of this match must be determined first")
+
+
+class InvalidWinnerError(AppException):
+    def __init__(self):
+        super().__init__(400, "INVALID_WINNER", "The winner must be one of the two teams playing this match")
+
+
+class ResultConflictError(AppException):
+    def __init__(self, detail: str):
+        super().__init__(409, "RESULT_CONFLICT", detail)
 
 
 def register_exception_handlers(app: FastAPI) -> None:
