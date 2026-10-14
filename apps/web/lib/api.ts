@@ -19,13 +19,17 @@ export class ApiError extends Error {
   constructor(public status: number, public data: Record<string, unknown>) {
     let msg = "Ein Fehler ist aufgetreten";
     if (Array.isArray(data?.detail)) {
-      msg = data.detail.map((e: any) => e.msg).join(", ");
+      msg = data.detail.map((e: any) => String(e.msg).replace(/^Value error, /, "")).join(", ");
     } else if (typeof data?.detail === "string") {
       msg = data.detail;
     }
     super(msg);
   }
 }
+
+// Tournament invite token, forwarded so private tournaments stay readable via invite link
+const inviteQuery = (inviteToken?: string | null) =>
+  inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : "";
 
 // ── Core fetch logic ──────────────────────────────────
 
@@ -177,7 +181,7 @@ export const api = {
     list: () => request<Tournament[]>("/tournaments"),
     getMyTournaments: () => request<MyTournamentsResponse>("/tournaments/me"),
     get: (id: string, inviteToken?: string | null) => 
-      request<Tournament>(`/tournaments/${id}${inviteToken ? `?invite=${inviteToken}` : ''}`),
+      request<Tournament>(`/tournaments/${id}${inviteQuery(inviteToken)}`),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
         method: "POST",
@@ -203,10 +207,10 @@ export const api = {
       request<Bracket>(`/tournaments/${id}/generate-bracket`, { method: "POST" }),
     startTournament: (id: string) =>
       request<void>(`/tournaments/${id}/start`, { method: "POST" }),
-    getBracket: (id: string) =>
-      request<Bracket>(`/tournaments/${id}/bracket`),
-    getTeams: (id: string) =>
-      request<TournamentTeam[]>(`/tournaments/${id}/teams`),
+    getBracket: (id: string, inviteToken?: string | null) =>
+      request<Bracket>(`/tournaments/${id}/bracket${inviteQuery(inviteToken)}`),
+    getTeams: (id: string, inviteToken?: string | null) =>
+      request<TournamentTeam[]>(`/tournaments/${id}/teams${inviteQuery(inviteToken)}`),
     checkin: (tournamentId: string, teamId: string, is_checked_in: boolean) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}/checkin`, {
         method: "POST",
@@ -219,8 +223,8 @@ export const api = {
   },
 
   roles: {
-    list: (tournamentId: string) =>
-      request<TournamentUserRole[]>(`/tournaments/${tournamentId}/roles`),
+    list: (tournamentId: string, inviteToken?: string | null) =>
+      request<TournamentUserRole[]>(`/tournaments/${tournamentId}/roles${inviteQuery(inviteToken)}`),
     assign: (tournamentId: string, userId: string, role: string) =>
       request<TournamentUserRole>(`/tournaments/${tournamentId}/roles`, {
         method: "POST",
@@ -233,8 +237,8 @@ export const api = {
   },
 
   results: {
-    list: (matchId: string) =>
-      request<Result[]>(`/matches/${matchId}/results`),
+    list: (matchId: string, inviteToken?: string | null) =>
+      request<Result[]>(`/matches/${matchId}/results${inviteQuery(inviteToken)}`),
     create: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
       request<Result>(`/matches/${matchId}/results`, {
         method: "POST",

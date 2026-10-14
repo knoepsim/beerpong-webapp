@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.models.tournament import Tournament
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
 from app.schemas.match import BracketResponse
@@ -21,7 +22,7 @@ from app.schemas.tournament import (
 from app.services.bracket_service import BracketService
 from app.services.role_service import RoleService
 from app.services.team_service import TeamService
-from app.services.tournament_service import TournamentService
+from app.services.tournament_service import TournamentService, get_accessible_tournament
 
 router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 
@@ -55,21 +56,6 @@ async def update_tournament(
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await TournamentService(db).update_tournament(tournament_id, body)
-
-
-@router.delete(
-    "/{tournament_id}/roles/{role_id}",
-    status_code=204,
-    summary="Rolle entziehen",
-    description="Entfernt eine Rolle von einem User. Erfordert hierarchische Berechtigung.",
-)
-async def remove_role(
-    tournament_id: UUID,
-    role_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    await RoleService(db).remove_role(tournament_id, role_id, current_user.id)
 
 
 @router.post(
@@ -136,13 +122,8 @@ async def list_tournaments(
     response_model=TournamentResponse,
     summary="Turnier-Details abrufen",
 )
-async def get_tournament(
-    tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-    invite: str | None = None,
-):
-    return await TournamentService(db).get_tournament_for_user(tournament_id, current_user.id, invite)
+async def get_tournament(tournament: Annotated[Tournament, Depends(get_accessible_tournament)]):
+    return tournament
 
 @router.post(
     "/{tournament_id}/join",
@@ -197,11 +178,10 @@ async def generate_bracket(
     description="Gibt den vollständigen Turnierbaum mit allen Matches zurück.",
 )
 async def get_bracket(
-    tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await BracketService(db).get_bracket(tournament_id)
+    return await BracketService(db).get_bracket(tournament.id)
 
 
 from app.schemas.team import TournamentTeamResponse, TeamMemberResponse
@@ -213,12 +193,10 @@ from app.schemas.team import TournamentTeamResponse, TeamMemberResponse
     description="Gibt alle Teams zurück, die an diesem Turnier teilnehmen.",
 )
 async def get_teams(
-    tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.services import team_service
-    teams_data = await TournamentService(db).get_tournament_teams(tournament_id)
+    teams_data = await TournamentService(db).get_tournament_teams(tournament.id)
     result = []
     for team, is_checked_in in teams_data:
         members = await TeamService(db).get_team_members_with_names(team.id)

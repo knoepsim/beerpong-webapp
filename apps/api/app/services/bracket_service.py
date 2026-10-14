@@ -2,15 +2,23 @@ import math
 import secrets
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError, ResultRequiresWinnerError
+from app.core.exceptions import (
+    InvalidWinnerError,
+    MatchNotReadyError,
+    NotFoundError,
+    ResultConflictError,
+    TournamentAlreadyStartedError,
+    TournamentNotStartedError,
+)
 from app.models.match import Match
 from app.models.result import Result, ResultType
 from app.models.tournament import TournamentTeam
 from app.schemas.match import BracketResponse, MatchResponse
 from app.schemas.result import ResultCreate
+from app.services.tournament_service import TournamentService
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
@@ -27,6 +35,13 @@ class BracketService:
         - Handles byes for non-power-of-2 team counts
         - Creates the full match tree with next_match references
         """
+        tournament = await TournamentService(self.db).get_tournament(tournament_id)
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+
+        # Regenerating before the start replaces the previous bracket
+        await self._delete_bracket(tournament_id)
+
         # Get all teams in the tournament
         result = await self.db.execute(
             select(TournamentTeam).where(TournamentTeam.tournament_id == tournament_id)
@@ -51,6 +66,14 @@ class BracketService:
         await self._assign_teams_and_process_byes(matches_by_round[1], team_ids, all_matches)
 
         return all_matches
+
+
+    async def _delete_bracket(self, tournament_id: UUID) -> None:
+        """Remove all matches of a tournament (only valid before it has started)."""
+        await self.db.execute(
+            update(Match).where(Match.tournament_id == tournament_id).values(next_match_id=None)
+        )
+        await self.db.execute(delete(Match).where(Match.tournament_id == tournament_id))
 
 
     def _create_empty_matches(self, tournament_id: UUID, total_rounds: int, total_slots: int
@@ -119,8 +142,16 @@ class BracketService:
             next_match.team_b_id = team_id
 
 
+    async def _get_match(self, match_id: UUID) -> Match:
+        result = await self.db.execute(select(Match).where(Match.id == match_id))
+        match = result.scalar_one_or_none()
+        if match is None:
+            raise NotFoundError("Match")
+        return match
+
+
     async def _has_active_result(self, match_id: UUID) -> bool:
-        """Check if a match has a non-deleted result."""
+        """A match is decided if its latest event is not a deletion."""
         result = await self.db.execute(
             select(Result)
             .where(Result.match_id == match_id)
@@ -130,96 +161,78 @@ class BracketService:
         latest = result.scalar_one_or_none()
         return latest is not None and latest.type != ResultType.DELETED
 
-    async def report_result(self, match_id: UUID, data: ResultCreate, user_id: UUID
-    ) -> Result:
-        """Report a result for a match and advance the winner to the next match."""
-        # Verify match exists
-        match_result = await self.db.execute(select(Match).where(Match.id == match_id))
-        match = match_result.scalar_one_or_none()
-        if match is None:
-            raise NotFoundError("Match")
 
-        if data.winner_team_id is None:
-            raise ResultRequiresWinnerError()
+    async def _record_result(
+        self,
+        match_id: UUID,
+        result_type: ResultType,
+        user_id: UUID,
+        winner_team_id: UUID | None = None,
+        cups_left: int | None = None,
+    ) -> Result:
+        """Append a result event and propagate the winner (or its removal) to the next match.
+
+        Single place for all result rules:
+        - the tournament must be running
+        - CREATED needs a ready match without active result, MODIFIED/DELETED need an active one
+        - the winner must be one of the match's two teams
+        - the next match must not be decided yet
+        """
+        match = await self._get_match(match_id)
+        tournament = await TournamentService(self.db).get_tournament(match.tournament_id)
+        if not tournament.is_started:
+            raise TournamentNotStartedError()
+
+        is_active = await self._has_active_result(match_id)
+        if result_type == ResultType.CREATED and is_active:
+            raise ResultConflictError("This match already has a result. Modify it instead.")
+        if result_type != ResultType.CREATED and not is_active:
+            raise ResultConflictError("This match has no result to modify or delete.")
+
+        if result_type != ResultType.DELETED:
+            if match.team_a_id is None or match.team_b_id is None:
+                raise MatchNotReadyError()
+            if winner_team_id not in (match.team_a_id, match.team_b_id):
+                raise InvalidWinnerError()
 
         if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Cannot edit result: next match already has a result.")
+            raise ResultConflictError(
+                "The next match already has a result. Delete the next match's result first."
+            )
 
-        # Create result entry
-        result_entry = Result(
+        entry = Result(
             match_id=match_id,
-            type=ResultType.CREATED,
-            winner_team_id=data.winner_team_id,
-            cups_left=data.cups_left,
+            type=result_type,
+            winner_team_id=winner_team_id,
+            cups_left=cups_left,
             reported_by_user_id=user_id,
         )
-        self.db.add(result_entry)
+        self.db.add(entry)
 
-        # Advance winner to next match
         if match.next_match_id is not None:
-            await self._advance_team(match.next_match_id, match.next_match_slot, data.winner_team_id)
+            await self._advance_team(match.next_match_id, match.next_match_slot, winner_team_id)
 
         await self.db.flush()
-        return result_entry
+        return entry
+
+
+    async def report_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
+        """Report the first result for a match and advance the winner."""
+        return await self._record_result(
+            match_id, ResultType.CREATED, user_id, data.winner_team_id, data.cups_left
+        )
 
 
     async def modify_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
         """Modify an existing result, updating the winner in the next match."""
-        match_result = await self.db.execute(select(Match).where(Match.id == match_id))
-        match = match_result.scalar_one_or_none()
-        if match is None:
-            raise NotFoundError("Match")
-
-        if data.winner_team_id is None:
-            raise ResultRequiresWinnerError()
-
-        if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Cannot edit result: next match already has a result. Delete the next match's result first.")
-
-        result_entry = Result(
-            match_id=match_id,
-            type=ResultType.MODIFIED,
-            winner_team_id=data.winner_team_id,
-            cups_left=data.cups_left,
-            reported_by_user_id=user_id,
+        return await self._record_result(
+            match_id, ResultType.MODIFIED, user_id, data.winner_team_id, data.cups_left
         )
-        self.db.add(result_entry)
-
-        if match.next_match_id is not None:
-            await self._advance_team(match.next_match_id, match.next_match_slot, data.winner_team_id)
-
-        await self.db.flush()
-        return result_entry
 
 
     async def delete_result(self, match_id: UUID, user_id: UUID) -> Result:
-        """Delete an existing result, removing the winner from the next match."""
-        match_result = await self.db.execute(select(Match).where(Match.id == match_id))
-        match = match_result.scalar_one_or_none()
-        if match is None:
-            raise NotFoundError("Match")
-
-        if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Cannot delete result: next match already has a result. Delete the next match's result first.")
-
-        result_entry = Result(
-            match_id=match_id,
-            type=ResultType.DELETED,
-            winner_team_id=None,
-            cups_left=None,
-            reported_by_user_id=user_id,
-        )
-        self.db.add(result_entry)
-
-        if match.next_match_id is not None:
-            await self._advance_team(match.next_match_id, match.next_match_slot, None)
-
-        await self.db.flush()
-        return result_entry
-
+        """Mark the current result as deleted, removing the winner from the next match."""
+        return await self._record_result(match_id, ResultType.DELETED, user_id)
 
 
     async def get_bracket(self, tournament_id: UUID) -> BracketResponse:

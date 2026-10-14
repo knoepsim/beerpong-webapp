@@ -108,9 +108,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     try {
       const [tData, rolesData, myTeamsData, tTeamsData] = await Promise.all([
         api.tournaments.get(tournamentId, inviteToken),
-        api.roles.list(tournamentId),
+        api.roles.list(tournamentId, inviteToken),
         api.teams.list(), // currently list returns user teams
-        api.tournaments.getTeams(tournamentId)
+        api.tournaments.getTeams(tournamentId, inviteToken)
       ]);
       setTournament(tData);
       setRoles(rolesData);
@@ -118,7 +118,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       setTournamentTeams(tTeamsData);
 
       try {
-        const bData = await api.tournaments.getBracket(tournamentId);
+        const bData = await api.tournaments.getBracket(tournamentId, inviteToken);
         if (bData && bData.matches.length > 0) {
           setBracket(bData);
           
@@ -126,7 +126,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           const finalsMatch = bData.matches.find(m => m.round === bData.total_rounds);
           if (finalsMatch) {
             try {
-              const results = await api.results.list(finalsMatch.id);
+              const results = await api.results.list(finalsMatch.id, inviteToken);
               const latestWin = [...results].reverse().find(r => r.type !== ResultType.DELETED);
               if (latestWin && latestWin.winner_team_id) {
                 setTournamentWinnerTeamId(latestWin.winner_team_id);
