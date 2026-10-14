@@ -1,0 +1,8 @@
+# pnpm >= 11 no longer reads the "pnpm" field of package.json, settings live here
+onlyBuiltDependencies:
+  - sharp
+  - unrs-resolver
+
+overrides:
+  # pulled in with 6.x by @tailwindcss/typography (Dependabot alert)
+  postcss-selector-parser@<7.1.6: ^7.1.6
