@@ -22,8 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -258,11 +257,9 @@ export function TournamentSettings({
                   />
                 </TabsContent>
                 <TabsContent value="preview">
-                  <div className="p-4 bg-muted/30 border rounded-md min-h-[120px] prose prose-sm dark:prose-invert max-w-none">
+                  <div className="p-4 bg-muted/30 border rounded-md min-h-[120px]">
                     {editDescription ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                        {editDescription}
-                      </ReactMarkdown>
+                      <Markdown>{editDescription}</Markdown>
                     ) : (
                       <span className="text-muted-foreground italic">Keine Beschreibung...</span>
                     )}

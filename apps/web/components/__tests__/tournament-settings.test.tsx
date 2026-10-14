@@ -93,6 +93,7 @@ const tournament: Tournament = {
   checkin_enabled: false,
   checkin_start_time: null,
   started_at: null,
+  finished_at: null,
   phase: 'registration',
   registration_open: true,
   checkin_open: false,
