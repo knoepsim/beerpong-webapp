@@ -1,6 +1,7 @@
 import math
 import secrets
 import uuid
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -185,7 +186,10 @@ class BracketService:
         )
         self.db.add(entry)
 
-        if match.next_match_id is not None:
+        if match.next_match_id is None:
+            # the final: its result decides whether the tournament is over
+            tournament.finished_at = None if result_type == ResultType.DELETED else datetime.now(UTC)
+        else:
             await self._advance_team(match.next_match_id, match.next_match_slot, winner_team_id)
 
         await self.db.flush()

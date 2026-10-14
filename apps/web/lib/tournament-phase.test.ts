@@ -11,10 +11,7 @@ describe('phaseLabel', () => {
     expect(phaseLabel('registration_closed')).toBe('Anmeldung geschlossen')
     expect(phaseLabel('checkin')).toBe('Check-in läuft')
     expect(phaseLabel('running')).toBe('Läuft')
-  })
-
-  it('says finished once there is a winner', () => {
-    expect(phaseLabel('running', true)).toBe('Beendet')
+    expect(phaseLabel('finished')).toBe('Beendet')
   })
 })
 

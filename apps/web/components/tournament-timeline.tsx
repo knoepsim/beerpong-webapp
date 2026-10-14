@@ -19,8 +19,9 @@ interface Step {
   active: boolean;
 }
 
-function buildSteps(tournament: Tournament, hasWinner: boolean): Step[] {
-  const running = tournament.phase === "running";
+function buildSteps(tournament: Tournament): Step[] {
+  const started = tournament.started_at !== null;
+  const finished = tournament.phase === "finished";
   const steps: Step[] = [
     {
       key: "registration",
@@ -42,14 +43,14 @@ function buildSteps(tournament: Tournament, hasWinner: boolean): Step[] {
       key: "checkin",
       icon: "✅",
       label: "Check-in vor Ort",
-      description: running
+      description: started
         ? "Beendet"
         : tournament.checkin_open
           ? "Geöffnet"
           : checkinOpensAt(tournament)
             ? `Ab ${formatDateTime(checkinOpensAt(tournament)!)}`
             : "Vor dem Start",
-      done: running,
+      done: started,
       active: tournament.phase === "checkin",
     });
   }
@@ -58,16 +59,16 @@ function buildSteps(tournament: Tournament, hasWinner: boolean): Step[] {
     key: "play",
     icon: "🏓",
     label: "Turnier",
-    description: hasWinner ? "Beendet" : running ? "Läuft" : "Wartet auf den Start",
-    done: hasWinner,
-    active: running && !hasWinner,
+    description: finished ? "Beendet" : started ? "Läuft" : "Wartet auf den Start",
+    done: finished,
+    active: started && !finished,
   });
   return steps;
 }
 
 /** Progress of a tournament: registration -> (check-in) -> play. Driven by the phase from the API. */
-export function TournamentTimeline({ tournament, hasWinner }: { tournament: Tournament; hasWinner: boolean }) {
-  const steps = buildSteps(tournament, hasWinner);
+export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tournament }>) {
+  const steps = buildSteps(tournament);
 
   return (
     <ol className="flex flex-col sm:flex-row w-full gap-0 mt-2" aria-label="Turnier-Ablauf">

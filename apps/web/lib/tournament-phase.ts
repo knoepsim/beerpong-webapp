@@ -5,11 +5,12 @@ const PHASE_LABELS: Record<TournamentPhase, string> = {
   registration_closed: "Anmeldung geschlossen",
   checkin: "Check-in läuft",
   running: "Läuft",
+  finished: "Beendet",
 };
 
 /** Short status text for the badge. The API decides the phase, the UI only names it. */
-export function phaseLabel(phase: TournamentPhase, finished = false): string {
-  return finished ? "Beendet" : PHASE_LABELS[phase];
+export function phaseLabel(phase: TournamentPhase): string {
+  return PHASE_LABELS[phase];
 }
 
 /** When check-in opens: its own start time, otherwise with the registration deadline. `null` = right away. */

@@ -46,6 +46,7 @@ class TournamentResponse(BaseModel):
     checkin_enabled: bool
     checkin_start_time: datetime | None
     started_at: datetime | None
+    finished_at: datetime | None
     phase: TournamentPhase
     registration_open: bool
     checkin_open: bool
