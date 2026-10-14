@@ -91,6 +91,22 @@ async def get_current_user(
     return user
 
 
+optional_security_scheme = HTTPBearer(auto_error=False)
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """Like get_current_user, but for pages anybody may open: no (or an invalid) token means a stranger, not an error."""
+    if credentials is None:
+        return None
+    try:
+        return await get_current_user(credentials, db)
+    except HTTPException:
+        return None
+
+
 async def get_current_system_admin(
     current_user=Depends(get_current_user),
 ):

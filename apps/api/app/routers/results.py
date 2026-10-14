@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_user
 from app.models.match import Match
 from app.models.result import Result, ResultType
 from app.models.tournament_role import TournamentRoleType
@@ -96,11 +96,15 @@ async def delete_result(
 )
 async def list_results(
     match_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     match = await _get_match(db, match_id)
-    await TournamentService(db).get_tournament_for_user(match.tournament_id, current_user.id)
+    service = TournamentService(db)
+    viewer_id = viewer.id if viewer else None
+    await service.get_tournament_for_user(match.tournament_id, viewer_id)
+    # who entered a result is for those who play or help, not for strangers
+    involved = await service.is_involved(match.tournament_id, viewer_id)
     result = await db.execute(
         select(Result)
         .options(joinedload(Result.reported_by_user))
@@ -116,7 +120,7 @@ async def list_results(
             winner_team_id=r.winner_team_id,
             cups_left=r.cups_left,
             reported_by_user_id=r.reported_by_user_id,
-            reported_by_username=r.reported_by_user.name if r.reported_by_user else None,
+            reported_by_username=r.reported_by_user.name if involved and r.reported_by_user else None,
             created_at=r.created_at
         )
         for r in results

@@ -1,13 +1,10 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { useCurrentUser } from "@/components/user-provider";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
-import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TournamentPreview } from "@/types";
 
@@ -15,7 +12,6 @@ import type { TournamentPreview } from "@/types";
 export default function InvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const router = useRouter();
-  const { user, isLoading: isUserLoading } = useCurrentUser();
   const [preview, setPreview] = useState<TournamentPreview | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,27 +30,6 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
     if (preview) router.replace(`/t/${preview.slug}`);
   }, [preview, router]);
 
-  let action: React.ReactNode = null;
-  if (preview?.registration_open) {
-    action = user ? (
-      <JoinTournament
-        tournamentId={preview.tournament_id}
-        tournamentName={preview.name}
-        inviteToken={token}
-        onJoined={goToTournament}
-      />
-    ) : (
-      !isUserLoading && (
-        <Link
-          href={`/login?redirect=${encodeURIComponent(`/invite/${token}`)}`}
-          className={buttonVariants({ size: "lg" })}
-        >
-          Anmelden und beitreten
-        </Link>
-      )
-    );
-  }
-
   return (
     <main className="mx-auto max-w-md px-4 pt-10 pb-10 space-y-4">
       {notFound ? (
@@ -69,7 +44,17 @@ export default function InvitePage({ params }: { params: Promise<{ token: string
       ) : preview ? (
         <>
           <p className="text-sm text-muted-foreground">Du bist eingeladen zu</p>
-          <TournamentPreviewCard preview={preview}>{action}</TournamentPreviewCard>
+          <TournamentPreviewCard preview={preview}>
+            {preview.registration_open && (
+              <JoinTournament
+                tournamentId={preview.tournament_id}
+                tournamentName={preview.name}
+                inviteToken={token}
+                loginRedirect={`/invite/${token}`}
+                onJoined={goToTournament}
+              />
+            )}
+          </TournamentPreviewCard>
         </>
       ) : (
         <Skeleton className="h-44 w-full rounded-2xl" />

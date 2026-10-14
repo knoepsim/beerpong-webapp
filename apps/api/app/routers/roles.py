@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_user
 from app.models.tournament import Tournament
 from app.models.user import User
 from app.schemas.tournament_role import RoleAssignRequest, TournamentUserRoleResponse
 from app.services.role_service import RoleService
-from app.services.tournament_service import get_accessible_tournament
+from app.services.tournament_service import TournamentService, get_accessible_tournament
 
 router = APIRouter(prefix="/tournaments/{tournament_id}/roles", tags=["Roles"])
 
@@ -57,6 +57,10 @@ async def revoke_role(
 )
 async def list_roles(
     tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    # who helps is for those who play or help themselves, not for strangers
+    if not await TournamentService(db).is_involved(tournament.id, viewer.id if viewer else None):
+        return []
     return await RoleService(db).list_roles(tournament.id)

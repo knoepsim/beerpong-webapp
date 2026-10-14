@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCurrentUser } from "@/components/user-provider";
 import { api } from "@/lib/api";
 import type { Team } from "@/types";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -22,14 +24,18 @@ export function JoinTournament({
   tournamentId,
   tournamentName,
   inviteToken,
+  loginRedirect,
   onJoined,
 }: Readonly<{
   tournamentId: string;
   tournamentName: string;
   inviteToken?: string | null;
+  /** Where somebody without login comes back to after logging in. */
+  loginRedirect: string;
   onJoined: () => void | Promise<void>;
 }>) {
   const router = useRouter();
+  const { user, isLoading: isUserLoading } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [teamId, setTeamId] = useState("");
@@ -64,6 +70,15 @@ export function JoinTournament({
       setIsJoining(false);
     }
   };
+
+  if (isUserLoading) return null;
+  if (!user) {
+    return (
+      <Link href={`/login?redirect=${encodeURIComponent(loginRedirect)}`} className={buttonVariants({ size: "lg" })}>
+        Anmelden und beitreten
+      </Link>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
