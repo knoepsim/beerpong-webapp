@@ -103,6 +103,17 @@ async def test_custom_names_stay_deletable_and_unknown_owner_is_an_error(db):
 
 
 @pytest.mark.asyncio
+async def test_players_have_a_complete_profile_so_they_can_log_in_without_onboarding(db):
+    db.add(User(phone_number=player_phone(1), name="Dummy Spieler 1"))  # an older dummy without e-mail
+    await db.flush()
+    await create_tournament(db, teams=2, state="fresh", owner_phone=OWNER)
+
+    players = (await db.execute(select(User).where(User.phone_number.startswith(PHONE_PREFIX)))).scalars().all()
+    assert len(players) == 4
+    assert all(p.email and p.name for p in players)
+
+
+@pytest.mark.asyncio
 async def test_token_belongs_to_the_dummy_player(db):
     token = await dummy_token(db, 3)
     user = (await db.execute(select(User).where(User.phone_number == player_phone(3)))).scalar_one()
