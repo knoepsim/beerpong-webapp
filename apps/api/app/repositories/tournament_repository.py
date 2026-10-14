@@ -2,7 +2,6 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.tournament import Tournament, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
@@ -12,19 +11,6 @@ from app.repositories.base import BaseRepository
 class TournamentRepository(BaseRepository[Tournament]):
     def __init__(self):
         super().__init__(Tournament)
-
-    async def get_with_relations(self, db: AsyncSession, id: UUID) -> Tournament | None:
-        stmt = (
-            select(Tournament)
-            .where(Tournament.id == id, Tournament.is_deleted == False)
-            .options(
-                selectinload(Tournament.teams),
-                selectinload(Tournament.matches),
-                selectinload(Tournament.roles),
-            )
-        )
-        result = await db.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def list_visible_for_user(self, db: AsyncSession, user_id: UUID) -> list[Tournament]:
         # Public listed tournaments

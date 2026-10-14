@@ -27,8 +27,8 @@ async def assign_role(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await role_service.assign_role(
-        db, tournament_id, body.user_id, body.role, current_user.id
+    return await RoleService(db).assign_role(
+        tournament_id, body.user_id, body.role, current_user.id
     )
 
 
