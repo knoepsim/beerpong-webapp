@@ -68,10 +68,14 @@ class Tournament(Base):
 
     @property
     def checkin_open(self) -> bool:
-        """Check-in only exists if enabled; it opens at checkin_start_time (if any) and ends at the start."""
+        """Check-in only exists if enabled and ends at the start.
+
+        It opens at checkin_start_time, otherwise when the registration closes, without any
+        deadline it is open right away.
+        """
         if not self.checkin_enabled or self.is_started:
             return False
-        opens_at = _aware(self.checkin_start_time)
+        opens_at = _aware(self.checkin_start_time or self.registration_end_time)
         return opens_at is None or datetime.now(UTC) >= opens_at
 
     @property

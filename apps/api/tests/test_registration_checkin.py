@@ -120,6 +120,12 @@ async def test_phase_follows_the_schedule(ctx: Ctx):
     )
     assert (not_yet["phase"], not_yet["checkin_open"]) == ("registration_closed", False)
 
+    # without an own check-in time the check-in opens with the end of the registration
+    waiting = await ctx.get(await ctx.create(checkin_enabled=True, registration_end_time=FUTURE))
+    assert (waiting["phase"], waiting["checkin_open"]) == ("registration", False)
+    after_deadline = await ctx.get(await ctx.create(checkin_enabled=True, registration_end_time=PAST))
+    assert (after_deadline["phase"], after_deadline["checkin_open"]) == ("checkin", True)
+
     tid = await ctx.create(checkin_enabled=True)
     await ctx.join(tid, 0)
     await ctx.join(tid, 1)
