@@ -39,18 +39,16 @@ async def ctx(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_manager_can_generate_bracket_and_start(ctx):
+async def test_manager_can_start(ctx):
     client, h, tid = ctx
-    assert (await client.post(f"/tournaments/{tid}/generate-bracket", headers=h["manager"])).status_code == 200
-    assert (await client.post(f"/tournaments/{tid}/start", headers=h["manager"])).status_code == 204
+    assert (await client.post(f"/tournaments/{tid}/start", headers=h["manager"])).status_code == 200
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("path", ["generate-bracket", "start"])
 @pytest.mark.parametrize("who", ["referee", "p1"])
-async def test_referee_and_players_cannot_generate_or_start(ctx, who: str, path: str):
+async def test_referee_and_players_cannot_start(ctx, who: str):
     client, h, tid = ctx
-    assert (await client.post(f"/tournaments/{tid}/{path}", headers=h[who])).status_code == 403
+    assert (await client.post(f"/tournaments/{tid}/start", headers=h[who])).status_code == 403
 
 
 @pytest.mark.asyncio

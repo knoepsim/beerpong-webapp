@@ -142,8 +142,7 @@ async def test_match_result_cannot_be_reported_twice_concurrently(client: AsyncC
     for i in range(2):
         team_id = await make_team(client, f"T{i}", players[i * 2], players[i * 2 + 1] if i * 2 + 1 < 4 else None)
         await client.post(f"/tournaments/{tid}/join", json={"team_id": team_id}, headers=players[i * 2])
-    assert (await client.post(f"/tournaments/{tid}/generate-bracket", headers=admin)).status_code == 200
-    assert (await client.post(f"/tournaments/{tid}/start", headers=admin)).status_code == 204
+    assert (await client.post(f"/tournaments/{tid}/start", headers=admin)).status_code == 200
     match = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"][0]
     body = {"winner_team_id": match["team_a_id"], "cups_left": 1}
     rendezvous(monkeypatch, BracketService, "_has_active_result")

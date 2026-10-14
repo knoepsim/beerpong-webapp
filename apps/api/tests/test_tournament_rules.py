@@ -26,8 +26,7 @@ class Setup:
         return await self.client.post(f"/tournaments/{self.tournament_id}/{path}", headers=self.headers[0], **kwargs)
 
     async def start(self) -> None:
-        assert (await self.post("generate-bracket")).status_code == 200
-        assert (await self.post("start")).status_code == 204
+        assert (await self.post("start")).status_code == 200
 
     async def report(self, match_id: str, winner: str, method: str = "post"):
         return await self.client.request(
@@ -79,24 +78,7 @@ async def _join_all(s: Setup):
         assert (await _join(s, i)).status_code == 201
 
 
-# --- Bracket generation / roster -------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_regenerating_bracket_replaces_old_one(setup: Setup):
-    await _join_all(setup)
-    await setup.post("generate-bracket")
-    await setup.post("generate-bracket")
-    assert len(await setup.bracket()) == 3  # 4 teams -> 2 + 1 matches, no duplicates
-
-
-@pytest.mark.asyncio
-async def test_bracket_cannot_be_regenerated_after_start(setup: Setup):
-    await _join_all(setup)
-    await setup.start()
-    resp = await setup.post("generate-bracket")
-    assert resp.status_code == 409
-    assert resp.json()["error_code"] == "TOURNAMENT_ALREADY_STARTED"
+# --- Start / roster -------------------------------------------------
 
 
 @pytest.mark.asyncio
@@ -122,16 +104,6 @@ async def test_roster_is_frozen_after_start(setup: Setup):
 
 
 # --- Results ---------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_result_requires_started_tournament(setup: Setup):
-    await _join_all(setup)
-    await setup.post("generate-bracket")
-    match = (await setup.bracket())[0]
-    resp = await setup.report(match["id"], match["team_a_id"])
-    assert resp.status_code == 409
-    assert resp.json()["error_code"] == "TOURNAMENT_NOT_STARTED"
 
 
 @pytest.mark.asyncio

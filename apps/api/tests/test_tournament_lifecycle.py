@@ -93,19 +93,12 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
             )
             assert resp.status_code == 201
             
-        # 5. Generate Bracket
-        resp = await async_client.post(
-            f"/tournaments/{tournament_id}/generate-bracket",
-            headers=auth_header(0) # User 1 is Admin
-        )
-        assert resp.status_code == 200
-
-        # Start Tournament
+        # 5. Start Tournament (draws the bracket)
         resp = await async_client.post(
             f"/tournaments/{tournament_id}/start",
             headers=auth_header(0) # User 1 is Admin
         )
-        assert resp.status_code == 204
+        assert resp.status_code == 200
         
         # 6. Fetch Bracket and Play Matches
         # We simulate playing until all rounds are done

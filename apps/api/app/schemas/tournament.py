@@ -1,35 +1,37 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.models.tournament import TournamentMode, TournamentVisibility
+from app.models.tournament import TournamentMode, TournamentPhase, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType
 from app.schemas.team import TeamResponse
 
 
 class TournamentCreate(BaseModel):
     """Request body for creating a tournament."""
-    name: str
-    location: str | None = None
-    description: str | None = None
+    name: str = Field(min_length=1, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     start_time: datetime
     registration_end_time: datetime | None = None
+    checkin_enabled: bool = False
     checkin_start_time: datetime | None = None
-    table_count: int = 1
+    table_count: int = Field(default=1, ge=1, le=100)
     mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION
     visibility: TournamentVisibility = TournamentVisibility.PRIVATE
 
 
 class TournamentUpdate(BaseModel):
     """Request body for updating tournament details."""
-    name: str | None = None
-    location: str | None = None
-    description: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
     start_time: datetime | None = None
     registration_end_time: datetime | None = None
+    checkin_enabled: bool | None = None
     checkin_start_time: datetime | None = None
-    table_count: int | None = None
+    table_count: int | None = Field(default=None, ge=1, le=100)
     visibility: TournamentVisibility | None = None
 
 
@@ -41,8 +43,12 @@ class TournamentResponse(BaseModel):
     description: str | None
     start_time: datetime | None
     registration_end_time: datetime | None
+    checkin_enabled: bool
     checkin_start_time: datetime | None
     started_at: datetime | None
+    phase: TournamentPhase
+    registration_open: bool
+    checkin_open: bool
     table_count: int
     mode: TournamentMode
     visibility: TournamentVisibility
@@ -52,6 +58,12 @@ class TournamentResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TournamentStartResponse(BaseModel):
+    """Outcome of starting a tournament."""
+    team_count: int
+    removed_team_ids: list[UUID] = []
 
 
 class TournamentJoinRequest(BaseModel):

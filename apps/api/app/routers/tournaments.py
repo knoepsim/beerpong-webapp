@@ -16,10 +16,12 @@ from app.schemas.tournament import (
     TournamentCreate,
     TournamentJoinRequest,
     TournamentResponse,
+    TournamentStartResponse,
     TournamentUpdate,
     TournamentInviteResponse,
 )
 from app.services.bracket_service import BracketService
+from app.services.lifecycle_service import LifecycleService
 from app.services.role_service import RoleService
 from app.services.team_service import TeamService
 from app.services.tournament_service import TournamentService, get_accessible_tournament
@@ -155,23 +157,6 @@ async def leave_tournament(
     await TournamentService(db).leave_tournament(tournament_id, current_user.id)
 
 
-@router.post(
-    "/{tournament_id}/generate-bracket",
-    response_model=BracketResponse,
-    summary="Bracket generieren",
-    description="Generiert das KO-Bracket mit zufälliger Team-Zuordnung und Freilos-Handling. "
-    "Nur Admin und Manager, nur vor dem Turnierstart.",
-)
-async def generate_bracket(
-    tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
-    await BracketService(db).generate_bracket(tournament_id)
-    return await BracketService(db).get_bracket(tournament_id)
-
-
 @router.get(
     "/{tournament_id}/bracket",
     response_model=BracketResponse,
@@ -256,9 +241,11 @@ async def checkin_team(
 
 @router.post(
     "/{tournament_id}/start",
-    status_code=204,
+    response_model=TournamentStartResponse,
     summary="Turnier starten",
-    description="Setzt den Status auf gestartet. Nur Admin und Manager.",
+    description="Startet das Turnier in einem Schritt. Mit Check-in spielen nur eingecheckte Teams, alle anderen "
+    "werden entfernt; ohne Check-in spielen alle angemeldeten Teams. Aus den spielenden Teams wird der "
+    "K.-o.-Baum ausgelost. Nur Admin und Manager.",
 )
 async def start_tournament(
     tournament_id: UUID,
@@ -266,6 +253,4 @@ async def start_tournament(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
-    await TournamentService(db).start_tournament(tournament_id)
-    await db.commit()
-
+    return await LifecycleService(db).start_tournament(tournament_id)

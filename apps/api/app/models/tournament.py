@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -19,6 +19,18 @@ class TournamentVisibility(str, enum.Enum):
     PUBLIC_UNLISTED = "public_unlisted"
 
 
+class TournamentPhase(str, enum.Enum):
+    REGISTRATION = "registration"
+    REGISTRATION_CLOSED = "registration_closed"
+    CHECKIN = "checkin"
+    RUNNING = "running"
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    """Treat naive timestamps (SQLite) as UTC so they can be compared with aware ones."""
+    return value if value is None or value.tzinfo else value.replace(tzinfo=UTC)
+
+
 class Tournament(Base):
     __tablename__ = "tournaments"
 
@@ -30,6 +42,7 @@ class Tournament(Base):
     registration_end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
@@ -44,6 +57,32 @@ class Tournament(Base):
     @property
     def is_started(self) -> bool:
         return self.started_at is not None
+
+    @property
+    def registration_open(self) -> bool:
+        """Teams can join until the registration deadline (if any) and before the start."""
+        if self.is_started:
+            return False
+        deadline = _aware(self.registration_end_time)
+        return deadline is None or datetime.now(UTC) < deadline
+
+    @property
+    def checkin_open(self) -> bool:
+        """Check-in only exists if enabled; it opens at checkin_start_time (if any) and ends at the start."""
+        if not self.checkin_enabled or self.is_started:
+            return False
+        opens_at = _aware(self.checkin_start_time)
+        return opens_at is None or datetime.now(UTC) >= opens_at
+
+    @property
+    def phase(self) -> TournamentPhase:
+        if self.is_started:
+            return TournamentPhase.RUNNING
+        if self.registration_open:
+            return TournamentPhase.REGISTRATION
+        if self.checkin_open:
+            return TournamentPhase.CHECKIN
+        return TournamentPhase.REGISTRATION_CLOSED
 
 
 class TournamentTeam(Base):
