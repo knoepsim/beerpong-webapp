@@ -15,7 +15,7 @@ from app.core.exceptions import (
 )
 from app.models.match import Match
 from app.models.result import Result, ResultType
-from app.schemas.match import BracketResponse, MatchResponse
+from app.schemas.match import BracketResponse, MatchResponse, MatchStatus
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import round_one_pairings
 from app.services.tournament_service import TournamentService
@@ -116,16 +116,22 @@ class BracketService:
         return match
 
 
+    async def _current_results(self, match_ids: list[UUID]) -> dict[UUID, Result]:
+        """The current result per match: its latest event, unless that event is a deletion.
+
+        One query for all matches (the result log is append-only, the last event wins).
+        """
+        if not match_ids:
+            return {}
+        rows = await self.db.execute(
+            select(Result).where(Result.match_id.in_(match_ids)).order_by(Result.created_at)
+        )
+        latest = {r.match_id: r for r in rows.scalars()}
+        return {match_id: r for match_id, r in latest.items() if r.type != ResultType.DELETED}
+
     async def _has_active_result(self, match_id: UUID) -> bool:
         """A match is decided if its latest event is not a deletion."""
-        result = await self.db.execute(
-            select(Result)
-            .where(Result.match_id == match_id)
-            .order_by(Result.created_at.desc())
-            .limit(1)
-        )
-        latest = result.scalar_one_or_none()
-        return latest is not None and latest.type != ResultType.DELETED
+        return match_id in await self._current_results([match_id])
 
 
     async def _record_result(
@@ -213,13 +219,33 @@ class BracketService:
             .order_by(Match.round, Match.position)
         )
         matches = list(result.scalars().all())
+        results = await self._current_results([m.id for m in matches])
 
         total_rounds = max((m.round for m in matches), default=0)
+        responses = [self._to_response(m, results.get(m.id)) for m in matches]
+        final = next((r for r in responses if r.round == total_rounds), None)
 
         return BracketResponse(
             tournament_id=tournament_id,
             total_rounds=total_rounds,
-            matches=[MatchResponse.model_validate(m) for m in matches],
+            champion_team_id=final.winner_team_id if final else None,
+            matches=responses,
+        )
+
+    @staticmethod
+    def _to_response(match: Match, current: Result | None) -> MatchResponse:
+        if current is not None:
+            status = MatchStatus.FINISHED
+        elif match.team_a_id is not None and match.team_b_id is not None:
+            status = MatchStatus.READY
+        else:
+            status = MatchStatus.WAITING
+        return MatchResponse.model_validate(match).model_copy(
+            update={
+                "status": status,
+                "winner_team_id": current.winner_team_id if current else None,
+                "cups_left": current.cups_left if current else None,
+            }
         )
 
 

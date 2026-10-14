@@ -127,6 +127,8 @@ export interface MyTournamentsResponse {
   managing: ManagedTournament[];
 }
 
+export type MatchStatus = "waiting" | "ready" | "finished";
+
 export interface Match {
   id: string;
   tournament_id: string;
@@ -138,11 +140,18 @@ export interface Match {
   next_match_slot: string | null;
   table_number: number | null;
   created_at: string;
+  /** waiting: a team is still open, ready: both teams known, finished: has a result */
+  status: MatchStatus;
+  winner_team_id: string | null;
+  /** cups the winner had left */
+  cups_left: number | null;
 }
 
 export interface Bracket {
   tournament_id: string;
   total_rounds: number;
+  /** winner of the final, once it has a result */
+  champion_team_id: string | null;
   matches: Match[];
 }
 

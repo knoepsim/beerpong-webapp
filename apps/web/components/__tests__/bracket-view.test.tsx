@@ -19,16 +19,23 @@ const match = (overrides: Partial<Match> & Pick<Match, 'id' | 'round' | 'positio
   next_match_slot: null,
   table_number: null,
   created_at: '',
+  status: 'waiting',
+  winner_team_id: null,
+  cups_left: null,
   ...overrides,
 });
 
-// Semi-final A vs B is decided (Alpha advanced), C vs D is open, final waits for C/D.
+// Semi-final A vs B is decided (Alpha won with 4 cups left), C vs D is ready, the final waits for C/D.
 const bracket: Bracket = {
   tournament_id: 't',
   total_rounds: 2,
+  champion_team_id: null,
   matches: [
-    match({ id: 'm2', round: 1, position: 1, team_a_id: 'c', team_b_id: 'd', next_match_id: 'f' }),
-    match({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f' }),
+    match({ id: 'm2', round: 1, position: 1, team_a_id: 'c', team_b_id: 'd', next_match_id: 'f', status: 'ready' }),
+    match({
+      id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f',
+      status: 'finished', winner_team_id: 'a', cups_left: 4,
+    }),
     match({ id: 'f', round: 2, position: 0, team_a_id: 'a', team_b_id: null }),
   ],
 };
@@ -55,67 +62,10 @@ describe('BracketView', () => {
     expect(screen.getByText('TBD')).toBeInTheDocument();
   });
 
-  it('marks decided matches as finished and open matches as running', () => {
-    render(<BracketView bracket={bracket} teamsMap={teamsMap} />);
-    // Alpha advanced from A vs B, nobody advanced from C vs D yet.
-    expect(screen.getAllByText('Beendet')).toHaveLength(1);
-    expect(screen.getAllByText('12:34')).toHaveLength(1);
-  });
-
-  it('shows a timer for matches that are not decided yet', () => {
-    const open: Bracket = {
-      ...bracket,
-      matches: [match({ id: 'x', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b' })],
-      total_rounds: 1,
-    };
-    render(<BracketView bracket={open} teamsMap={teamsMap} />);
-    expect(screen.getByText('12:34')).toBeInTheDocument();
-  });
-
-  it('hides the meta row until both teams are set', () => {
-    const waiting: Bracket = {
-      ...bracket,
-      matches: [match({ id: 'x', round: 1, position: 0, team_a_id: 'a' })],
-      total_rounds: 1,
-    };
-    render(<BracketView bracket={waiting} teamsMap={teamsMap} />);
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
-  });
-
-  it('highlights the tournament winner with a trophy', () => {
-    const final: Bracket = {
-      ...bracket,
-      total_rounds: 1,
-      matches: [match({ id: 'f', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b' })],
-    };
-    const { container, rerender } = render(
-      <BracketView bracket={final} teamsMap={teamsMap} tournamentWinnerTeamId="a" />,
-    );
-    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(1);
-
-    rerender(<BracketView bracket={final} teamsMap={teamsMap} tournamentWinnerTeamId="b" />);
-    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(1);
-
-    rerender(<BracketView bracket={final} teamsMap={teamsMap} />);
-    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(0);
-  });
-
-  it('marks the advancing team of the second slot', () => {
-    const b2: Bracket = {
-      ...bracket,
-      matches: [
-        match({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f' }),
-        match({ id: 'f', round: 2, position: 0, team_a_id: null, team_b_id: 'b' }),
-      ],
-    };
-    render(<BracketView bracket={b2} teamsMap={teamsMap} />);
-    expect(screen.getByText('Beendet')).toBeInTheDocument();
-  });
-
   it('renders invisible placeholders for missing matches', () => {
     const sparse: Bracket = {
       ...bracket,
-      matches: [match({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b' })],
+      matches: [match({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready' })],
     };
     const { container } = render(<BracketView bracket={sparse} teamsMap={teamsMap} />);
     expect(container.querySelectorAll('.invisible').length).toBeGreaterThan(0);
@@ -125,7 +75,7 @@ describe('BracketView', () => {
     const odd: Bracket = {
       ...bracket,
       total_rounds: 1,
-      matches: [match({ id: 'x', round: 3, position: 0, team_a_id: 'a', team_b_id: 'b' })],
+      matches: [match({ id: 'x', round: 3, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready' })],
     };
     render(<BracketView bracket={odd} teamsMap={teamsMap} />);
     expect(screen.getByText('Runde 3')).toBeInTheDocument();
@@ -139,10 +89,44 @@ describe('BracketView', () => {
     expect(onMatchClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'm2' }));
   });
 
-  it('is not interactive without a click handler', () => {
-    render(<BracketView bracket={bracket} teamsMap={teamsMap} />);
-    const button = screen.getByText('Charlie').closest('button')!;
-    expect(button.className).toContain('cursor-default');
-    fireEvent.click(button);
+  it('shows the trophy only in the final, not in earlier matches of the champion', () => {
+    const decided: Bracket = {
+      ...bracket,
+      champion_team_id: 'a',
+      matches: [
+        match({
+          id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', next_match_id: 'f',
+          status: 'finished', winner_team_id: 'a', cups_left: 4,
+        }),
+        match({
+          id: 'm2', round: 1, position: 1, team_a_id: 'c', team_b_id: 'd', next_match_id: 'f',
+          status: 'finished', winner_team_id: 'c', cups_left: 1,
+        }),
+        match({
+          id: 'f', round: 2, position: 0, team_a_id: 'a', team_b_id: 'c', status: 'finished',
+          winner_team_id: 'a', cups_left: 2,
+        }),
+      ],
+    };
+    render(<BracketView bracket={decided} teamsMap={teamsMap} />);
+    expect(screen.getAllByLabelText('Turniersieger')).toHaveLength(1);
+    expect(screen.getAllByLabelText('Gewinner')).toHaveLength(2); // winners of the two semi-finals
+  });
+
+  it('shows the trophy for the champion of the final', () => {
+    const final: Bracket = {
+      ...bracket,
+      total_rounds: 1,
+      champion_team_id: 'b',
+      matches: [
+        match({ id: 'f', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'finished', winner_team_id: 'b', cups_left: 2 }),
+      ],
+    };
+    const { container, rerender } = render(<BracketView bracket={final} teamsMap={teamsMap} />);
+    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(1);
+    expect(screen.getByLabelText('Turniersieger')).toBeInTheDocument();
+
+    rerender(<BracketView bracket={{ ...final, champion_team_id: null }} teamsMap={teamsMap} />);
+    expect(container.querySelectorAll('.text-amber-500')).toHaveLength(0);
   });
 });

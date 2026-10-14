@@ -1,16 +1,13 @@
 """Bracket layout and generation for every team count."""
 import uuid
-from datetime import UTC, datetime
 
 import pytest
 
 from app.core.database import get_db
-from app.models.team import Team
-from app.models.tournament import Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import bracket_size, round_one_pairings, seed_order
-from app.services.bracket_service import BracketService
 from main import app
+from tests.helpers import generate_started_tournament
 
 TEAM_COUNTS = range(2, 41)
 
@@ -60,35 +57,13 @@ def test_single_team_is_rejected():
         round_one_pairings([uuid.uuid4()])
 
 
-async def _generate(db, n: int):
-    tournament = Tournament(
-        name="x",
-        mode=TournamentMode.SINGLE_ELIMINATION,
-        visibility=TournamentVisibility.PRIVATE,
-        created_by_id=uuid.uuid4(),
-    )
-    db.add(tournament)
-    await db.flush()
-    teams = []
-    for i in range(n):
-        team = Team(name=f"T{i}")
-        db.add(team)
-        await db.flush()
-        db.add(TournamentTeam(tournament_id=tournament.id, team_id=team.id))
-        teams.append(team.id)
-    await db.flush()
-    service = BracketService(db)
-    await service.generate_bracket(tournament.id, teams)
-    tournament.started_at = datetime.now(UTC)
-    await db.flush()
-    return service, tournament, teams
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("n", TEAM_COUNTS)
 async def test_bracket_can_be_played_to_the_end(n: int):
     async for db in app.dependency_overrides[get_db]():
-        service, tournament, teams = await _generate(db, n)
+        service, tournament, teams = await generate_started_tournament(db, n)
         matches = (await service.get_bracket(tournament.id)).matches
         assert len(matches) == n - 1, "single elimination needs n-1 matches"
 
