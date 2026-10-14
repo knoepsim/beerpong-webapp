@@ -1,3 +1,5 @@
+# Runners: API Tests and Docker Build Check run on the self-hosted runner (tournament-gitrunner).
+# Jobs with secrets (Sonar) stay on GitHub-hosted runners.
 name: Scan
 on:
   push:
@@ -44,9 +46,65 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+  api-tests:
+    name: API Tests
+    # Self-hosted runner. It runs as a container with the host's Docker socket (Docker-out-of-Docker),
+    # so neither `container:` jobs (the runner's /__e mount does not exist on the host) nor `services:`
+    # (reachable via localhost) work. PostgreSQL is started by hand and the runner container is
+    # attached to its network, which makes it reachable by container name.
+    runs-on: [self-hosted, Linux, X64]
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./apps/api
+    env:
+      PG_NAME: pg-${{ github.run_id }}-${{ github.run_attempt }}
+      DATABASE_URL: postgresql+asyncpg://beerpong:beerpong_ci@pg-${{ github.run_id }}-${{ github.run_attempt }}:5432/beerpong
+      # Scratch database for the concurrency tests that need real row locks (tables are dropped)
+      TEST_POSTGRES_URL: postgresql+asyncpg://beerpong:beerpong_ci@pg-${{ github.run_id }}-${{ github.run_attempt }}:5432/beerpong_test
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Start PostgreSQL
+        run: |
+          docker network create "$PG_NAME"
+          docker run -d --name "$PG_NAME" --network "$PG_NAME"             -e POSTGRES_USER=beerpong -e POSTGRES_PASSWORD=beerpong_ci -e POSTGRES_DB=beerpong             postgres:17-alpine
+          docker network connect "$PG_NAME" "$(hostname)"
+          # -h 127.0.0.1: the temporary init server of the image only listens on the unix socket,
+          # so this only succeeds once the real server is up
+          for i in $(seq 1 30); do
+            docker exec "$PG_NAME" pg_isready -h 127.0.0.1 -U beerpong && break
+            sleep 1
+          done
+          docker exec "$PG_NAME" psql -h 127.0.0.1 -U beerpong -d beerpong -c "CREATE DATABASE beerpong_test"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run migrations on an empty database
+        run: uv run alembic upgrade head
+
+      - name: Run API tests
+        run: uv run pytest -v
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: |
+          docker network disconnect "$PG_NAME" "$(hostname)" || true
+          docker rm -f "$PG_NAME" || true
+          docker network rm "$PG_NAME" || true
+
   docker-build-check:
     name: Docker Build Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       
