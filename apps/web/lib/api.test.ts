@@ -39,6 +39,11 @@ describe('ApiError', () => {
     expect(err.status).toBe(422);
   });
 
+  it('hides the validation prefix from users', () => {
+    const err = new ApiError(422, { detail: [{ msg: 'Value error, Nur deutsche Handynummern' }] });
+    expect(err.message).toBe('Nur deutsche Handynummern');
+  });
+
   it('falls back to a generic message', () => {
     expect(new ApiError(500, {}).message).toBe('Ein Fehler ist aufgetreten');
   });
