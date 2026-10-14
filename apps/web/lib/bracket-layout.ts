@@ -30,8 +30,6 @@ export type BracketSlot = MatchSlot | ByeSlot | EmptySlot;
 export interface RoundLayout {
   round: number;
   slots: BracketSlot[];
-  matchCount: number;
-  finishedCount: number;
 }
 
 export interface BracketLayout {
@@ -88,12 +86,9 @@ export function buildBracketLayout(bracket: Bracket): BracketLayout {
 
   const rounds: RoundLayout[] = Array.from({ length: total }, (_, index) => {
     const round = index + 1;
-    const roundMatches = matches.filter((m) => m.round === round);
     return {
       round,
       slots: Array.from({ length: 2 ** (total - round) }, (_, position) => slotAt(round, position)),
-      matchCount: roundMatches.length,
-      finishedCount: roundMatches.filter((m) => m.status === "finished").length,
     };
   });
   return { totalRounds: total, rounds };
@@ -104,10 +99,10 @@ export function isAdvanced(slot: BracketSlot | undefined): boolean {
   return slot?.kind === "bye" || (slot?.kind === "match" && slot.match.status === "finished");
 }
 
-/** The round that is being played right now: the first one with a match that is ready. */
-export function currentRound(layout: BracketLayout): number | null {
-  const round = layout.rounds.find((r) => r.slots.some((s) => s.kind === "match" && s.match.status === "ready"));
-  return round ? round.round : null;
+/** The rounds with a match that can be played right now. Several rounds can be active at the same time. */
+export function activeRounds(layout: BracketLayout): Set<number> {
+  const active = layout.rounds.filter((r) => r.slots.some((s) => s.kind === "match" && s.match.status === "ready"));
+  return new Set(active.map((r) => r.round));
 }
 
 export function isMatchSlot(slot: BracketSlot): slot is MatchSlot {

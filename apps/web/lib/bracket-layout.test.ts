@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allMatchSlots, buildBracketLayout, currentRound, isAdvanced, isMatchSlot } from './bracket-layout'
+import { activeRounds, allMatchSlots, buildBracketLayout, isAdvanced, isMatchSlot } from './bracket-layout'
 import { fiveTeamBracket, makeMatch } from './test-fixtures/bracket'
 import type { Bracket } from '@/types'
 
@@ -29,11 +29,6 @@ describe('buildBracketLayout', () => {
     expect(layout.rounds[2].slots[0]).toMatchObject({ sources: { a: 2, b: 3 } })
   })
 
-  it('counts matches and finished matches per round', () => {
-    const played = buildBracketLayout(fiveTeamBracket({ m1: { status: 'finished', winner_team_id: 't4' } }))
-    expect(played.rounds.map((r) => [r.matchCount, r.finishedCount])).toEqual([[1, 1], [2, 0], [1, 0]])
-  })
-
   it('ignores matches outside the rounds of the bracket', () => {
     const odd: Bracket = {
       ...fiveTeamBracket(),
@@ -59,21 +54,21 @@ describe('isAdvanced', () => {
   })
 })
 
-describe('currentRound', () => {
-  it('is the first round with a match that is ready', () => {
-    expect(currentRound(buildBracketLayout(fiveTeamBracket()))).toBe(1)
+describe('activeRounds', () => {
+  it('lists the rounds with a match that can be played, also several at once', () => {
+    expect([...activeRounds(buildBracketLayout(fiveTeamBracket()))]).toEqual([1, 2]) // match 1 and the ready semi-final
     const played = fiveTeamBracket({ m1: { status: 'finished', winner_team_id: 't4' } })
-    expect(currentRound(buildBracketLayout(played))).toBe(2)
+    expect([...activeRounds(buildBracketLayout(played))]).toEqual([2])
   })
 
-  it('is null when nothing can be played', () => {
+  it('is empty when nothing can be played', () => {
     const done = fiveTeamBracket({
       m1: { status: 'finished', winner_team_id: 't4' },
       m3: { status: 'finished', winner_team_id: 't2' },
     })
     done.matches[1].status = 'finished'
     done.matches[3].status = 'finished'
-    expect(currentRound(buildBracketLayout(done))).toBeNull()
+    expect(activeRounds(buildBracketLayout(done)).size).toBe(0)
   })
 })
 

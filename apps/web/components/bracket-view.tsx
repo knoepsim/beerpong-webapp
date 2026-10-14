@@ -2,7 +2,7 @@
 
 import { useMemo, type ReactNode } from "react";
 import { ByeCard, MatchCard } from "@/components/match-card";
-import { buildBracketLayout, currentRound, isAdvanced, type BracketSlot } from "@/lib/bracket-layout";
+import { activeRounds, buildBracketLayout, isAdvanced, type BracketSlot } from "@/lib/bracket-layout";
 import { cn, roundLabel } from "@/lib/utils";
 import type { Bracket, Match, Team } from "@/types";
 
@@ -115,7 +115,7 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
   if (layout.totalRounds === 0) return null;
 
   const treeHeight = 2 ** (layout.totalRounds - 1) * SLOT_HEIGHT;
-  const playing = currentRound(layout);
+  const active = activeRounds(layout);
 
   return (
     // One grey surface behind the whole tree; the cards stand out in white and the lines show the structure.
@@ -137,18 +137,22 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
                 className="snap-start shrink-0 flex flex-col"
                 style={{ width: `calc(var(--col) + ${GUTTER}px)` }}
               >
-                <header className="h-14 flex flex-col justify-center px-3">
-                  <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider">
+                <header
+                  className={cn(
+                    "mb-1 h-12 flex flex-col justify-center rounded-md px-3",
+                    // rounds with matches that can be played right now stand out
+                    active.has(round.round) && "bg-primary/10 text-primary",
+                  )}
+                >
+                  <h3 className="text-xs font-semibold uppercase tracking-wider">
                     {roundLabel(round.round, layout.totalRounds)}
-                    {round.round === playing && (
-                      <span className="rounded-full bg-primary/15 px-1.5 py-px text-[10px] font-medium normal-case tracking-normal text-primary">
-                        Aktuell
-                      </span>
-                    )}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {round.finishedCount} von {round.matchCount} beendet
-                  </p>
+                  {active.has(round.round) && (
+                    <p className="flex items-center gap-1 text-xs font-medium">
+                      <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                      Aktuell
+                    </p>
+                  )}
                 </header>
                 <div className="flex flex-col" style={{ height: treeHeight }}>
                   {round.slots.map((slot, position) => (

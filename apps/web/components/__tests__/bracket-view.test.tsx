@@ -7,12 +7,12 @@ import type { Bracket } from '@/types';
 const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: cups });
 
 describe('BracketView', () => {
-  it('draws every round as a column with its name and progress', () => {
+  it('draws every round as a column with its name', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
 
     const columns = screen.getAllByRole('region');
     expect(columns.map((c) => c.getAttribute('aria-label'))).toEqual(['Viertelfinale', 'Halbfinale', 'Finale']);
-    expect(within(columns[0]).getByText('0 von 1 beendet')).toBeInTheDocument();
+    expect(screen.queryByText(/beendet/)).not.toBeInTheDocument(); // no progress counter in the headers
   });
 
   it('shows byes as their own card in round one', () => {
@@ -67,6 +67,20 @@ describe('BracketView', () => {
     const scroller = container.querySelector('.overflow-x-auto')!;
     expect(scroller.className).not.toContain('overflow-auto');
     expect(scroller.className).not.toContain('max-h');
+  });
+
+  it('highlights every round that has matches that can be played', () => {
+    // match 1 (first round) and match 3 (semi-final) are both ready: two active rounds
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
+    expect(within(screen.getByRole('region', { name: 'Viertelfinale' })).getByText('Aktuell')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Finale' })).queryByText('Aktuell')).not.toBeInTheDocument();
+  });
+
+  it('highlights only the round that is still active once the first one is played', () => {
+    render(<BracketView bracket={fiveTeamBracket({ m1: finished('t4') })} teamsMap={fiveTeams} />);
+    expect(screen.getAllByText('Aktuell')).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Halbfinale' })).getByText('Aktuell')).toBeInTheDocument();
   });
 
   it('draws the lines of teams that moved on dark and the others light', () => {
