@@ -3,10 +3,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { MyTournamentsResponse } from "@/types";
+import type { MyTournamentsResponse, Tournament } from "@/types";
 import { TournamentVisibility } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
-import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
+import { discoverableTournaments, groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
+import { VisibilitySelect } from "@/components/visibility-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,13 +19,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -78,6 +72,7 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
 export default function TournamentsPage() {
   const router = useRouter();
   const [data, setData] = useState<MyTournamentsResponse | null>(null);
+  const [publicTournaments, setPublicTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,6 +103,8 @@ export default function TournamentsPage() {
     try {
       const response = await api.tournaments.getMyTournaments();
       setData(response);
+      // the public list only adds suggestions: if it fails, my own tournaments are still shown
+      setPublicTournaments(await api.tournaments.list().catch(() => []));
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Fehler beim Laden";
       setError(message);
@@ -145,6 +142,10 @@ export default function TournamentsPage() {
   };
 
   const groups = useMemo(() => (data ? groupTournaments(mergeMyTournaments(data)) : null), [data]);
+  const discoverable = useMemo(
+    () => (data ? discoverableTournaments(publicTournaments, mergeMyTournaments(data)) : []),
+    [data, publicTournaments],
+  );
   const hasTournaments = !!groups && groups.active.length + groups.planned.length + groups.finished.length > 0;
 
   if (isLoading) {
@@ -184,6 +185,7 @@ export default function TournamentsPage() {
             description="Du bist noch keinem Turnier beigetreten."
           />
         )}
+        <TournamentSection title="Offene Turniere zum Mitmachen" items={discoverable.map((tournament) => ({ tournament }))} />
       </div>
 
       {/* Create Tournament Button */}
@@ -263,7 +265,7 @@ export default function TournamentsPage() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <FormField
                     control={form.control}
                     name="table_count"
@@ -284,27 +286,9 @@ export default function TournamentsPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Sichtbarkeit</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Wähle die Sichtbarkeit" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value={TournamentVisibility.PRIVATE}>
-                              Privat
-                            </SelectItem>
-                            <SelectItem value={TournamentVisibility.PUBLIC_LISTED}>
-                              Öffentlich
-                            </SelectItem>
-                            <SelectItem value={TournamentVisibility.PUBLIC_UNLISTED}>
-                              Nicht gelistet
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <VisibilitySelect value={field.value} onChange={field.onChange} />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

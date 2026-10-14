@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
+import { VisibilitySelect } from "@/components/visibility-select";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { TournamentRoleType } from "@/types";
@@ -222,16 +223,7 @@ export function TournamentSettings({
               </div>
               <div className="space-y-2">
                 <Label>Sichtbarkeit</Label>
-                <Select value={editVisibility} onValueChange={(v: any) => setEditVisibility(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public_listed">Öffentlich (sichtbar für alle)</SelectItem>
-                    <SelectItem value="private">Privat (nur mit Link/Einladung)</SelectItem>
-                    <SelectItem value="public_unlisted">Versteckt (nur mit Link)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <VisibilitySelect value={editVisibility} onChange={setEditVisibility} />
               </div>
             </div>
             <TournamentScheduleFields
@@ -277,9 +269,10 @@ export function TournamentSettings({
       {tournament.visibility === "private" && (userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
         <Card>
           <CardHeader>
-            <CardTitle>Einladungslink (Privates Turnier)</CardTitle>
+            <CardTitle>Einladungslink</CardTitle>
             <CardDescription>
-              Da dieses Turnier privat ist, können Teams nur mit einem Einladungslink beitreten.
+              Mit diesem Link sehen und betreten Eingeladene das private Turnier. Der normale Turnierlink funktioniert
+              nur für Mitwirkende und Teilnehmer. Ein neuer Link macht den alten ungültig.
             </CardDescription>
           </CardHeader>
           <CardContent>

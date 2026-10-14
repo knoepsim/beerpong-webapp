@@ -146,7 +146,7 @@ describe('visibility per role', () => {
     expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
     expect(screen.getByText('Gefahrenzone')).toBeInTheDocument();
     expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(3);
-    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument(); // not private
+    expect(screen.queryByText('Einladungslink')).not.toBeInTheDocument(); // not private
   });
 
   it('lets managers edit details but only revoke referees', () => {
@@ -207,7 +207,7 @@ describe('editing the tournament details', () => {
     fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'Rules' } });
     expect(saveButton()).toBeDisabled();
 
-    fireEvent.click(screen.getByText('Versteckt (nur mit Link)'));
+    fireEvent.click(screen.getByText('Nur mit Link', { selector: 'span' }));
     expect(saveButton()).toBeEnabled();
   });
 
@@ -217,7 +217,7 @@ describe('editing the tournament details', () => {
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
     fireEvent.change(screen.getByDisplayValue('4'), { target: { value: '' } });
-    fireEvent.click(screen.getByText('Privat (nur mit Link/Einladung)'));
+    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
     fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
     fireEvent.click(saveButton());
 
@@ -334,7 +334,7 @@ describe('invite link for private tournaments', () => {
 
   it('is only offered to organisers', () => {
     setup(TournamentRoleType.REFEREE, privateTournament);
-    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Einladungslink')).not.toBeInTheDocument();
   });
 
   it('generates, shows and copies the link, then resets the label', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupTournaments, mergeMyTournaments, type MyTournament } from './tournament-groups'
+import { discoverableTournaments, groupTournaments, mergeMyTournaments, type MyTournament } from './tournament-groups'
 import type { MyTournamentsResponse, Team, Tournament } from '@/types'
 import { TournamentRoleType } from '@/types'
 
@@ -91,5 +91,32 @@ describe('mergeMyTournaments', () => {
       ['p', true, undefined],
       ['m', false, TournamentRoleType.REFEREE],
     ])
+  })
+})
+
+describe('discoverableTournaments', () => {
+  const pub = (id: string, overrides: Partial<Tournament> = {}) =>
+    tournament(id, { visibility: 'public_listed', registration_open: true, ...overrides } as Partial<Tournament>)
+
+  it('offers listed tournaments with open registration that are not mine', () => {
+    const result = discoverableTournaments(
+      [
+        pub('open'),
+        pub('closed', { registration_open: false }),
+        pub('unlisted', { visibility: 'public_unlisted' } as Partial<Tournament>),
+        pub('private', { visibility: 'private' } as Partial<Tournament>),
+        pub('mine'),
+      ],
+      [item('mine')],
+    )
+    expect(result.map((t) => t.id)).toEqual(['open'])
+  })
+
+  it('shows the soonest tournament first', () => {
+    const result = discoverableTournaments(
+      [pub('later', { start_time: '2026-09-01T18:00:00Z' }), pub('sooner', { start_time: '2026-08-01T18:00:00Z' })],
+      [],
+    )
+    expect(result.map((t) => t.id)).toEqual(['sooner', 'later'])
   })
 })

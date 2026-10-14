@@ -1,4 +1,4 @@
-import type { MyTournamentsResponse, Team, Tournament, TournamentRoleType } from "@/types";
+import { TournamentVisibility, type MyTournamentsResponse, type Team, type Tournament, type TournamentRoleType } from "@/types";
 
 /** A tournament of the logged-in user with the way they are involved: with a team, with a role, or both. */
 export interface MyTournament {
@@ -42,4 +42,12 @@ export function groupTournaments(items: MyTournament[]): TournamentGroups {
     planned: planned.sort((a, b) => plannedAt(a.tournament) - plannedAt(b.tournament)),
     finished: finished.sort((a, b) => time(b.tournament.finished_at) - time(a.tournament.finished_at)),
   };
+}
+
+/** Public tournaments I could join: listed, registration open, and not already mine. Soonest start first. */
+export function discoverableTournaments(all: Tournament[], mine: MyTournament[]): Tournament[] {
+  const mineIds = new Set(mine.map((i) => i.tournament.id));
+  return all
+    .filter((t) => t.visibility === TournamentVisibility.PUBLIC_LISTED && t.registration_open && !mineIds.has(t.id))
+    .sort((a, b) => plannedAt(a) - plannedAt(b));
 }
