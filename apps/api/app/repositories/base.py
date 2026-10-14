@@ -11,8 +11,12 @@ class BaseRepository(Generic[ModelType]):
     def __init__(self, model: Type[ModelType]):
         self.model = model
 
-    async def get_by_id(self, db: AsyncSession, id: UUID) -> ModelType | None:
-        result = await db.execute(select(self.model).where(self.model.id == id))
+    async def get_by_id(self, db: AsyncSession, id: UUID, *, for_update: bool = False) -> ModelType | None:
+        """Load by primary key. `for_update` locks the row until the transaction ends (no-op on SQLite)."""
+        stmt = select(self.model).where(self.model.id == id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def create(self, db: AsyncSession, *, obj_in: dict[str, Any]) -> ModelType:
