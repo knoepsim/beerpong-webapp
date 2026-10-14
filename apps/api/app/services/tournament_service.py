@@ -48,9 +48,13 @@ class TournamentService:
         return tournament
 
 
-    async def get_tournament(self, tournament_id: UUID) -> Tournament:
-        """Get a tournament by ID. Raises NotFoundError for missing or deleted tournaments."""
-        tournament = await tournament_repository.get_by_id(self.db, tournament_id)
+    async def get_tournament(self, tournament_id: UUID, *, for_update: bool = False) -> Tournament:
+        """Get a tournament by ID. Raises NotFoundError for missing or deleted tournaments.
+
+        `for_update` locks the row for the rest of the transaction. Use it for check-then-write
+        flows (join, leave, start, bracket generation) so they cannot interleave.
+        """
+        tournament = await tournament_repository.get_by_id(self.db, tournament_id, for_update=for_update)
         if tournament is None:
             raise NotFoundError("Tournament")
         if tournament.is_deleted:
@@ -142,7 +146,7 @@ class TournamentService:
         self, tournament_id: UUID, team_id: UUID, invite_token: str | None = None
     ) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""
-        tournament = await self.get_tournament(tournament_id)
+        tournament = await self.get_tournament(tournament_id, for_update=True)
         if tournament.is_started:
             raise TournamentAlreadyStartedError()
 
@@ -199,7 +203,7 @@ class TournamentService:
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
         """Withdraw a team from a tournament before it starts."""
-        if (await self.get_tournament(tournament_id)).is_started:
+        if (await self.get_tournament(tournament_id, for_update=True)).is_started:
             raise TournamentAlreadyStartedError()
 
         team_q = (
@@ -227,7 +231,7 @@ class TournamentService:
 
     async def remove_team(self, tournament_id: UUID, team_id: UUID) -> None:
         """Remove a specific team from a tournament (Admin action, only before it starts)."""
-        if (await self.get_tournament(tournament_id)).is_started:
+        if (await self.get_tournament(tournament_id, for_update=True)).is_started:
             raise TournamentAlreadyStartedError()
         result = await self.db.execute(
             delete(TournamentTeam)
@@ -247,7 +251,7 @@ class TournamentService:
         from app.models.match import Match
         from fastapi import HTTPException
         
-        tournament = await self.get_tournament(tournament_id)
+        tournament = await self.get_tournament(tournament_id, for_update=True)
         if tournament.is_started:
             raise TournamentAlreadyStartedError()
             

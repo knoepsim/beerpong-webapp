@@ -15,8 +15,11 @@ class TeamRepository(BaseRepository[Team]):
     def __init__(self):
         super().__init__(Team)
 
-    async def get_by_id_active(self, db: AsyncSession, id: UUID) -> Team | None:
-        result = await db.execute(select(Team).where(Team.id == id, Team.is_deleted == False))
+    async def get_by_id_active(self, db: AsyncSession, id: UUID, *, for_update: bool = False) -> Team | None:
+        stmt = select(Team).where(Team.id == id, Team.is_deleted == False)
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
     async def get_user_teams(self, db: AsyncSession, user_id: UUID) -> list[Team]:
