@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MatchCard } from '../match-card';
+import { makeMatch } from '@/lib/test-fixtures/bracket';
+import type { MatchSlot } from '@/lib/bracket-layout';
 import type { Match, Team } from '@/types';
 
 const teamsMap: Record<string, Team> = {
@@ -8,67 +10,72 @@ const teamsMap: Record<string, Team> = {
   b: { id: 'b', name: 'Bravo' } as Team,
 };
 
-const match = (overrides: Partial<Match> = {}): Match => ({
-  id: 'm',
-  tournament_id: 't',
-  round: 1,
-  position: 0,
-  team_a_id: 'a',
-  team_b_id: 'b',
-  next_match_id: null,
-  next_match_slot: null,
-  table_number: null,
-  created_at: '',
-  status: 'ready',
-  winner_team_id: null,
-  cups_left: null,
-  ...overrides,
+const slot = (overrides: Partial<Match> = {}, sources: MatchSlot['sources'] = { a: null, b: null }): MatchSlot => ({
+  kind: 'match',
+  number: 7,
+  sources,
+  match: makeMatch({ id: 'm', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready', ...overrides }),
 });
 
 describe('MatchCard', () => {
-  it('waits without a status badge until both teams are known', () => {
-    render(<MatchCard match={match({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
-    expect(screen.getByText('TBD')).toBeInTheDocument();
-    expect(screen.queryByText('Bereit')).not.toBeInTheDocument();
-    expect(screen.queryByText('Beendet')).not.toBeInTheDocument();
-  });
-
-  it('shows a ready match as ready without made-up score, timer or table', () => {
-    render(<MatchCard match={match()} teamsMap={teamsMap} />);
+  it('shows the number and a ready match as ready, without made-up score, timer or table', () => {
+    render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
+    expect(screen.getByText('Spiel 7')).toBeInTheDocument();
     expect(screen.getByText('Bereit')).toBeInTheDocument();
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
     expect(screen.queryByText('12:34')).not.toBeInTheDocument();
-    expect(screen.queryByText('10')).not.toBeInTheDocument();
   });
 
-  it('shows the table only when one is assigned', () => {
-    render(<MatchCard match={match({ table_number: 3 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Tisch 3')).toBeInTheDocument();
-  });
-
-  it('marks the winner with text and an icon, not only a color, and shows the cups left', () => {
+  it('names the matches whose winners are still missing', () => {
     render(
       <MatchCard
-        match={match({ status: 'finished', winner_team_id: 'b', cups_left: 3 })}
+        slot={slot({ status: 'waiting', team_a_id: 'a', team_b_id: null }, { a: null, b: 3 })}
         teamsMap={teamsMap}
       />,
     );
-    expect(screen.getByText(/Beendet/)).toBeInTheDocument();
-    expect(screen.getByText(/3 Becher/)).toBeInTheDocument();
+    expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument();
+    expect(screen.queryByText('Bereit')).not.toBeInTheDocument();
+  });
+
+  it('says "Offen" for a missing team without a feeder match', () => {
+    render(<MatchCard slot={slot({ status: 'waiting', team_a_id: null, team_b_id: null })} teamsMap={teamsMap} />);
+    expect(screen.getAllByText('Offen')).toHaveLength(2);
+  });
+
+  it('shows the table only when one is assigned', () => {
+    render(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Spiel 7 · Tisch 3')).toBeInTheDocument();
+  });
+
+  it('marks the winner with an icon and text, not only a color, and shows the cups left', () => {
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('3 Becher')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Gewinner')).toHaveLength(1);
-    // the winner row is the one with Bravo
-    expect(screen.getByText('Bravo').closest('div.flex.items-center.h-\\[40px\\]')).toContainElement(
-      screen.getByLabelText('Gewinner'),
-    );
+    expect(screen.getByText('Bravo').closest('div')).toContainElement(screen.getByLabelText('Gewinner'));
+    expect(screen.getByText('Alpha').closest('div')!.className).toContain('text-muted-foreground');
   });
 
   it('does not mark anybody while the match is open', () => {
-    render(<MatchCard match={match()} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.queryByLabelText('Gewinner')).not.toBeInTheDocument();
   });
 
-  it('shows the finished match without cups when none were recorded', () => {
-    render(<MatchCard match={match({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
-    expect(screen.queryByText(/Becher/)).not.toBeInTheDocument();
+  it('says "Beendet" when no cups were recorded', () => {
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Beendet')).toBeInTheDocument();
+  });
+
+  it('describes the whole match for screen readers', () => {
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2, table_number: 4 })} teamsMap={teamsMap} />);
+    expect(
+      screen.getByRole('group', { name: 'Spiel 7, Alpha gegen Bravo, beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
+    ).toBeInTheDocument();
+  });
+
+  it('becomes a button with a handler', () => {
+    const onClick = vi.fn();
+    render(<MatchCard slot={slot()} teamsMap={teamsMap} onClick={onClick} />);
+    fireEvent.click(screen.getByRole('button', { name: /Spiel 7/ }));
+    expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'm' }));
   });
 });

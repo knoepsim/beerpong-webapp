@@ -594,10 +594,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </div>
               ) : (
                 <div className="space-y-8">
-                  <BracketView 
-                    bracket={bracket} 
-                    teamsMap={teamsMap} 
-                    onMatchClick={canReferee ? handleMatchClick : undefined} 
+                  <BracketView
+                    bracket={bracket}
+                    teamsMap={teamsMap}
+                    onMatchClick={canReferee ? handleMatchClick : undefined}
+                    highlightTeamId={myTournamentTeam?.id}
                   />
                   
                   <div className="border-t pt-6">
