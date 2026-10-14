@@ -102,7 +102,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
                 />
               </div>
 
-              <div className="text-left sm:text-center pb-4 sm:pb-0 px-1 sm:px-2 flex-1 sm:flex-none">
+              <div className="text-left sm:text-center pb-4 sm:pb-0 px-1 sm:px-2 flex-1 sm:flex-none sm:w-full">
                 <p
                   className={`text-sm font-semibold leading-tight ${
                     step.active ? "text-primary" : step.done ? "text-foreground" : "text-muted-foreground"

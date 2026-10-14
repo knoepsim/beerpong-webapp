@@ -8,7 +8,7 @@ from app.core.security import verify_access_token
 from app.models.match import Match
 from app.models.result import Result
 from app.models.team import Team
-from app.models.tournament import Tournament
+from app.models.tournament import Tournament, TournamentTeam
 from app.models.user import User
 from main import app
 from scripts.seed_dummy_tournaments import (
@@ -118,3 +118,18 @@ async def test_token_belongs_to_the_dummy_player(db):
     token = await dummy_token(db, 3)
     user = (await db.execute(select(User).where(User.phone_number == player_phone(3)))).scalar_one()
     assert verify_access_token(token) == user.id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("state", "phase", "checked_in"),
+    [("registration", "registration", 0), ("checkin", "checkin", 3)],
+)
+async def test_preparation_states_stay_unstarted_in_their_phase(db, state, phase, checked_in):
+    info = await create_tournament(db, teams=6, state=state, played=None, owner_phone=OWNER)
+
+    tournament = (await db.execute(select(Tournament).where(Tournament.id == info["id"]))).scalar_one()
+    assert tournament.phase.value == phase
+    assert tournament.started_at is None
+    assert await _count(db, Match, Match.tournament_id == tournament.id) == 0
+    assert await _count(db, TournamentTeam, TournamentTeam.tournament_id == tournament.id, TournamentTeam.is_checked_in) == checked_in

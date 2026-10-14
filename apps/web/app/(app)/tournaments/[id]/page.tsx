@@ -437,10 +437,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
           <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
-          {canManage && <TabsTrigger value="admin" className="flex-1">
-            <ShieldAlert className="h-3 w-3 mr-1.5" />
-            Einstellungen
-          </TabsTrigger>}
+          {canManage && (
+            <TabsTrigger value="admin" className="basis-full mt-1 h-9 border-t border-border/60 rounded-t-none">
+              <ShieldAlert className="size-4 mr-1.5" />
+              Einstellungen
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 space-y-6">

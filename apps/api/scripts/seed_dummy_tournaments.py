@@ -7,6 +7,7 @@ Dummy players and teams follow a fixed scheme and stay in the database, so they 
 
 Usage (from apps/api):
     uv run python -m scripts.seed_dummy_tournaments create --teams 28 --state running
+    uv run python -m scripts.seed_dummy_tournaments seed       # one tournament per phase: registration, check-in, running, finished
     uv run python -m scripts.seed_dummy_tournaments delete
     uv run python -m scripts.seed_dummy_tournaments token 5
 """
@@ -35,7 +36,14 @@ from app.services.tournament_service import TournamentService
 
 PHONE_PREFIX = "+4915899"
 TOURNAMENT_PREFIX = "Dummy "
-STATES = {"fresh": ("frisch", 0.0), "running": ("laufend", 0.6), "finished": ("beendet", 1.0)}
+# state -> (label, share of matches played); None = not started yet (still in the registration / check-in phase)
+STATES: dict[str, tuple[str, float | None]] = {
+    "registration": ("Anmeldung offen", None),
+    "checkin": ("Check-in offen", None),
+    "fresh": ("frisch", 0.0),
+    "running": ("laufend", 0.6),
+    "finished": ("beendet", 1.0),
+}
 
 
 def player_phone(n: int) -> str:
@@ -118,7 +126,7 @@ def default_owner() -> str:
     return phones[0]
 
 
-def tournament_name(teams: int, played: float, state: str | None) -> str:
+def tournament_name(teams: int, played: float | None, state: str | None) -> str:
     label = STATES[state][0] if state else f"{round(played * 100)} % gespielt"
     return f"{TOURNAMENT_PREFIX}{teams} Teams – {label}"
 
@@ -127,12 +135,13 @@ async def create_tournament(
     db: AsyncSession,
     *,
     teams: int = 28,
-    played: float = 0.0,
+    played: float | None = 0.0,
     state: str | None = None,
     owner_phone: str | None = None,
     name: str | None = None,
 ) -> dict:
-    """Create (or replace) a started dummy tournament and play the given share of its matches."""
+    """Create (or replace) a dummy tournament. With `played` it is started and that share of its matches is played;
+    without (`None`) it stays in the registration phase, or in the check-in phase if `state == "checkin"`."""
     owner = (await db.execute(select(User).where(User.phone_number == (owner_phone or default_owner())))).scalar_one_or_none()
     if owner is None:
         raise SystemExit(f"Besitzer {owner_phone or default_owner()} existiert nicht. Erst in der App anmelden oder --owner angeben.")
@@ -149,15 +158,21 @@ async def create_tournament(
             location="Dummy-Garten",
             description=f"Testturnier mit {teams} Dummy-Teams, erzeugt mit scripts/seed_dummy_tournaments.py.",
             start_time=datetime.now(UTC) + timedelta(hours=1),
+            registration_end_time=datetime.now(UTC) - timedelta(minutes=10) if state == "checkin" else None,
+            checkin_enabled=state == "checkin",
             table_count=8,
             visibility=TournamentVisibility.PUBLIC_LISTED,
         ),
         owner.id,
     )
     await db.flush()
-    for team in team_rows:
-        db.add(TournamentTeam(tournament_id=tournament.id, team_id=team.id))
+    for i, team in enumerate(team_rows):
+        # during check-in about half of the teams have already arrived
+        db.add(TournamentTeam(tournament_id=tournament.id, team_id=team.id, is_checked_in=state == "checkin" and i % 2 == 0))
     await db.flush()
+
+    if played is None:
+        return {"id": tournament.id, "name": name, "teams": teams, "matches": 0, "rounds": 0, "played": 0}
 
     await LifecycleService(db).start_tournament(tournament.id)
 
@@ -198,12 +213,16 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    create = sub.add_parser("create", help="create (or replace) a started dummy tournament")
+    create = sub.add_parser("create", help="create (or replace) a dummy tournament")
     create.add_argument("--teams", type=int, default=28)
     create.add_argument("--state", choices=list(STATES), default="fresh")
     create.add_argument("--played", type=float, help="share of matches played (0.0 - 1.0), overrides --state")
     create.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
     create.add_argument("--name", help="tournament name (default: scheme)")
+
+    seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, running, finished)")
+    seed.add_argument("--teams", type=int, default=28)
+    seed.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
 
     sub.add_parser("delete", help="delete all dummy tournaments (players and teams stay)")
 
@@ -212,11 +231,18 @@ async def main() -> None:
 
     args = parser.parse_args()
     async with async_session() as db:
-        if args.command == "create":
+        if args.command == "seed":
+            for state in ("registration", "checkin", "running", "finished"):
+                info = await create_tournament(
+                    db, teams=args.teams, played=STATES[state][1], state=state, owner_phone=args.owner
+                )
+                print(f"{info['name']}: http://localhost:3000/tournaments/{info['id']}")
+            await db.commit()
+        elif args.command == "create":
             if args.teams < 2:
                 raise SystemExit("--teams muss mindestens 2 sein.")
             played = args.played if args.played is not None else STATES[args.state][1]
-            if not 0.0 <= played <= 1.0:
+            if played is not None and not 0.0 <= played <= 1.0:
                 raise SystemExit("--played muss zwischen 0.0 und 1.0 liegen.")
             info = await create_tournament(
                 db,
