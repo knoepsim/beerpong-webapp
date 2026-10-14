@@ -1,7 +1,7 @@
 """Test tournaments with dummy players and teams (local development tool).
 
 Dummy players and teams follow a fixed scheme and stay in the database, so they can be reused:
-    player n   phone +4915899{n:06d}, name "Dummy Spieler n"
+    player n   phone +4915899{n:06d}, name "Dummy Spieler n", e-mail dummyN@example.test
     team k     name "Dummy Team kk", players 2k-1 and 2k
     tournament "Dummy {teams} Teams – {state}"
 
@@ -42,6 +42,10 @@ def player_phone(n: int) -> str:
     return f"{PHONE_PREFIX}{n:06d}"
 
 
+def player_email(n: int) -> str:
+    return f"dummy{n}@example.test"
+
+
 def team_name(k: int) -> str:
     return f"Dummy Team {k:02d}"
 
@@ -54,8 +58,10 @@ async def ensure_players(db: AsyncSession, count: int) -> list[User]:
     for n, phone in enumerate(phones, start=1):
         user = existing.get(phone)
         if user is None:
-            user = User(phone_number=phone, name=f"Dummy Spieler {n}")
+            user = User(phone_number=phone, name=f"Dummy Spieler {n}", email=player_email(n))
             db.add(user)
+        elif user.email is None:
+            user.email = player_email(n)  # complete profile: the app skips the onboarding for the login
         players.append(user)
     await db.flush()
     return players
