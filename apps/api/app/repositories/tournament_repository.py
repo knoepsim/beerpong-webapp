@@ -12,39 +12,6 @@ class TournamentRepository(BaseRepository[Tournament]):
     def __init__(self):
         super().__init__(Tournament)
 
-    async def list_visible_for_user(self, db: AsyncSession, user_id: UUID) -> list[Tournament]:
-        # Public listed tournaments
-        public_q = select(Tournament).where(
-            Tournament.visibility == TournamentVisibility.PUBLIC_LISTED,
-            Tournament.is_deleted == False,
-        )
-
-        # Tournaments user is part of (as a player in a team)
-        from app.models.team import Team, TeamMember
-        from app.models.tournament import TournamentTeam
-        player_q = (
-            select(Tournament)
-            .join(TournamentTeam, Tournament.id == TournamentTeam.tournament_id)
-            .join(Team, TournamentTeam.team_id == Team.id)
-            .join(TeamMember, Team.id == TeamMember.team_id)
-            .where(TeamMember.user_id == user_id, Tournament.is_deleted == False)
-        )
-
-        # Tournaments user manages
-        manager_q = (
-            select(Tournament)
-            .join(TournamentUserRole, Tournament.id == TournamentUserRole.tournament_id)
-            .where(TournamentUserRole.user_id == user_id, Tournament.is_deleted == False)
-        )
-
-        # Execute queries and combine results uniquely
-        public_res = await db.execute(public_q)
-        player_res = await db.execute(player_q)
-        manager_res = await db.execute(manager_q)
-
-        all_tournaments = set(public_res.scalars()) | set(player_res.scalars()) | set(manager_res.scalars())
-        return list(all_tournaments)
-
     async def get_my_tournaments(self, db: AsyncSession, user_id: UUID):
         # Participating tournaments
         from app.models.team import Team, TeamMember

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
 import { api, ApiError } from '@/lib/api';
-import { TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
+import { JoinPolicy, TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
 import type { Tournament, TournamentUserRole, User } from '@/types';
 
 const push = vi.fn();
@@ -17,7 +17,7 @@ vi.mock('remark-gfm', () => ({ default: () => {} }));
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
-    tournaments: { update: vi.fn(), generateInvite: vi.fn(), delete: vi.fn() },
+    tournaments: { update: vi.fn(), delete: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn() },
     users: { search: vi.fn() },
     roles: { assign: vi.fn(), revoke: vi.fn() },
   },
@@ -78,7 +78,7 @@ vi.mock('@/components/ui/alert-dialog', () => {
 
 const mocked = {
   update: vi.mocked(api.tournaments.update),
-  invite: vi.mocked(api.tournaments.generateInvite),
+  invites: vi.mocked(api.tournaments.listInvites),
   remove: vi.mocked(api.tournaments.delete),
   search: vi.mocked(api.users.search),
   assign: vi.mocked(api.roles.assign),
@@ -104,7 +104,8 @@ const tournament: Tournament = {
   checkin_open: false,
   table_count: 4,
   mode: TournamentMode.SINGLE_ELIMINATION,
-  visibility: TournamentVisibility.PUBLIC_LISTED,
+  visibility: TournamentVisibility.PUBLIC,
+  join_policy: JoinPolicy.OPEN,
   is_deleted: false,
   created_by_id: 'u0',
   created_at: '',
@@ -149,7 +150,7 @@ describe('visibility per role', () => {
     expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
     expect(screen.getByText('Gefahrenzone')).toBeInTheDocument();
     expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(3);
-    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument(); // not private
+    expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument(); // everybody may join
   });
 
   it('lets managers edit details but only revoke referees', () => {
@@ -210,7 +211,7 @@ describe('editing the tournament details', () => {
     fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'Rules' } });
     expect(saveButton()).toBeDisabled();
 
-    fireEvent.click(screen.getByText('Versteckt (nur mit Link)'));
+    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
     expect(saveButton()).toBeEnabled();
   });
 
@@ -220,7 +221,8 @@ describe('editing the tournament details', () => {
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
     fireEvent.change(screen.getByDisplayValue('4'), { target: { value: '' } });
-    fireEvent.click(screen.getByText('Privat (nur mit Link/Einladung)'));
+    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
+    fireEvent.click(screen.getByText('Nur mit Einladungslink', { selector: 'span' }));
     fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
     fireEvent.click(saveButton());
 
@@ -232,6 +234,7 @@ describe('editing the tournament details', () => {
       description: 'Rules',
       table_count: 1,
       visibility: 'private',
+      join_policy: 'invite_only',
       start_time: new Date('2026-07-01T18:00').toISOString(),
       registration_end_time: null,
       registration_auto_close: false,
@@ -357,44 +360,23 @@ describe('editing the tournament details', () => {
   });
 });
 
-describe('invite link for private tournaments', () => {
-  const privateTournament = { visibility: TournamentVisibility.PRIVATE };
+describe('invitation links', () => {
+  const inviteOnly = { join_policy: JoinPolicy.INVITE_ONLY };
 
-  it('is only offered to organisers', () => {
-    setup(TournamentRoleType.REFEREE, privateTournament);
-    expect(screen.queryByText(/Einladungslink/)).not.toBeInTheDocument();
+  beforeEach(() => mocked.invites.mockResolvedValue([]));
+
+  it('are managed by organisers when joining needs an invitation', async () => {
+    setup(TournamentRoleType.MANAGER, inviteOnly);
+    expect(await screen.findByText('Einladungslinks')).toBeInTheDocument();
+    expect(mocked.invites).toHaveBeenCalledWith('t1');
   });
 
-  it('generates, shows and copies the link, then resets the label', async () => {
-    mocked.invite.mockResolvedValue({ token: 'tok' });
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      setup(TournamentRoleType.MANAGER, privateTournament);
-      fireEvent.click(screen.getByText('Link generieren & kopieren'));
-
-      const link = `${window.location.origin}/t/summer-cup?invite=tok`;
-      expect(await screen.findByText(link)).toBeInTheDocument();
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link);
-      expect(screen.getByText('Kopiert')).toBeInTheDocument();
-      expect(toast.success).toHaveBeenCalledWith('Link kopiert!');
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
-      });
-      expect(screen.getByText('Link generieren & kopieren')).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('shows progress and reports failures', async () => {
-    let reject!: (e: unknown) => void;
-    mocked.invite.mockReturnValue(new Promise((_, r) => (reject = r)));
-    setup(TournamentRoleType.ADMIN, privateTournament);
-    fireEvent.click(screen.getByText('Link generieren & kopieren'));
-    expect(await screen.findByText('Generiere...')).toBeDisabled();
-    reject(new Error('x'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Generieren des Einladungslinks'));
+  it('are not offered to referees, nor when everybody may join', () => {
+    setup(TournamentRoleType.REFEREE, inviteOnly);
+    expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
+    cleanup();
+    setup(TournamentRoleType.ADMIN);
+    expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
   });
 });
 

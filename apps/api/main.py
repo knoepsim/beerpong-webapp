@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.exceptions import register_exception_handlers
-from app.routers import admin, auth, results, roles, teams, tournaments, users
+from app.routers import admin, auth, invites, results, roles, teams, tournaments, users
 
 app = FastAPI(
     title="Bierpong API",
@@ -29,6 +29,7 @@ app.include_router(users.router)
 app.include_router(teams.router)
 app.include_router(tournaments.router)
 app.include_router(roles.router)
+app.include_router(invites.router)
 app.include_router(results.router)
 
 

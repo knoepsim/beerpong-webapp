@@ -133,6 +133,11 @@ class SlugTakenError(AppException):
         super().__init__(409, "SLUG_TAKEN", "Diese Adresse ist schon vergeben.")
 
 
+class InviteRequiredError(AppException):
+    def __init__(self):
+        super().__init__(403, "INVITE_REQUIRED", "Zum Beitreten brauchst du einen Einladungslink.")
+
+
 class InvalidScheduleError(AppException):
     def __init__(self, detail: str):
         super().__init__(422, "INVALID_SCHEDULE", detail)

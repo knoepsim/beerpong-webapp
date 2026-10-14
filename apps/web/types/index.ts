@@ -58,14 +58,37 @@ export enum TournamentMode {
   SINGLE_ELIMINATION = "single_elimination",
 }
 
+/** Who sees bracket and results. */
 export enum TournamentVisibility {
+  PUBLIC = "public",
   PRIVATE = "private",
-  PUBLIC_LISTED = "public_listed",
-  PUBLIC_UNLISTED = "public_unlisted",
 }
 
+/** Who may join with a team. */
+export enum JoinPolicy {
+  OPEN = "open",
+  INVITE_ONLY = "invite_only",
+}
+
+/** An invitation link /invite/{token} of a tournament. */
 export interface TournamentInvite {
+  id: string;
   token: string;
+  label: string | null;
+  created_at: string;
+  /** Teams that joined through this link. */
+  uses: number;
+}
+
+/** What a stranger sees of a tournament before joining. */
+export interface TournamentPreview {
+  tournament_id: string;
+  slug: string;
+  name: string;
+  location: string | null;
+  start_time: string | null;
+  registration_open: boolean;
+  join_policy: JoinPolicy;
 }
 
 export type TournamentPhase =
@@ -99,6 +122,7 @@ export interface Tournament {
   table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
+  join_policy: JoinPolicy;
   is_deleted: boolean;
   created_by_id: string;
   created_at: string;
@@ -124,6 +148,7 @@ export interface TournamentCreateRequest {
   table_count?: number;
   mode?: TournamentMode;
   visibility?: TournamentVisibility;
+  join_policy?: JoinPolicy;
 }
 
 // ── Match & Bracket ───────────────────────────────────

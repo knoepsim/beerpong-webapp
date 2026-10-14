@@ -8,6 +8,8 @@ import type {
   TokenResponse,
   Tournament,
   TournamentCreateRequest,
+  TournamentInvite,
+  TournamentPreview,
   TournamentStartResponse,
   TournamentUserRole,
   User,
@@ -30,8 +32,6 @@ export class ApiError extends Error {
 }
 
 // Tournament invite token, forwarded so private tournaments stay readable via invite link
-const inviteQuery = (inviteToken?: string | null) =>
-  inviteToken ? `?invite=${encodeURIComponent(inviteToken)}` : "";
 
 // ── Core fetch logic ──────────────────────────────────
 
@@ -180,12 +180,20 @@ export const api = {
   },
 
   tournaments: {
-    list: () => request<Tournament[]>("/tournaments"),
     getMyTournaments: () => request<MyTournamentsResponse>("/tournaments/me"),
-    get: (id: string, inviteToken?: string | null) =>
-      request<Tournament>(`/tournaments/${id}${inviteQuery(inviteToken)}`),
-    getBySlug: (slug: string, inviteToken?: string | null) =>
-      request<Tournament>(`/tournaments/by-slug/${encodeURIComponent(slug)}${inviteQuery(inviteToken)}`),
+    get: (id: string) => request<Tournament>(`/tournaments/${id}`),
+    getBySlug: (slug: string) => request<Tournament>(`/tournaments/by-slug/${encodeURIComponent(slug)}`),
+    /** What a stranger may see of a tournament everybody may join; 404 for all others. */
+    getPreview: (slug: string) =>
+      request<TournamentPreview>(`/tournaments/by-slug/${encodeURIComponent(slug)}/preview`),
+    listInvites: (tournamentId: string) => request<TournamentInvite[]>(`/tournaments/${tournamentId}/invites`),
+    createInvite: (tournamentId: string, label?: string) =>
+      request<TournamentInvite>(`/tournaments/${tournamentId}/invites`, {
+        method: "POST",
+        body: JSON.stringify({ label: label || null }),
+      }),
+    deleteInvite: (tournamentId: string, inviteId: string) =>
+      request<void>(`/tournaments/${tournamentId}/invites/${inviteId}`, { method: "DELETE" }),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
         method: "POST",
@@ -213,24 +221,22 @@ export const api = {
       request<void>(`/tournaments/${id}/checkin`, { method: "PUT", body: JSON.stringify({ open }) }),
     startTournament: (id: string) =>
       request<TournamentStartResponse>(`/tournaments/${id}/start`, { method: "POST" }),
-    getBracket: (id: string, inviteToken?: string | null) =>
-      request<Bracket>(`/tournaments/${id}/bracket${inviteQuery(inviteToken)}`),
-    getTeams: (id: string, inviteToken?: string | null) =>
-      request<TournamentTeam[]>(`/tournaments/${id}/teams${inviteQuery(inviteToken)}`),
+    getBracket: (id: string) => request<Bracket>(`/tournaments/${id}/bracket`),
+    getTeams: (id: string) => request<TournamentTeam[]>(`/tournaments/${id}/teams`),
     checkin: (tournamentId: string, teamId: string, is_checked_in: boolean) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}/checkin`, {
         method: "POST",
         body: JSON.stringify({ is_checked_in }),
       }),
-    generateInvite: (tournamentId: string) =>
-      request<{token: string}>(`/tournaments/${tournamentId}/invite`, {
-        method: "POST",
-      }),
+  },
+
+  invites: {
+    /** The tournament behind an invitation link; works without login. */
+    get: (token: string) => request<TournamentPreview>(`/invites/${encodeURIComponent(token)}`),
   },
 
   roles: {
-    list: (tournamentId: string, inviteToken?: string | null) =>
-      request<TournamentUserRole[]>(`/tournaments/${tournamentId}/roles${inviteQuery(inviteToken)}`),
+    list: (tournamentId: string) => request<TournamentUserRole[]>(`/tournaments/${tournamentId}/roles`),
     assign: (tournamentId: string, userId: string, role: string) =>
       request<TournamentUserRole>(`/tournaments/${tournamentId}/roles`, {
         method: "POST",
@@ -243,8 +249,7 @@ export const api = {
   },
 
   results: {
-    list: (matchId: string, inviteToken?: string | null) =>
-      request<Result[]>(`/matches/${matchId}/results${inviteQuery(inviteToken)}`),
+    list: (matchId: string) => request<Result[]>(`/matches/${matchId}/results`),
     create: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
       request<Result>(`/matches/${matchId}/results`, {
         method: "POST",

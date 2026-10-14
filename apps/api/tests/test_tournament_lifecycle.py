@@ -74,21 +74,13 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
         assert resp.status_code == 201
         tournament_id = resp.json()["id"]
 
-        # Generate Tournament Invite
-        resp = await async_client.post(
-            f"/tournaments/{tournament_id}/invite",
-            headers=auth_header(0)
-        )
-        assert resp.status_code == 201
-        tourney_invite = resp.json()["token"]
-
         # 4. Join Tournament
         # User 1 (Team 1), User 3 (Team 2), User 5 (Team 3)
         for i, team_id in enumerate(teams):
             creator_idx = i * 2
             resp = await async_client.post(
                 f"/tournaments/{tournament_id}/join",
-                json={"team_id": team_id, "invite_token": tourney_invite},
+                json={"team_id": team_id},
                 headers=auth_header(creator_idx)
             )
             assert resp.status_code == 201

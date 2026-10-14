@@ -2,12 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user
-from app.models.tournament import Tournament
+from app.models.tournament import JoinPolicy, Tournament
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
 from app.schemas.match import BracketResponse
@@ -18,9 +19,12 @@ from app.schemas.tournament import (
     TournamentResponse,
     TournamentStartResponse,
     TournamentUpdate,
-    TournamentInviteResponse,
+    InviteCreate,
+    InviteResponse,
+    TournamentPreview,
 )
 from app.services.bracket_service import BracketService
+from app.services.invite_service import InviteService, preview_of
 from app.services.lifecycle_service import LifecycleService
 from app.services.role_service import RoleService
 from app.services.team_service import TeamService
@@ -60,21 +64,59 @@ async def update_tournament(
     return await TournamentService(db).update_tournament(tournament_id, body)
 
 
-@router.post(
-    "/{tournament_id}/invite",
-    response_model=TournamentInviteResponse,
-    status_code=201,
-    summary="Einladungslink generieren",
-    description="Generiert ein neues Einladungs-Token für das Turnier. Nur für Manager/Admin.",
+@router.get(
+    "/{tournament_id}/invites",
+    response_model=list[InviteResponse],
+    summary="Einladungslinks auflisten",
+    description="Alle Einladungslinks des Turniers mit der Zahl der Teams, die darüber beigetreten sind. "
+    "Nur Admin und Manager.",
 )
-async def generate_invite_token(
+async def list_invites(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
-    token = await TournamentService(db).generate_invite_token(tournament_id)
-    return TournamentInviteResponse(token=token)
+    await TournamentService(db).get_tournament(tournament_id)
+    return await InviteService(db).list(tournament_id)
+
+
+@router.post(
+    "/{tournament_id}/invites",
+    response_model=InviteResponse,
+    status_code=201,
+    summary="Einladungslink erstellen",
+    description="Erstellt einen neuen Einladungslink /invite/{token}, optional mit Namen. Nur Admin und Manager.",
+)
+async def create_invite(
+    tournament_id: UUID,
+    body: InviteCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await TournamentService(db).get_tournament(tournament_id)
+    invite = await InviteService(db).create(tournament_id, current_user.id, body.label)
+    await db.commit()
+    return InviteResponse(id=invite.id, token=invite.token, label=invite.label, created_at=invite.created_at, uses=0)
+
+
+@router.delete(
+    "/{tournament_id}/invites/{invite_id}",
+    status_code=204,
+    summary="Einladungslink löschen",
+    description="Löscht einen Einladungslink. Teams, die darüber schon beigetreten sind, bleiben im Turnier. "
+    "Nur Admin und Manager.",
+)
+async def delete_invite(
+    tournament_id: UUID,
+    invite_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await InviteService(db).delete(tournament_id, invite_id)
+    await db.commit()
 
 
 @router.delete(
@@ -106,20 +148,6 @@ async def get_my_tournaments(
 
 
 @router.get(
-    "",
-    response_model=list[TournamentResponse],
-    summary="Turniere auflisten",
-    description="Listet alle öffentlich gelisteten Turniere sowie Turniere, "
-    "in denen der User eine Rolle hat oder mit einem Team teilnimmt.",
-)
-async def list_tournaments(
-    current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    return await TournamentService(db).list_tournaments(current_user.id)
-
-
-@router.get(
     "/by-slug/{slug}",
     response_model=TournamentResponse,
     summary="Turnier über seine Adresse abrufen",
@@ -129,11 +157,28 @@ async def get_tournament_by_slug(
     slug: str,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    invite: str | None = None,
 ):
     service = TournamentService(db)
     tournament = await service.get_tournament_by_slug(slug)
-    return await service.get_tournament_for_user(tournament.id, current_user.id, invite)
+    try:
+        return await service.get_tournament_for_user(tournament.id, current_user.id)
+    except HTTPException:
+        # a private tournament does not say that it exists
+        raise NotFoundError("Tournament") from None
+
+
+@router.get(
+    "/by-slug/{slug}/preview",
+    response_model=TournamentPreview,
+    summary="Vorschau für Fremde",
+    description="Name, Zeit und Ort eines Turniers, dem jeder mit Link beitreten darf, ohne Anmeldung abrufbar. "
+    "Bei Turnieren, die nur mit Einladungslink offen sind, antwortet die Adresse wie eine unbekannte (404).",
+)
+async def get_tournament_preview(slug: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    tournament = await TournamentService(db).get_tournament_by_slug(slug)
+    if tournament.join_policy != JoinPolicy.OPEN:
+        raise NotFoundError("Tournament")
+    return preview_of(tournament)
 
 
 @router.get(

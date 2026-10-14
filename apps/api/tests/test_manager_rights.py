@@ -22,7 +22,7 @@ async def ctx(async_client: AsyncClient):
     tid = (
         await async_client.post(
             "/tournaments",
-            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public_listed"},
+            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
             headers=h["admin"],
         )
     ).json()["id"]

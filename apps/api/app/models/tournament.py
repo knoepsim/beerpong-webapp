@@ -15,9 +15,17 @@ class TournamentMode(str, enum.Enum):
 
 
 class TournamentVisibility(str, enum.Enum):
+    """Who sees the bracket and the results: everybody, or only participants and helpers."""
+
+    PUBLIC = "public"
     PRIVATE = "private"
-    PUBLIC_LISTED = "public_listed"
-    PUBLIC_UNLISTED = "public_unlisted"
+
+
+class JoinPolicy(str, enum.Enum):
+    """Who may join with a team: anybody who knows the address, or only with an invitation link."""
+
+    OPEN = "open"
+    INVITE_ONLY = "invite_only"
 
 
 class TournamentPhase(str, enum.Enum):
@@ -63,7 +71,9 @@ class Tournament(Base):
     table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
-    invite_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+    join_policy: Mapped[JoinPolicy] = mapped_column(
+        Enum(JoinPolicy), default=JoinPolicy.OPEN, server_default=JoinPolicy.OPEN.name, nullable=False
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -144,4 +154,8 @@ class TournamentTeam(Base):
     )
     team_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=False)
     is_checked_in: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # the invitation link this team joined with (if any); kept only to count what a link brought
+    invite_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tournament_invites.id", ondelete="SET NULL"), nullable=True
+    )
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
