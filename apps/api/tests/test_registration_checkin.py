@@ -168,6 +168,58 @@ async def test_players_cannot_check_in_teams(ctx: Ctx):
     assert resp.status_code == 403
 
 
+@pytest.mark.asyncio
+async def test_check_in_can_be_opened_early_and_closes_the_registration(ctx: Ctx):
+    tid = await ctx.create(checkin_enabled=True, registration_end_time=FUTURE, checkin_start_time=FUTURE)
+    await ctx.join(tid, 0)
+    assert (await ctx.checkin(tid, 0)).status_code == 409, "not open yet"
+
+    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
+
+    assert resp.status_code == 204
+    tournament = await ctx.get(tid)
+    assert (tournament["phase"], tournament["registration_open"], tournament["checkin_open"]) == ("checkin", False, True)
+    assert (await ctx.checkin(tid, 0)).status_code == 204
+    assert (await ctx.join(tid, 1)).status_code == 409, "registration is closed"
+
+
+@pytest.mark.asyncio
+async def test_opening_check_in_twice_is_harmless(ctx: Ctx):
+    tid = await ctx.create(checkin_enabled=True, checkin_start_time=PAST)  # already open by time
+    for _ in range(2):
+        assert (await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)).status_code == 204
+    assert (await ctx.get(tid))["checkin_open"] is True
+
+
+@pytest.mark.asyncio
+async def test_check_in_cannot_be_opened_without_check_in_after_the_start_or_by_players(ctx: Ctx):
+    plain = await ctx.create()
+    resp = await ctx.client.post(f"/tournaments/{plain}/checkin/open", headers=ctx.admin)
+    assert (resp.status_code, resp.json()["error_code"]) == (409, "CHECKIN_DISABLED")
+
+    tid = await ctx.create(checkin_enabled=True)
+    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.players[0])
+    assert resp.status_code == 403
+
+    for team in range(2):
+        await ctx.join(tid, team)
+        await ctx.checkin(tid, team)
+    await ctx.start(tid)
+    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_switching_check_in_off_reopens_the_registration(ctx: Ctx):
+    tid = await ctx.create(checkin_enabled=True, registration_end_time=FUTURE, checkin_start_time=FUTURE)
+    await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
+
+    await ctx.client.patch(f"/tournaments/{tid}", json={"checkin_enabled": False}, headers=ctx.admin)
+
+    tournament = await ctx.get(tid)
+    assert (tournament["registration_open"], tournament["checkin_open"]) == (True, False)
+
+
 # --- start -----------------------------------------------------------------------
 
 

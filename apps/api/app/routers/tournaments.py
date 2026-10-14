@@ -240,6 +240,23 @@ async def checkin_team(
     await db.commit()
 
 @router.post(
+    "/{tournament_id}/checkin/open",
+    status_code=204,
+    summary="Check-in starten",
+    description="Öffnet den Check-in sofort, auch vor der geplanten Zeit. Die Anmeldung wird damit geschlossen. "
+    "Nur Admin und Manager.",
+)
+async def open_checkin(
+    tournament_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await LifecycleService(db).open_checkin(tournament_id)
+    await db.commit()
+
+
+@router.post(
     "/{tournament_id}/start",
     response_model=TournamentStartResponse,
     summary="Turnier starten",

@@ -148,6 +148,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     return roleObj ? roleObj.role : null;
   }, [roles, user]);
 
+  // Without check-in the tournament can be started any time; with check-in the organizer opens check-in first
+  const waitingForCheckin = !!tournament?.checkin_enabled && !tournament.checkin_open;
+  const startPlan = tournament ? planStart(tournament, tournamentTeams) : null;
+
   const canAdmin = userRole === TournamentRoleType.ADMIN;
   const canManage = canAdmin || userRole === TournamentRoleType.MANAGER;
   const canReferee = canManage || userRole === TournamentRoleType.REFEREE;
@@ -214,6 +218,22 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       // Revert on error
       setTournamentTeams(prev => prev.map(t => t.id === teamId ? { ...t, is_checked_in: !isCheckedIn } : t));
     }
+  };
+
+  const handleOpenCheckin = () => {
+    setConfirmState({
+      title: "Check-in jetzt starten?",
+      description: "Die Anmeldung wird damit geschlossen. Teams können dann vor Ort eingecheckt werden.",
+      action: async () => {
+        try {
+          await api.tournaments.openCheckin(tournamentId);
+          await loadData();
+          toast.success("Check-in gestartet");
+        } catch (err: unknown) {
+          toast.error(err instanceof Error ? err.message : "Fehler beim Starten des Check-ins");
+        }
+      },
+    });
   };
 
   const handleStartTournament = () => {
@@ -465,7 +485,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   {tournament.started_at
                     ? "Das Turnier läuft."
                     : tournament.checkin_enabled
-                      ? "Checke die Teams vor Ort ein und starte dann das Turnier."
+                      ? tournament.checkin_open
+                        ? "Checke die Teams vor Ort ein und starte dann das Turnier."
+                        : "Starte den Check-in, sobald die ersten Teams vor Ort sind."
                       : "Starte das Turnier, sobald alle Teams bereit sind."}
                 </CardDescription>
               </CardHeader>
@@ -477,19 +499,23 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 ) : (
                   <>
-                    {tournament.checkin_enabled && <CheckinSummary teams={tournamentTeams} />}
-                    <Button
-                      onClick={handleStartTournament}
-                      disabled={isStartingTournament || !planStart(tournament, tournamentTeams).canStart}
-                      className="w-full sm:w-auto"
-                      size="lg"
-                    >
-                      Turnier starten
-                    </Button>
-                    {!planStart(tournament, tournamentTeams).canStart && (
-                      <p className="text-sm text-muted-foreground">
-                        {planStart(tournament, tournamentTeams).description}
-                      </p>
+                    {tournament.checkin_open && <CheckinSummary teams={tournamentTeams} />}
+                    {waitingForCheckin ? (
+                      <Button onClick={handleOpenCheckin} className="w-full sm:w-auto" size="lg">
+                        Check-in starten
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleStartTournament}
+                          disabled={isStartingTournament || !startPlan?.canStart}
+                          className="w-full sm:w-auto"
+                          size="lg"
+                        >
+                          Turnier starten
+                        </Button>
+                        {!startPlan?.canStart && <p className="text-sm text-muted-foreground">{startPlan?.description}</p>}
+                      </>
                     )}
                   </>
                 )}

@@ -100,7 +100,7 @@ export function TournamentScheduleFields({
               <p className="text-sm text-destructive">{errors.checkin_start_time}</p>
             ) : (
               <p id={id("checkin-start-hint")} className="text-xs text-muted-foreground">
-                Leer lassen: Der Check-in beginnt mit dem Anmeldeschluss (ohne Anmeldeschluss sofort).
+                Zur Orientierung für die Spieler. Leer lassen: Der Check-in beginnt mit dem Anmeldeschluss (ohne Anmeldeschluss sofort). Du kannst ihn im Turnier jederzeit früher starten.
               </p>
             )}
           </div>
