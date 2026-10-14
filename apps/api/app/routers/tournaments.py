@@ -158,15 +158,16 @@ async def leave_tournament(
 @router.post(
     "/{tournament_id}/generate-bracket",
     response_model=BracketResponse,
-    summary="Turnier starten",
-    description="Generiert das KO-Bracket mit zufälliger Team-Zuordnung und Freilos-Handling. Nur Admin.",
+    summary="Bracket generieren",
+    description="Generiert das KO-Bracket mit zufälliger Team-Zuordnung und Freilos-Handling. "
+    "Nur Admin und Manager, nur vor dem Turnierstart.",
 )
 async def generate_bracket(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.ADMIN)
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await BracketService(db).generate_bracket(tournament_id)
     return await BracketService(db).get_bracket(tournament_id)
 
@@ -257,14 +258,14 @@ async def checkin_team(
     "/{tournament_id}/start",
     status_code=204,
     summary="Turnier starten",
-    description="Setzt den Status auf gestartet. Nur Admin.",
+    description="Setzt den Status auf gestartet. Nur Admin und Manager.",
 )
 async def start_tournament(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.ADMIN)
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).start_tournament(tournament_id)
     await db.commit()
 
