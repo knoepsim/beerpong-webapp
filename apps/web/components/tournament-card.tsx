@@ -43,7 +43,7 @@ const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !==
 
 /**
  * A tournament in the list: when (date tile), what (name), where and at what time, the state, and how I am
- * involved. Nothing else; everything else is on the tournament page.
+ * involved (a badge with my team if I play, a badge per role if I organize; both if I do both). Nothing else; everything else is on the tournament page.
  */
 export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
   const { tournament: t, team, role } = item;
@@ -78,10 +78,10 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
         <div className="flex flex-wrap items-center gap-1.5">
           {isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
           {team && (
-            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-              <Users className="size-3 shrink-0" aria-hidden="true" />
+            <Badge variant="secondary" className="max-w-full">
+              <Users aria-hidden="true" />
               <span className="truncate">{team.name}</span>
-            </span>
+            </Badge>
           )}
           {role && <Badge variant="secondary">{ROLE_LABELS[role]}</Badge>}
         </div>
