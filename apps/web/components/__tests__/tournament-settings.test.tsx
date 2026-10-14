@@ -2,18 +2,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
 import type { Tournament, TournamentUserRole, User } from '@/types';
 
 const push = vi.fn();
+const replace = vi.fn();
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace }) }));
 vi.mock('sonner', () => ({ toast }));
 vi.mock('react-markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div data-testid="markdown">{children}</div> }));
 vi.mock('remark-gfm', () => ({ default: () => {} }));
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
     tournaments: { update: vi.fn(), generateInvite: vi.fn(), delete: vi.fn() },
     users: { search: vi.fn() },
@@ -85,6 +87,7 @@ const mocked = {
 
 const tournament: Tournament = {
   id: 't1',
+  slug: 'summer-cup',
   name: 'Summer Cup',
   location: 'Garden',
   description: 'Rules',
@@ -224,6 +227,7 @@ describe('editing the tournament details', () => {
     await waitFor(() => expect(onReload).toHaveBeenCalled());
     expect(mocked.update).toHaveBeenCalledWith('t1', {
       name: 'Winter Cup',
+      slug: 'summer-cup',
       location: undefined,
       description: 'Rules',
       table_count: 1,
@@ -302,6 +306,30 @@ describe('editing the tournament details', () => {
     expect(screen.getByRole('switch', { name: 'Check-in vor Ort' })).toHaveAttribute('data-disabled');
   });
 
+  it('changes the address and follows it to the new page', async () => {
+    mocked.update.mockResolvedValue({ ...tournament, slug: 'winter-cup' });
+    setup(TournamentRoleType.ADMIN);
+    expect(screen.getByText('So lautet der Link zum Turnier.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Adresse'), { target: { value: 'Winter-Cup' } });
+    expect(screen.getByText(/Der alte Link und QR-Codes .* funktionieren dann nicht mehr/)).toBeInTheDocument();
+    fireEvent.click(saveButton());
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/t/winter-cup'));
+    expect(mocked.update.mock.calls[0][1]).toMatchObject({ slug: 'winter-cup' });
+  });
+
+  it('names a taken or invalid address at the field', async () => {
+    mocked.update.mockRejectedValue(new ApiError(409, { detail: 'Diese Adresse ist schon vergeben.', error_code: 'SLUG_TAKEN' }));
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(screen.getByLabelText('Adresse'), { target: { value: 'vergeben' } });
+    fireEvent.click(saveButton());
+
+    expect(await screen.findByText('Diese Adresse ist schon vergeben.')).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('shows the saving state and reports failures', async () => {
     let reject!: (e: unknown) => void;
     mocked.update.mockReturnValue(new Promise((_, r) => (reject = r)));
@@ -344,7 +372,7 @@ describe('invite link for private tournaments', () => {
       setup(TournamentRoleType.MANAGER, privateTournament);
       fireEvent.click(screen.getByText('Link generieren & kopieren'));
 
-      const link = `${window.location.origin}/tournaments/t1?invite=tok`;
+      const link = `${window.location.origin}/t/summer-cup?invite=tok`;
       expect(await screen.findByText(link)).toBeInTheDocument();
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(link);
       expect(screen.getByText('Kopiert')).toBeInTheDocument();

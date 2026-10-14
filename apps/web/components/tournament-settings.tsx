@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -72,6 +72,8 @@ export function TournamentSettings({
   const [editDescription, setEditDescription] = useState(tournament.description || "");
   const [editTableCount, setEditTableCount] = useState(tournament.table_count.toString());
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
+  const [editSlug, setEditSlug] = useState(tournament.slug);
+  const [slugError, setSlugError] = useState<string | null>(null);
   const initialSchedule: ScheduleValues = {
     start_time: toLocalInput(tournament.start_time),
     registration_end_time: toLocalInput(tournament.registration_end_time),
@@ -90,13 +92,16 @@ export function TournamentSettings({
     editDescription !== (tournament.description || "") ||
     editTableCount !== tournament.table_count.toString() ||
     editVisibility !== tournament.visibility ||
+    editSlug !== tournament.slug ||
     (Object.keys(initialSchedule) as (keyof ScheduleValues)[]).some((k) => schedule[k] !== initialSchedule[k]);
 
   const handleUpdateTournament = async () => {
     setIsUpdating(true);
     try {
-      await api.tournaments.update(tournament.id, {
+      setSlugError(null);
+      const saved = await api.tournaments.update(tournament.id, {
         name: editName,
+        slug: editSlug,
         location: editLocation || undefined,
         description: editDescription || undefined,
         table_count: parseInt(editTableCount) || 1,
@@ -104,10 +109,16 @@ export function TournamentSettings({
         start_time: toIsoOrNull(schedule.start_time) ?? undefined,
         ...scheduleToPayload(schedule),
       });
-      await onReload();
       toast.success("Turnier-Details erfolgreich gespeichert!");
+      // a changed address is the new page of the tournament
+      if (saved.slug !== tournament.slug) router.replace(`/t/${saved.slug}`);
+      else await onReload();
     } catch (err) {
-      toast.error("Fehler beim Speichern der Turnier-Details");
+      if (err instanceof ApiError && (err.data?.error_code === "SLUG_TAKEN" || err.data?.error_code === "INVALID_SLUG")) {
+        setSlugError(err.message);
+      } else {
+        toast.error("Fehler beim Speichern der Turnier-Details");
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -148,7 +159,7 @@ export function TournamentSettings({
     setIsGeneratingInvite(true);
     try {
       const res = await api.tournaments.generateInvite(tournament.id);
-      const link = `${window.location.origin}/tournaments/${tournament.id}?invite=${res.token}`;
+      const link = `${window.location.origin}/t/${tournament.slug}?invite=${res.token}`;
       setInviteLink(link);
       await navigator.clipboard.writeText(link);
       setCopied(true);
@@ -211,6 +222,29 @@ export function TournamentSettings({
               <div className="space-y-2">
                 <Label>Turniername</Label>
                 <Input value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="settings-slug">Adresse</Label>
+                <div className="flex items-center rounded-md border bg-background focus-within:ring-3 focus-within:ring-ring/50">
+                  <span className="pl-3 text-sm text-muted-foreground" aria-hidden="true">/t/</span>
+                  <Input
+                    id="settings-slug"
+                    value={editSlug}
+                    onChange={(e) => {
+                      setEditSlug(e.target.value.toLowerCase());
+                      setSlugError(null);
+                    }}
+                    className="border-0 pl-0.5 shadow-none focus-visible:ring-0"
+                    aria-invalid={!!slugError}
+                    aria-describedby="settings-slug-hint"
+                  />
+                </div>
+                {slugError && <p className="text-sm text-destructive">{slugError}</p>}
+                <p id="settings-slug-hint" className="text-xs text-muted-foreground">
+                  {editSlug !== tournament.slug
+                    ? "Der alte Link und QR-Codes mit der alten Adresse funktionieren dann nicht mehr."
+                    : "So lautet der Link zum Turnier."}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Ort (Optional)</Label>

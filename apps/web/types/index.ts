@@ -78,6 +78,8 @@ export type TournamentPhase =
 
 export interface Tournament {
   id: string;
+  /** The address /t/{slug}. */
+  slug: string;
   name: string;
   location: string | null;
   description: string | null;
@@ -110,6 +112,7 @@ export interface TournamentStartResponse {
 
 export interface TournamentCreateRequest {
   name: string;
+  slug?: string;
   location?: string | null;
   description?: string | null;
   start_time: string;

@@ -120,6 +120,23 @@ async def list_tournaments(
 
 
 @router.get(
+    "/by-slug/{slug}",
+    response_model=TournamentResponse,
+    summary="Turnier über seine Adresse abrufen",
+    description="Löst die Adresse /t/{slug} auf. Unbekannte und gelöschte Adressen antworten gleich (404).",
+)
+async def get_tournament_by_slug(
+    slug: str,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    invite: str | None = None,
+):
+    service = TournamentService(db)
+    tournament = await service.get_tournament_by_slug(slug)
+    return await service.get_tournament_for_user(tournament.id, current_user.id, invite)
+
+
+@router.get(
     "/{tournament_id}",
     response_model=TournamentResponse,
     summary="Turnier-Details abrufen",

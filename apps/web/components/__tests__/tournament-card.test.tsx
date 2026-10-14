@@ -8,6 +8,7 @@ import { TournamentRoleType } from '@/types'
 const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
   ({
     id: 't1',
+    slug: 'sommerfest',
     name: 'Sommerfest',
     location: 'Garten',
     start_time: '2026-10-14T20:17:00',
@@ -24,7 +25,7 @@ const card = (item: Partial<MyTournament> = {}, t: Partial<Tournament> = {}) =>
 describe('TournamentCard', () => {
   it('links to the tournament', () => {
     card()
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/tournaments/t1')
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/t/sommerfest')
   })
 
   it('shows what, when and where, nothing else', () => {

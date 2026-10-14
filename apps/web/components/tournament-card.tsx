@@ -51,7 +51,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
 
   return (
     <Link
-      href={`/tournaments/${t.id}`}
+      href={`/t/${t.slug}`}
       className={cn(
         "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-none transition",
         "hover:border-primary/40 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50",

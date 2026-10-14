@@ -182,8 +182,10 @@ export const api = {
   tournaments: {
     list: () => request<Tournament[]>("/tournaments"),
     getMyTournaments: () => request<MyTournamentsResponse>("/tournaments/me"),
-    get: (id: string, inviteToken?: string | null) => 
+    get: (id: string, inviteToken?: string | null) =>
       request<Tournament>(`/tournaments/${id}${inviteQuery(inviteToken)}`),
+    getBySlug: (slug: string, inviteToken?: string | null) =>
+      request<Tournament>(`/tournaments/by-slug/${encodeURIComponent(slug)}${inviteQuery(inviteToken)}`),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
         method: "POST",
