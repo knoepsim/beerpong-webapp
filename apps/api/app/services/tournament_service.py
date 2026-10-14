@@ -22,6 +22,8 @@ from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import User
 
 
 class TournamentService:
@@ -278,3 +280,17 @@ class TournamentService:
 def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TournamentService:
     return TournamentService(db)
 
+
+
+async def get_accessible_tournament(
+    tournament_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    service: Annotated[TournamentService, Depends(get_tournament_service)],
+    invite: str | None = None,
+) -> Tournament:
+    """Dependency for every read endpoint of a tournament: enforces the visibility rules.
+
+    Private tournaments are only accessible to role holders, participants and holders of
+    the invite token (passed as ?invite=...).
+    """
+    return await service.get_tournament_for_user(tournament_id, current_user.id, invite)
