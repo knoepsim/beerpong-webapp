@@ -39,6 +39,22 @@ def test_pairings_are_valid_for_every_team_count(n: int):
     assert abs(top - (len(byes) - top)) <= 1, "byes spread over both halves"
 
 
+@pytest.mark.parametrize(
+    ("n", "round_one_matches", "byes"),
+    [(2, 1, 0), (3, 1, 1), (5, 1, 3), (6, 2, 2), (10, 2, 6), (12, 4, 4), (14, 6, 2), (16, 8, 0), (17, 1, 15)],
+)
+def test_byes_only_exist_in_round_one(n: int, round_one_matches: int, byes: int):
+    """Round one plays N - 2^k matches, the remaining teams skip it; from round two on it is a full bracket."""
+    pairings = round_one_pairings([uuid.uuid4() for _ in range(n)])
+    matches = [p for p in pairings if None not in p]
+    skipping = [p for p in pairings if None in p]
+
+    assert len(matches) == round_one_matches
+    assert len(skipping) == byes
+    # everybody who plays round one or skips it is in round two: a power of two
+    assert round_one_matches + byes == bracket_size(n) // 2
+
+
 def test_single_team_is_rejected():
     with pytest.raises(ValueError):
         round_one_pairings([uuid.uuid4()])

@@ -43,9 +43,9 @@ describe('BracketView', () => {
     expect(screen.getByText('Delta')).toBeInTheDocument();
   });
 
-  it('numbers earlier rounds in larger brackets', () => {
+  it('names earlier rounds in larger brackets', () => {
     render(<BracketView bracket={{ ...bracket, total_rounds: 3 }} teamsMap={teamsMap} />);
-    expect(screen.getByText('Runde 1')).toBeInTheDocument();
+    expect(screen.getByText('Viertelfinale')).toBeInTheDocument();
     expect(screen.getByText('Halbfinale')).toBeInTheDocument();
   });
 

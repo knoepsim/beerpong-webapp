@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { BracketView } from "@/components/bracket-view";
+import { roundLabel } from "@/lib/utils";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { MapPin, Calendar, Users, Trophy, Trash2, Play, Share2 } from "lucide-react";
@@ -730,7 +731,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   
                   return (
                     <div className="flex flex-col gap-2">
-                      <p className="font-medium text-sm text-primary">Runde {currentMatch.round}</p>
+                      <p className="font-medium text-sm text-primary">{roundLabel(currentMatch.round, bracket.total_rounds)}</p>
                       <div className="p-4 rounded-lg border bg-card flex items-center justify-between shadow-sm">
                         <span className="font-bold truncate text-right flex-1">{myTournamentTeam.name}</span>
                         <span className="text-muted-foreground mx-4 text-xs font-semibold">VS</span>
@@ -788,7 +789,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         return (
                           <div key={m.id} className="p-3 border rounded-lg flex items-center justify-between text-sm">
                             <div className="flex-1 text-right truncate font-medium">{tA ? tA.name : "TBD"}</div>
-                            <div className="px-4 text-[10px] uppercase font-bold text-muted-foreground">Runde {m.round}</div>
+                            <div className="px-4 text-[10px] uppercase font-bold text-muted-foreground">{roundLabel(m.round, bracket.total_rounds)}</div>
                             <div className="flex-1 text-left truncate font-medium">{tB ? tB.name : "TBD"}</div>
                           </div>
                         );
