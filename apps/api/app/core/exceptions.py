@@ -55,6 +55,11 @@ class InvalidInviteError(AppException):
         super().__init__(400, "INVALID_INVITE", detail)
 
 
+class TooManyRequestsError(AppException):
+    def __init__(self, detail: str = "Too many requests, please try again later"):
+        super().__init__(429, "TOO_MANY_REQUESTS", detail)
+
+
 # --- Tournaments ---
 
 class TournamentDeletedError(AppException):
