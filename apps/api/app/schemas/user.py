@@ -1,14 +1,9 @@
-import re
 from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, field_validator
 
-
-def sanitize_phone_number(v: str) -> str:
-    has_plus = v.startswith('+')
-    digits = re.sub(r'\D', '', v)
-    return f"+{digits}" if has_plus else digits
+from app.core.phone import normalize_german_mobile
 
 
 class UserResponse(BaseModel):
@@ -36,7 +31,7 @@ class PhoneNumberChangeRequest(BaseModel):
     @field_validator('new_phone_number')
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        return sanitize_phone_number(v)
+        return normalize_german_mobile(v)
 
 
 class PhoneNumberChangeVerify(BaseModel):
@@ -47,4 +42,4 @@ class PhoneNumberChangeVerify(BaseModel):
     @field_validator('new_phone_number')
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        return sanitize_phone_number(v)
+        return normalize_german_mobile(v)
