@@ -44,6 +44,52 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: beerpong
+          POSTGRES_PASSWORD: beerpong_ci
+          POSTGRES_DB: beerpong
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beerpong"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: ./apps/api
+    env:
+      DATABASE_URL: postgresql+asyncpg://beerpong:beerpong_ci@localhost:5432/beerpong
+      # Scratch database for the concurrency tests that need real row locks (tables are dropped)
+      TEST_POSTGRES_URL: postgresql+asyncpg://beerpong:beerpong_ci@localhost:5432/beerpong_test
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Create scratch database
+        run: psql "postgresql://beerpong:beerpong_ci@localhost:5432/beerpong" -c "CREATE DATABASE beerpong_test"
+
+      - name: Run migrations on an empty database
+        run: uv run alembic upgrade head
+
+      - name: Run API tests
+        run: uv run pytest -v
+
   docker-build-check:
     name: Docker Build Check
     runs-on: ubuntu-latest
