@@ -21,6 +21,7 @@ class TournamentVisibility(str, enum.Enum):
 
 class TournamentPhase(str, enum.Enum):
     REGISTRATION = "registration"
+    REGISTRATION_AND_CHECKIN = "registration_and_checkin"
     REGISTRATION_CLOSED = "registration_closed"
     CHECKIN = "checkin"
     RUNNING = "running"
@@ -45,8 +46,16 @@ class Tournament(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # set while the final has a result: the tournament is over
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # set when an organizer opens check-in ahead of the planned time; this also closes the registration
-    checkin_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Registration and check-in are two independent switches the organizer can flip at any time.
+    # *_changed_at is the last manual flip; with *_auto the schedule above flips the switch at its time
+    # (registration closes at registration_end_time, check-in opens at checkin_start_time), unless the
+    # organizer flipped it after that time.
+    registration_is_open: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true", nullable=False)
+    registration_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    registration_auto_close: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    checkin_is_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    checkin_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    checkin_auto_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
@@ -67,27 +76,44 @@ class Tournament(Base):
     def _checkin_opened_manually(self) -> bool:
         return self.checkin_enabled and self.checkin_opened_at is not None
 
+    @staticmethod
+    def _switch(
+        is_open: bool,
+        changed_at: datetime | None,
+        auto: bool,
+        at: datetime | None,
+        auto_state: bool,
+        now: datetime | None = None,
+    ) -> bool:
+        """State of a switch: the schedule sets `auto_state` at its time, a later manual flip wins."""
+        due = _aware(at)
+        if auto and due is not None and (now or datetime.now(UTC)) >= due:
+            changed = _aware(changed_at)
+            if changed is None or changed < due:
+                return auto_state
+        return is_open
+
     @property
     def registration_open(self) -> bool:
-        """Teams can join until the registration deadline (if any), before check-in was opened and before the start."""
-        if self.is_started or self._checkin_opened_manually:
+        """Teams can join while registration is switched on (it closes by itself at the deadline if wanted)."""
+        if self.is_started:
             return False
-        deadline = _aware(self.registration_end_time)
-        return deadline is None or datetime.now(UTC) < deadline
+        return self._switch(
+            self.registration_is_open,
+            self.registration_changed_at,
+            self.registration_auto_close,
+            self.registration_end_time,
+            False,
+        )
 
     @property
     def checkin_open(self) -> bool:
-        """Check-in only exists if enabled and ends at the start.
-
-        It opens when an organizer opens it, otherwise at checkin_start_time, otherwise when the
-        registration closes, without any deadline it is open right away.
-        """
+        """Check-in only exists if enabled; it is switched on by the organizer or by itself at its start time."""
         if not self.checkin_enabled or self.is_started:
             return False
-        if self._checkin_opened_manually:
-            return True
-        opens_at = _aware(self.checkin_start_time or self.registration_end_time)
-        return opens_at is None or datetime.now(UTC) >= opens_at
+        return self._switch(
+            self.checkin_is_open, self.checkin_changed_at, self.checkin_auto_open, self.checkin_start_time, True
+        )
 
     @property
     def phase(self) -> TournamentPhase:
@@ -95,9 +121,12 @@ class Tournament(Base):
             return TournamentPhase.FINISHED
         if self.is_started:
             return TournamentPhase.RUNNING
-        if self.registration_open:
+        registration, checkin = self.registration_open, self.checkin_open
+        if registration and checkin:
+            return TournamentPhase.REGISTRATION_AND_CHECKIN
+        if registration:
             return TournamentPhase.REGISTRATION
-        if self.checkin_open:
+        if checkin:
             return TournamentPhase.CHECKIN
         return TournamentPhase.REGISTRATION_CLOSED
 

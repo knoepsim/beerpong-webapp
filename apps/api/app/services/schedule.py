@@ -11,7 +11,8 @@ def validate_schedule(
     checkin_enabled: bool,
     checkin_start_time: datetime | None,
 ) -> None:
-    """Registration closes before check-in opens, and both happen before the start.
+    """Registration deadline and check-in start lie before the start. They may overlap: late teams can still
+    register while others already check in.
 
     The check-in time is only taken into account if check-in is enabled.
     """
@@ -23,5 +24,3 @@ def validate_schedule(
         raise InvalidScheduleError("Der Anmeldeschluss muss vor dem Turnierstart liegen.")
     if checkin_start and start and checkin_start > start:
         raise InvalidScheduleError("Der Check-in muss vor dem Turnierstart beginnen.")
-    if registration_end and checkin_start and checkin_start < registration_end:
-        raise InvalidScheduleError("Der Check-in darf erst nach dem Anmeldeschluss beginnen.")

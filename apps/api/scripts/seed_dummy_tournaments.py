@@ -40,6 +40,7 @@ TOURNAMENT_PREFIX = "Dummy "
 STATES: dict[str, tuple[str, float | None]] = {
     "registration": ("Anmeldung offen", None),
     "checkin": ("Check-in offen", None),
+    "both": ("Anmeldung und Check-in offen", None),
     "fresh": ("frisch", 0.0),
     "running": ("laufend", 0.6),
     "finished": ("beendet", 1.0),
@@ -134,14 +135,24 @@ def tournament_name(teams: int, played: float | None, state: str | None) -> str:
 def _schedule(state: str | None) -> dict:
     """Registration deadline and check-in times that put the tournament into the given preparation phase."""
     now = datetime.now(UTC)
-    if state == "registration":  # registration open, check-in planned for later (can be opened early)
+    if state == "registration":  # registration open, closes by itself in 1 h; check-in opens by itself in 2 h
         return {
             "registration_end_time": now + timedelta(hours=1),
+            "registration_auto_close": True,
             "checkin_enabled": True,
             "checkin_start_time": now + timedelta(hours=2),
+            "checkin_auto_open": True,
         }
-    if state == "checkin":  # registration closed, check-in open
-        return {"registration_end_time": now - timedelta(minutes=10), "checkin_enabled": True}
+    if state == "checkin":  # registration closed by its deadline, check-in opened by its time
+        return {
+            "registration_end_time": now - timedelta(minutes=10),
+            "registration_auto_close": True,
+            "checkin_enabled": True,
+            "checkin_start_time": now - timedelta(minutes=5),
+            "checkin_auto_open": True,
+        }
+    if state == "both":  # no deadline, so registration stays open while check-in has begun
+        return {"checkin_enabled": True, "checkin_start_time": now - timedelta(minutes=5), "checkin_auto_open": True}
     return {}
 
 
@@ -155,7 +166,7 @@ async def create_tournament(
     name: str | None = None,
 ) -> dict:
     """Create (or replace) a dummy tournament. With `played` it is started and that share of its matches is played;
-    without (`None`) it stays in the registration phase, or in the check-in phase if `state == "checkin"`."""
+    without (`None`) it stays in the registration phase, or in the check-in phase if `state` is "checkin" / "both"."""
     owner = (await db.execute(select(User).where(User.phone_number == (owner_phone or default_owner())))).scalar_one_or_none()
     if owner is None:
         raise SystemExit(f"Besitzer {owner_phone or default_owner()} existiert nicht. Erst in der App anmelden oder --owner angeben.")
@@ -181,7 +192,7 @@ async def create_tournament(
     await db.flush()
     for i, team in enumerate(team_rows):
         # during check-in about half of the teams have already arrived
-        db.add(TournamentTeam(tournament_id=tournament.id, team_id=team.id, is_checked_in=state == "checkin" and i % 2 == 0))
+        db.add(TournamentTeam(tournament_id=tournament.id, team_id=team.id, is_checked_in=state in ("checkin", "both") and i % 2 == 0))
     await db.flush()
 
     if played is None:
@@ -233,7 +244,7 @@ async def main() -> None:
     create.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
     create.add_argument("--name", help="tournament name (default: scheme)")
 
-    seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, running, finished)")
+    seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, both open, running, finished)")
     seed.add_argument("--teams", type=int, default=28)
     seed.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
 
@@ -245,7 +256,7 @@ async def main() -> None:
     args = parser.parse_args()
     async with async_session() as db:
         if args.command == "seed":
-            for state in ("registration", "checkin", "running", "finished"):
+            for state in ("registration", "checkin", "both", "running", "finished"):
                 info = await create_tournament(
                     db, teams=args.teams, played=STATES[state][1], state=state, owner_phone=args.owner
                 )

@@ -18,7 +18,9 @@ import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
 import { CheckinSummary } from "@/components/checkin-summary";
 import { TournamentTeamList } from "@/components/tournament-team-list";
-import { checkinOpensAt, phaseLabel, planStart } from "@/lib/tournament-phase";
+import { phaseLabel, planStart } from "@/lib/tournament-phase";
+import { formatWhen } from "@/lib/format-when";
+import { PreparationControls } from "@/components/preparation-controls";
 import { MapPin, Calendar, Users, Trophy, Play, Share2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import {
@@ -148,8 +150,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     return roleObj ? roleObj.role : null;
   }, [roles, user]);
 
-  // Without check-in the tournament can be started any time; with check-in the organizer opens check-in first
-  const waitingForCheckin = !!tournament?.checkin_enabled && !tournament.checkin_open;
   const startPlan = tournament ? planStart(tournament, tournamentTeams) : null;
 
   const canAdmin = userRole === TournamentRoleType.ADMIN;
@@ -220,20 +220,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  const handleOpenCheckin = () => {
-    setConfirmState({
-      title: "Check-in jetzt starten?",
-      description: "Die Anmeldung wird damit geschlossen. Teams können dann vor Ort eingecheckt werden.",
-      action: async () => {
-        try {
-          await api.tournaments.openCheckin(tournamentId);
-          await loadData();
-          toast.success("Check-in gestartet");
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Fehler beim Starten des Check-ins");
-        }
-      },
-    });
+  const handleSetOpen = async (kind: "registration" | "checkin", open: boolean) => {
+    try {
+      if (kind === "registration") await api.tournaments.setRegistrationOpen(tournamentId, open);
+      else await api.tournaments.setCheckinOpen(tournamentId, open);
+      await loadData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuche es noch einmal.");
+    }
   };
 
   const handleStartTournament = () => {
@@ -245,7 +239,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
     setConfirmState({
       title: "Turnier jetzt starten?",
-      description: plan.description,
+      description: tournament.registration_open ? `${plan.description} Die Anmeldung wird geschlossen.` : plan.description,
       action: async () => {
         setIsStartingTournament(true);
         try {
@@ -481,15 +475,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <Play className="h-5 w-5" />
                   Turnier-Leitstand
                 </CardTitle>
-                <CardDescription>
-                  {tournament.started_at
-                    ? "Das Turnier läuft."
-                    : tournament.checkin_enabled
-                      ? tournament.checkin_open
-                        ? "Checke die Teams vor Ort ein und starte dann das Turnier."
-                        : "Starte den Check-in, sobald die ersten Teams vor Ort sind."
-                      : "Starte das Turnier, sobald alle Teams bereit sind."}
-                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {tournament.started_at ? (
@@ -499,24 +484,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 ) : (
                   <>
+                    <PreparationControls
+                      tournament={tournament}
+                      onRegistration={(open) => handleSetOpen("registration", open)}
+                      onCheckin={(open) => handleSetOpen("checkin", open)}
+                    />
                     {tournament.checkin_open && <CheckinSummary teams={tournamentTeams} />}
-                    {waitingForCheckin ? (
-                      <Button onClick={handleOpenCheckin} className="w-full sm:w-auto" size="lg">
-                        Check-in starten
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          onClick={handleStartTournament}
-                          disabled={isStartingTournament || !startPlan?.canStart}
-                          className="w-full sm:w-auto"
-                          size="lg"
-                        >
-                          Turnier starten
-                        </Button>
-                        {!startPlan?.canStart && <p className="text-sm text-muted-foreground">{startPlan?.description}</p>}
-                      </>
-                    )}
+                    <Button
+                      onClick={handleStartTournament}
+                      disabled={isStartingTournament || !startPlan?.canStart}
+                      className="w-full sm:w-auto"
+                      size="lg"
+                    >
+                      Turnier starten
+                    </Button>
+                    {!startPlan?.canStart && <p className="text-sm text-muted-foreground">{startPlan?.description}</p>}
                   </>
                 )}
               </CardContent>
@@ -628,15 +610,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
             <CheckinSummary teams={tournamentTeams} />
           )}
-          {tournament.checkin_enabled && !tournament.started_at && !tournament.checkin_open && checkinOpensAt(tournament) && (
-            <p className="text-sm text-muted-foreground">
-              Der Check-in beginnt am{" "}
-              {new Date(checkinOpensAt(tournament)!).toLocaleString("de-DE", {
-                day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-              })}{" "}
-              Uhr.
-            </p>
-          )}
+          {tournament.checkin_enabled &&
+            !tournament.started_at &&
+            !tournament.checkin_open &&
+            tournament.checkin_auto_open &&
+            tournament.checkin_start_time && (
+              <p className="text-sm text-muted-foreground">
+                Der Check-in beginnt {formatWhen(tournament.checkin_start_time)}.
+              </p>
+            )}
           {tournamentTeams.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground">Noch keine Teams angemeldet.</p>
           ) : (

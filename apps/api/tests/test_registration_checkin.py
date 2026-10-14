@@ -1,10 +1,13 @@
 """Registration deadline, optional check-in and the one-step start."""
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+
+from app.models.tournament import Tournament
 
 FUTURE = "2099-12-31T20:00:00Z"
 LONG_AGO = "2020-01-01T10:00:00Z"
@@ -38,6 +41,15 @@ class Ctx:
             json={"is_checked_in": value},
             headers=self.admin,
         )
+
+    async def create_with_open_checkin(self, **overrides) -> str:
+        return await self.create(checkin_enabled=True, checkin_start_time=PAST, checkin_auto_open=True, **overrides)
+
+    async def set_registration(self, tid: str, open_: bool):
+        return await self.client.put(f"/tournaments/{tid}/registration", json={"open": open_}, headers=self.admin)
+
+    async def set_checkin(self, tid: str, open_: bool):
+        return await self.client.put(f"/tournaments/{tid}/checkin", json={"open": open_}, headers=self.admin)
 
     async def start(self, tid: str):
         return await self.client.post(f"/tournaments/{tid}/start", headers=self.admin)
@@ -79,8 +91,8 @@ async def ctx(async_client: AsyncClient) -> Ctx:
 
 @pytest.mark.asyncio
 async def test_registration_is_open_until_the_deadline(ctx: Ctx):
-    open_tid = await ctx.create(registration_end_time=FUTURE)
-    closed_tid = await ctx.create(registration_end_time=PAST, start_time=FUTURE)
+    open_tid = await ctx.create(registration_end_time=FUTURE, registration_auto_close=True)
+    closed_tid = await ctx.create(registration_end_time=PAST, registration_auto_close=True, start_time=FUTURE)
 
     assert (await ctx.join(open_tid, 0)).status_code == 201
     resp = await ctx.join(closed_tid, 0)
@@ -101,32 +113,38 @@ async def test_without_deadline_registration_stays_open_until_start(ctx: Ctx):
 
 
 @pytest.mark.asyncio
-async def test_phase_follows_the_schedule(ctx: Ctx):
-    registration = await ctx.get(await ctx.create(registration_end_time=FUTURE))
+async def test_phase_follows_the_switches_and_the_schedule(ctx: Ctx):
+    registration = await ctx.get(await ctx.create(registration_end_time=FUTURE, registration_auto_close=True))
     assert (registration["phase"], registration["registration_open"], registration["checkin_open"]) == (
         "registration", True, False,
     )
 
-    closed = await ctx.get(await ctx.create(registration_end_time=PAST))
+    closed = await ctx.get(await ctx.create(registration_end_time=PAST, registration_auto_close=True))
     assert (closed["phase"], closed["registration_open"]) == ("registration_closed", False)
 
+    # without the automation the deadline is only a note for the players
+    only_a_note = await ctx.get(await ctx.create(registration_end_time=PAST))
+    assert only_a_note["registration_open"] is True
+
     checkin = await ctx.get(
-        await ctx.create(registration_end_time=LONG_AGO, checkin_enabled=True, checkin_start_time=PAST)
+        await ctx.create(
+            registration_end_time=LONG_AGO, registration_auto_close=True,
+            checkin_enabled=True, checkin_start_time=PAST, checkin_auto_open=True,
+        )
     )
-    assert (checkin["phase"], checkin["checkin_open"]) == ("checkin", True)
+    assert (checkin["phase"], checkin["registration_open"], checkin["checkin_open"]) == ("checkin", False, True)
 
     not_yet = await ctx.get(
-        await ctx.create(registration_end_time=PAST, checkin_enabled=True, checkin_start_time=FUTURE)
+        await ctx.create(checkin_enabled=True, checkin_start_time=FUTURE, checkin_auto_open=True)
     )
-    assert (not_yet["phase"], not_yet["checkin_open"]) == ("registration_closed", False)
+    assert (not_yet["phase"], not_yet["checkin_open"]) == ("registration", False)
 
-    # without an own check-in time the check-in opens with the end of the registration
-    waiting = await ctx.get(await ctx.create(checkin_enabled=True, registration_end_time=FUTURE))
-    assert (waiting["phase"], waiting["checkin_open"]) == ("registration", False)
-    after_deadline = await ctx.get(await ctx.create(checkin_enabled=True, registration_end_time=PAST))
-    assert (after_deadline["phase"], after_deadline["checkin_open"]) == ("checkin", True)
+    both = await ctx.get(await ctx.create_with_open_checkin())
+    assert (both["phase"], both["registration_open"], both["checkin_open"]) == (
+        "registration_and_checkin", True, True,
+    )
 
-    tid = await ctx.create(checkin_enabled=True)
+    tid = await ctx.create_with_open_checkin()
     await ctx.join(tid, 0)
     await ctx.join(tid, 1)
     await ctx.checkin(tid, 0)
@@ -147,12 +165,12 @@ async def test_checkin_only_works_when_enabled_and_open(ctx: Ctx):
     resp = await ctx.checkin(disabled, 0)
     assert (resp.status_code, resp.json()["error_code"]) == (409, "CHECKIN_DISABLED")
 
-    later = await ctx.create(checkin_enabled=True, checkin_start_time=FUTURE)
+    later = await ctx.create(checkin_enabled=True, checkin_start_time=FUTURE, checkin_auto_open=True)
     await ctx.join(later, 0)
     resp = await ctx.checkin(later, 0)
     assert (resp.status_code, resp.json()["error_code"]) == (409, "CHECKIN_NOT_OPEN")
 
-    open_tid = await ctx.create(checkin_enabled=True, checkin_start_time=PAST)
+    open_tid = await ctx.create_with_open_checkin()
     await ctx.join(open_tid, 0)
     assert (await ctx.checkin(open_tid, 0)).status_code == 204
     assert (await ctx.checkin(open_tid, 0, False)).status_code == 204
@@ -169,55 +187,105 @@ async def test_players_cannot_check_in_teams(ctx: Ctx):
 
 
 @pytest.mark.asyncio
-async def test_check_in_can_be_opened_early_and_closes_the_registration(ctx: Ctx):
-    tid = await ctx.create(checkin_enabled=True, registration_end_time=FUTURE, checkin_start_time=FUTURE)
-    await ctx.join(tid, 0)
-    assert (await ctx.checkin(tid, 0)).status_code == 409, "not open yet"
-
-    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
-
-    assert resp.status_code == 204
+async def test_registration_and_check_in_are_switched_independently_at_any_time(ctx: Ctx):
+    tid = await ctx.create(checkin_enabled=True)
+    for _ in range(2):  # switching to the same state twice is harmless
+        assert (await ctx.set_checkin(tid, True)).status_code == 204
     tournament = await ctx.get(tid)
-    assert (tournament["phase"], tournament["registration_open"], tournament["checkin_open"]) == ("checkin", False, True)
+    assert (tournament["phase"], tournament["registration_open"], tournament["checkin_open"]) == (
+        "registration_and_checkin", True, True,
+    )
+
+    await ctx.set_registration(tid, False)
+    assert (await ctx.get(tid))["phase"] == "checkin"
+
+    await ctx.set_checkin(tid, False)
+    assert (await ctx.get(tid))["phase"] == "registration_closed"
+
+    await ctx.set_registration(tid, True)  # one more team is brought along
+    assert (await ctx.join(tid, 0)).status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_a_team_can_register_while_check_in_is_open(ctx: Ctx):
+    tid = await ctx.create_with_open_checkin()
+    assert (await ctx.join(tid, 0)).status_code == 201
     assert (await ctx.checkin(tid, 0)).status_code == 204
-    assert (await ctx.join(tid, 1)).status_code == 409, "registration is closed"
 
 
 @pytest.mark.asyncio
-async def test_opening_check_in_twice_is_harmless(ctx: Ctx):
-    tid = await ctx.create(checkin_enabled=True, checkin_start_time=PAST)  # already open by time
-    for _ in range(2):
-        assert (await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)).status_code == 204
-    assert (await ctx.get(tid))["checkin_open"] is True
+async def test_the_schedule_runs_even_after_a_manual_switch_but_not_over_a_later_one(ctx: Ctx):
+    # a switch after the time wins: the registration was closed by its deadline and is opened again by hand
+    reg = await ctx.create(registration_end_time=PAST, registration_auto_close=True)
+    assert (await ctx.get(reg))["registration_open"] is False
+    await ctx.set_registration(reg, True)
+    assert (await ctx.get(reg))["registration_open"] is True
+
+
+def test_the_schedule_overrides_earlier_manual_switches_only():
+    """Pure rule: at its time the schedule flips the switch, whatever was switched before; later switches win."""
+    t = datetime(2026, 7, 1, 20, 0, tzinfo=UTC)
+    before, after = t - timedelta(hours=1), t + timedelta(hours=1)
+    switch = Tournament._switch
+
+    # check-in: closed by hand at 19:00, the schedule opens it at 20:00
+    assert switch(False, before, True, t, True, now=before + timedelta(minutes=30)) is False
+    assert switch(False, before, True, t, True, now=t) is True
+    # opened/closed by hand after the time: stays as the organizer left it
+    assert switch(False, after, True, t, True, now=after + timedelta(hours=1)) is False
+    # no automation: the time is only a note
+    assert switch(False, None, False, t, True, now=after) is False
+    # registration: reopened at 19:30, still closes at 20:00
+    assert switch(True, before, True, t, False, now=after) is False
 
 
 @pytest.mark.asyncio
-async def test_check_in_cannot_be_opened_without_check_in_after_the_start_or_by_players(ctx: Ctx):
+async def test_changing_the_time_moves_the_automation(ctx: Ctx):
+    tid = await ctx.create(registration_end_time=PAST, registration_auto_close=True)
+    assert (await ctx.get(tid))["registration_open"] is False
+
+    await ctx.client.patch(f"/tournaments/{tid}", json={"registration_end_time": FUTURE}, headers=ctx.admin)
+    assert (await ctx.get(tid))["registration_open"] is True
+
+    await ctx.client.patch(f"/tournaments/{tid}", json={"registration_auto_close": False}, headers=ctx.admin)
+    await ctx.client.patch(f"/tournaments/{tid}", json={"registration_end_time": PAST}, headers=ctx.admin)
+    assert (await ctx.get(tid))["registration_open"] is True, "without the automation the time is only a note"
+
+
+@pytest.mark.asyncio
+async def test_an_automation_needs_its_time(ctx: Ctx):
+    tid = await ctx.create(registration_auto_close=True, checkin_enabled=True, checkin_auto_open=True)
+    tournament = await ctx.get(tid)
+    assert (tournament["registration_auto_close"], tournament["checkin_auto_open"]) == (False, False)
+
+
+@pytest.mark.asyncio
+async def test_switches_cannot_be_used_without_check_in_after_the_start_or_by_players(ctx: Ctx):
     plain = await ctx.create()
-    resp = await ctx.client.post(f"/tournaments/{plain}/checkin/open", headers=ctx.admin)
+    resp = await ctx.set_checkin(plain, True)
     assert (resp.status_code, resp.json()["error_code"]) == (409, "CHECKIN_DISABLED")
 
-    tid = await ctx.create(checkin_enabled=True)
-    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.players[0])
-    assert resp.status_code == 403
+    tid = await ctx.create_with_open_checkin()
+    for url in ("registration", "checkin"):
+        resp = await ctx.client.put(f"/tournaments/{tid}/{url}", json={"open": True}, headers=ctx.players[0])
+        assert resp.status_code == 403
 
     for team in range(2):
         await ctx.join(tid, team)
         await ctx.checkin(tid, team)
     await ctx.start(tid)
-    resp = await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
-    assert resp.status_code == 409
+    assert (await ctx.set_registration(tid, True)).status_code == 409
+    assert (await ctx.set_checkin(tid, True)).status_code == 409
 
 
 @pytest.mark.asyncio
-async def test_switching_check_in_off_reopens_the_registration(ctx: Ctx):
-    tid = await ctx.create(checkin_enabled=True, registration_end_time=FUTURE, checkin_start_time=FUTURE)
-    await ctx.client.post(f"/tournaments/{tid}/checkin/open", headers=ctx.admin)
-
+async def test_switching_check_in_off_closes_it(ctx: Ctx):
+    tid = await ctx.create_with_open_checkin()
     await ctx.client.patch(f"/tournaments/{tid}", json={"checkin_enabled": False}, headers=ctx.admin)
-
     tournament = await ctx.get(tid)
-    assert (tournament["registration_open"], tournament["checkin_open"]) == (True, False)
+    assert (tournament["checkin_open"], tournament["checkin_start_time"], tournament["checkin_auto_open"]) == (
+        False, None, False,
+    )
 
 
 # --- start -----------------------------------------------------------------------
@@ -225,7 +293,7 @@ async def test_switching_check_in_off_reopens_the_registration(ctx: Ctx):
 
 @pytest.mark.asyncio
 async def test_start_with_checkin_removes_teams_that_did_not_show_up(ctx: Ctx):
-    tid = await ctx.create(checkin_enabled=True)
+    tid = await ctx.create_with_open_checkin()
     for team in range(3):
         await ctx.join(tid, team)
     await ctx.checkin(tid, 0)
@@ -265,7 +333,7 @@ async def test_start_needs_two_registered_teams(ctx: Ctx):
 
 @pytest.mark.asyncio
 async def test_start_needs_two_checked_in_teams_and_removes_nobody_otherwise(ctx: Ctx):
-    tid = await ctx.create(checkin_enabled=True)
+    tid = await ctx.create_with_open_checkin()
     await ctx.join(tid, 0)
     await ctx.join(tid, 1)
     await ctx.checkin(tid, 0)
@@ -293,11 +361,6 @@ async def test_generate_bracket_endpoint_is_gone(ctx: Ctx):
     [
         {"registration_end_time": "2099-12-31T21:00:00Z"},  # registration closes after the start
         {"checkin_enabled": True, "checkin_start_time": "2099-12-31T21:00:00Z"},  # check-in after the start
-        {
-            "registration_end_time": "2099-12-31T19:00:00Z",
-            "checkin_enabled": True,
-            "checkin_start_time": "2099-12-31T18:00:00Z",
-        },  # check-in before registration closes
         {"table_count": 0},
         {"name": ""},
     ],

@@ -90,8 +90,10 @@ const tournament: Tournament = {
   description: 'Rules',
   start_time: '2026-07-01T18:00:00',
   registration_end_time: '2026-06-30T18:00:00',
+  registration_auto_close: true,
   checkin_enabled: false,
   checkin_start_time: null,
+  checkin_auto_open: false,
   started_at: null,
   finished_at: null,
   phase: 'registration',
@@ -192,7 +194,7 @@ describe('editing the tournament details', () => {
 
   it('marks check-in, description and visibility changes as dirty', () => {
     setup(TournamentRoleType.ADMIN);
-    const checkinSwitch = screen.getByRole('switch');
+    const checkinSwitch = screen.getByRole('switch', { name: 'Check-in vor Ort' });
     fireEvent.click(checkinSwitch);
     expect(saveButton()).toBeEnabled();
     fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-06-30T19:00' } });
@@ -228,8 +230,10 @@ describe('editing the tournament details', () => {
       visibility: 'private',
       start_time: new Date('2026-07-01T18:00').toISOString(),
       registration_end_time: null,
+      registration_auto_close: false,
       checkin_enabled: false,
       checkin_start_time: null,
+      checkin_auto_open: false,
     });
     expect(toast.success).toHaveBeenCalledWith('Turnier-Details erfolgreich gespeichert!');
   });
@@ -259,19 +263,43 @@ describe('editing the tournament details', () => {
   it('saves check-in settings and drops the check-in time when it is switched off', async () => {
     mocked.update.mockResolvedValue(tournament);
     setup(TournamentRoleType.ADMIN);
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch', { name: 'Check-in vor Ort' }));
     fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-07-01T17:00' } });
     fireEvent.click(saveButton());
     await waitFor(() => expect(mocked.update).toHaveBeenCalled());
     expect(mocked.update.mock.calls[0][1]).toMatchObject({
       checkin_enabled: true,
       checkin_start_time: new Date('2026-07-01T17:00').toISOString(),
+      checkin_auto_open: true,
     });
+  });
+
+  it('lets the schedule act only if the organizer wants it: a switch behind each time', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN);
+    const closeSwitch = screen.getByRole('switch', { name: 'Anmeldung zu dieser Zeit automatisch schließen' });
+    expect(closeSwitch).toBeChecked();
+
+    fireEvent.click(closeSwitch);
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
+    expect(mocked.update.mock.calls[0][1]).toMatchObject({
+      registration_end_time: new Date('2026-06-30T18:00').toISOString(),
+      registration_auto_close: false,
+    });
+  });
+
+  it('cannot automate without a time and says so', () => {
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
+    const closeSwitch = screen.getByRole('switch', { name: /erst mit Datum möglich/ });
+    expect(closeSwitch).toHaveAttribute('data-disabled');
+    expect(closeSwitch).not.toBeChecked();
   });
 
   it('keeps the check-in setting locked once the tournament has started', () => {
     setup(TournamentRoleType.ADMIN, { started_at: '2026-07-01T18:05:00', phase: 'running' });
-    expect(screen.getByRole('switch')).toHaveAttribute('data-disabled');
+    expect(screen.getByRole('switch', { name: 'Check-in vor Ort' })).toHaveAttribute('data-disabled');
   });
 
   it('shows the saving state and reports failures', async () => {

@@ -9,8 +9,10 @@ const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
     id: 't1',
     start_time: '2099-07-01T18:00:00Z',
     registration_end_time: null,
+    registration_auto_close: false,
     checkin_enabled: false,
     checkin_start_time: null,
+    checkin_auto_open: false,
     started_at: null,
     finished_at: null,
     phase: 'registration',
@@ -24,40 +26,54 @@ describe('TournamentTimeline', () => {
     render(<TournamentTimeline tournament={tournament()} />)
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.queryByText('Check-in vor Ort')).not.toBeInTheDocument()
-    expect(screen.getByText('Offen bis zum Start')).toBeInTheDocument()
+    expect(screen.getByText('Offen')).toBeInTheDocument()
   })
 
-  it('adds the check-in step when it is enabled and marks the current one', () => {
+  it('adds the check-in step when it is enabled', () => {
+    render(<TournamentTimeline tournament={tournament({ checkin_enabled: true })} />)
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(3)
+    expect(screen.getByText('Geschlossen')).toBeInTheDocument()
+  })
+
+  it('shows registration and check-in as open at the same time', () => {
     render(
       <TournamentTimeline
-        tournament={tournament({
-          checkin_enabled: true,
-          checkin_open: true,
-          registration_open: false,
-          phase: 'checkin',
-        })}
-       
+        tournament={tournament({ checkin_enabled: true, checkin_open: true, phase: 'registration_and_checkin' })}
       />,
     )
     const items = screen.getAllByRole('listitem')
-    expect(items).toHaveLength(3)
+    expect(items[0]).toHaveAttribute('aria-current', 'step')
     expect(items[1]).toHaveAttribute('aria-current', 'step')
-    expect(screen.getByText('Geöffnet')).toBeInTheDocument()
+    expect(screen.getAllByText('Offen')).toHaveLength(2)
   })
 
-  it('announces the deadline and the opening time', () => {
-    render(
+  it('names a closed registration and a registration that closes by itself', () => {
+    const { rerender } = render(<TournamentTimeline tournament={tournament({ registration_open: false })} />)
+    expect(screen.getByText('Geschlossen')).toBeInTheDocument()
+
+    rerender(
       <TournamentTimeline
-        tournament={tournament({
-          registration_end_time: '2099-06-30T18:00:00Z',
-          checkin_enabled: true,
-          checkin_start_time: '2099-07-01T17:00:00Z',
-        })}
-       
+        tournament={tournament({ registration_end_time: '2099-06-30T18:00:00Z', registration_auto_close: true })}
       />,
     )
-    expect(screen.getByText(/^Bis /)).toBeInTheDocument()
+    expect(screen.getByText(/^Offen bis /)).toBeInTheDocument()
+  })
+
+  it('announces the opening of check-in only if it opens by itself', () => {
+    const { rerender } = render(
+      <TournamentTimeline
+        tournament={tournament({ checkin_enabled: true, checkin_start_time: '2099-07-01T17:00:00Z', checkin_auto_open: true })}
+      />,
+    )
     expect(screen.getByText(/^Ab /)).toBeInTheDocument()
+
+    rerender(
+      <TournamentTimeline
+        tournament={tournament({ checkin_enabled: true, checkin_start_time: '2099-07-01T17:00:00Z', checkin_auto_open: false })}
+      />,
+    )
+    expect(screen.queryByText(/^Ab /)).not.toBeInTheDocument()
   })
 
   it('shows a running and a finished tournament', () => {

@@ -205,8 +205,10 @@ export const api = {
       request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),
     removeTeam: (tournamentId: string, teamId: string) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}`, { method: "DELETE" }),
-    openCheckin: (id: string) =>
-      request<void>(`/tournaments/${id}/checkin/open`, { method: "POST" }),
+    setRegistrationOpen: (id: string, open: boolean) =>
+      request<void>(`/tournaments/${id}/registration`, { method: "PUT", body: JSON.stringify({ open }) }),
+    setCheckinOpen: (id: string, open: boolean) =>
+      request<void>(`/tournaments/${id}/checkin`, { method: "PUT", body: JSON.stringify({ open }) }),
     startTournament: (id: string) =>
       request<TournamentStartResponse>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string, inviteToken?: string | null) =>
