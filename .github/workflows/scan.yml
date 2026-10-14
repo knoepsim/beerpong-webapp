@@ -1,3 +1,5 @@
+# Runners: API Tests and Docker Build Check run on the self-hosted runner (tournament-gitrunner).
+# Jobs with secrets (Sonar) stay on GitHub-hosted runners.
 name: Scan
 on:
   push:
