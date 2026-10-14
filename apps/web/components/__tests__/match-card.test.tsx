@@ -28,24 +28,21 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the table of matches that are ready or still waiting, with a placeholder until one is assigned', () => {
+  it('shows the table of a match that can be played, with a placeholder until one is assigned', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument(); // nothing to tell yet
 
     rerender(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 3')).toBeInTheDocument();
     expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument();
   });
 
-  it('shows no table for a finished match unless one was recorded', () => {
-    const { rerender } = render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
+  it('shows no table for a finished match', () => {
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_number: 2 })} teamsMap={teamsMap} />);
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
-
-    rerender(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_number: 2 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Tisch 2')).toBeInTheDocument();
   });
 
   it('marks the winner with an icon and text, not only a color, and shows the cups left', () => {
@@ -67,9 +64,9 @@ describe('MatchCard', () => {
   });
 
   it('describes the whole match for screen readers', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2, table_number: 4 })} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2 })} teamsMap={teamsMap} />);
     expect(
-      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
+      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig' }),
     ).toBeInTheDocument();
   });
 

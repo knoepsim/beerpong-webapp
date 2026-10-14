@@ -39,13 +39,18 @@ describe('tableLabel', () => {
     expect(tableLabel(slot({ table_number: 4 }).match)).toBe('Tisch 4')
   })
 
-  it('says the table follows for matches that are still to be played', () => {
+  it('says the table follows for a match that can be played now', () => {
     expect(tableLabel(slot().match)).toBe('Tisch folgt')
-    expect(tableLabel(slot({ status: 'waiting' }).match)).toBe('Tisch folgt')
   })
 
-  it('shows nothing for a finished match without table', () => {
+  it('has nothing to say for a match that waits for its teams', () => {
+    expect(tableLabel(slot({ status: 'waiting' }).match)).toBeNull()
+    expect(tableLabel(slot({ status: 'waiting', table_number: 2 }).match)).toBe('Tisch 2')
+  })
+
+  it('shows nothing for a finished match, even if it had a table', () => {
     expect(tableLabel(slot({ status: 'finished', winner_team_id: 'a' }).match)).toBeNull()
+    expect(tableLabel(slot({ status: 'finished', winner_team_id: 'a', table_number: 2 }).match)).toBeNull()
   })
 })
 

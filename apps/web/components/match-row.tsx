@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
-import { describeSides, matchSummary, sideTone, statusLabel, tableLabel } from "@/lib/match-display";
+import { describeSides, matchSummary, sideTone, tableLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchRowProps {
@@ -14,51 +14,63 @@ interface MatchRowProps {
   onClick?: (match: Match) => void;
 }
 
+/** The right-hand side of a row: only what belongs to the state of the match, nothing for a waiting one. */
+function Aside({ match }: Readonly<{ match: Match }>) {
+  const table = tableLabel(match);
+  const cups = match.status === "finished" ? match.cups_left : null;
+  if (match.status === "ready" || table || cups != null) {
+    return (
+      <div className="flex w-[5.5rem] shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
+        {match.status === "ready" && (
+          <span className="rounded-full bg-primary px-2 py-0.5 font-medium text-primary-foreground">Bereit</span>
+        )}
+        {table && <span className="font-medium">{table}</span>}
+        {cups != null && <span className="text-balance text-muted-foreground">{cups} Becher übrig</span>}
+      </div>
+    );
+  }
+  return null;
+}
+
 /**
- * A match as a compact list row: "Spiel 13 · Tisch 2 · Status" above, both teams side by side below.
+ * A match as a list row, like a scoreboard: number | both teams | what matters now.
  * Used for the list of all matches and for "my matches", so both read the same.
+ *
+ * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out; "Bereit" and
+ * the table only exist for matches that can be played; the cups only for finished ones.
  */
 export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchRowProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
-  const table = tableLabel(match);
-  const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
   const className = cn(
-    "block w-full rounded-lg border bg-card text-left overflow-hidden",
-    match.status === "ready" && "border-primary/50",
-    mine && "ring-2 ring-primary/60",
-    onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow",
+    "flex w-full items-stretch rounded-lg border bg-card text-left overflow-hidden",
+    onClick && "cursor-pointer hover:border-primary/50 transition-colors",
   );
   const content = (
     <>
-      <div className="flex items-center justify-between gap-2 px-2.5 pt-1.5 pb-1 text-xs leading-4 text-muted-foreground">
-        <span className="truncate">
-          Spiel {number}
-          {table && ` · ${table}`}
-        </span>
-        <span className={cn("shrink-0", match.status === "ready" && "font-medium text-primary")}>
-          {match.status === "ready" && (
-            <span className="inline-block size-1.5 mr-1 rounded-full bg-primary align-middle" aria-hidden="true" />
-          )}
-          {statusLabel(match)}
-        </span>
-      </div>
-      <div className="grid grid-cols-2 border-t divide-x">
+      <span
+        className="flex w-9 shrink-0 items-center justify-center border-r text-xs tabular-nums text-muted-foreground"
+        aria-hidden="true"
+      >
+        {number}
+      </span>
+      <div className="min-w-0 flex-1 divide-y">
         {sides.map((side) => (
           <div
             key={side.side}
             className={cn(
-              "flex items-center gap-1 min-h-9 min-w-0 px-2 py-1 text-[13px] leading-tight",
-              sideTone(side, !!highlightTeamId && side.id === highlightTeamId),
-              // the loser looks disabled and is crossed out, so the result reads without the check
+              "flex min-h-9 items-center gap-1 px-2 py-1 text-[13px] leading-tight",
+              sideTone(side, !!highlightTeamId && side.id === highlightTeamId, false),
+              side.isWinner && "font-semibold",
               side.isLoser && "line-through decoration-muted-foreground/60",
             )}
           >
-            <TeamLabel side={side} />
+            <TeamLabel side={side} marker={false} />
           </div>
         ))}
       </div>
+      <Aside match={match} />
     </>
   );
   const summary = matchSummary(slot, sides, teamsMap);

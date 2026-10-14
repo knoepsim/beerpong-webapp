@@ -547,7 +547,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   bracket={bracket}
                   teamsMap={teamsMap}
                   teamId={myTournamentTeam.id}
-                  location={tournament.location}
                   onMatchClick={canReferee ? handleMatchClick : undefined}
                 />
               </CardContent>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { MapPin, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { MatchRow } from "@/components/match-row";
 import { allMatchSlots, buildBracketLayout, type MatchSlot } from "@/lib/bracket-layout";
 import { roundLabel } from "@/lib/utils";
@@ -12,8 +12,6 @@ interface MyMatchesProps {
   teamsMap: Record<string, Team>;
   /** The team of the logged-in user. */
   teamId: string;
-  /** Where the tournament takes place. */
-  location?: string | null;
   onMatchClick?: (match: Match) => void;
 }
 
@@ -38,7 +36,7 @@ function NothingToPlay({ matches, bracket, teamId }: Readonly<{ matches: MatchSl
  * What still concerns my team: every match it is placed in that has not been played yet (the next one and
  * the ones that are already fixed after it). Nothing from the past. Same row as the list of all matches.
  */
-export function MyMatches({ bracket, teamsMap, teamId, location, onMatchClick }: Readonly<MyMatchesProps>) {
+export function MyMatches({ bracket, teamsMap, teamId, onMatchClick }: Readonly<MyMatchesProps>) {
   const layout = useMemo(() => buildBracketLayout(bracket), [bracket]);
   const mine = useMemo(
     () => allMatchSlots(layout).filter((s) => s.match.team_a_id === teamId || s.match.team_b_id === teamId),
@@ -48,14 +46,6 @@ export function MyMatches({ bracket, teamsMap, teamId, location, onMatchClick }:
 
   return (
     <div className="space-y-3">
-      {location && (
-        <p className="flex items-center gap-1.5 text-sm">
-          <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="text-muted-foreground">Ort:</span>
-          <span className="font-medium">{location}</span>
-        </p>
-      )}
-
       {upcoming.length === 0 ? (
         <NothingToPlay matches={mine} bracket={bracket} teamId={teamId} />
       ) : (

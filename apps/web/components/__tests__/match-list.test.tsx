@@ -17,10 +17,10 @@ describe('MatchList', () => {
     expect(within(sections[2]).getAllByRole('listitem')).toHaveLength(1)
   })
 
-  it('shows results, tables and open sources like the bracket', () => {
+  it('shows results, the table of playable matches and the open sources', () => {
     render(<MatchList bracket={fiveTeamBracket({ m1: finished('t4', 6) })} teamsMap={fiveTeams} />)
-    expect(screen.getByText('6 Becher')).toBeInTheDocument()
-    expect(screen.getAllByText(/Tisch folgt/).length).toBeGreaterThan(0)
+    expect(screen.getByText('6 Becher übrig')).toBeInTheDocument()
+    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1) // only match 3 is ready
     expect(screen.getByText('Sieger Spiel 2')).toBeInTheDocument()
   })
 
@@ -29,24 +29,29 @@ describe('MatchList', () => {
     render(<MatchList bracket={fiveTeamBracket()} teamsMap={fiveTeams} onMatchClick={onMatchClick} highlightTeamId="t4" />)
 
     const mine = screen.getByRole('button', { name: /Spiel 1,/ })
-    expect(mine.className).toContain('ring-primary')
+    expect(screen.getByText('Team 4').closest('div')!.className).toContain('bg-primary/10')
     fireEvent.click(mine)
     expect(onMatchClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }))
   })
 })
 
 describe('MyMatches', () => {
-  const props = { teamsMap: fiveTeams, location: 'Garten' }
+  const props = { teamsMap: fiveTeams }
 
-  it('shows the matches my team is placed in that are not played yet, with the venue', () => {
+  it('shows the matches my team is placed in that are not played yet, each with its round', () => {
     // T1 got a bye and waits in the semi-final for the winner of match 1
     render(<MyMatches {...props} bracket={fiveTeamBracket()} teamId="t1" />)
 
-    expect(screen.getByText('Garten')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(screen.getByRole('article', { name: /Spiel 2,/ })).toBeInTheDocument()
     expect(screen.getByText('Halbfinale')).toBeInTheDocument()
-    expect(screen.getByText(/Tisch folgt/)).toBeInTheDocument()
+    expect(screen.getByText('Sieger Spiel 1')).toBeInTheDocument()
+  })
+
+  it('shows where to play for a match that is ready, and nothing about the venue', () => {
+    render(<MyMatches {...props} bracket={fiveTeamBracket()} teamId="t4" />)
+    expect(screen.getByText('Tisch folgt')).toBeInTheDocument()
+    expect(screen.queryByText(/Ort/)).not.toBeInTheDocument()
   })
 
   it('shows nothing from the past', () => {
@@ -78,10 +83,9 @@ describe('MyMatches', () => {
     expect(screen.getByText(/gewonnen/)).toBeInTheDocument()
   })
 
-  it('says so when nothing is planned and works without a venue', () => {
+  it('says so when nothing is planned', () => {
     render(<MyMatches teamsMap={fiveTeams} bracket={fiveTeamBracket()} teamId="nobody" />)
     expect(screen.getByText(/keine weiteren Spiele/)).toBeInTheDocument()
-    expect(screen.queryByText('Ort:')).not.toBeInTheDocument()
   })
 
   it('opens the organizer action on click', () => {

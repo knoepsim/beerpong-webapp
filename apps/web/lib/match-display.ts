@@ -54,12 +54,14 @@ export function describeSides(
 }
 
 /**
- * The table of a match. Tables are handed out by the organizer logic; until a match has one, matches that
- * are still to be played say so, finished matches show nothing.
+ * The table of a match, only where it helps: a match that is waiting for teams has none to tell, a finished
+ * match does not need one anymore. A match that can be played right now says "Tisch folgt" until the table
+ * logic has assigned one.
  */
 export function tableLabel(match: Match): string | null {
+  if (match.status === "finished") return null;
   if (match.table_number != null) return `Tisch ${match.table_number}`;
-  return match.status === "finished" ? null : "Tisch folgt";
+  return match.status === "ready" ? "Tisch folgt" : null;
 }
 
 /** Short status for the corner of a card: Wartet / Bereit / "9 Becher" (cups the winner had left). */
@@ -75,12 +77,12 @@ const STATUS_WORD = { waiting: "wartet", ready: "bereit", finished: null } as co
  * Classes of a team on a card or row: the colored stripe stays strong until the match is decided and then
  * only the winner keeps it (with a tint); the loser is disabled. The own team gets the highlight color.
  */
-export function sideTone(side: SideInfo, isMine: boolean): string {
+export function sideTone(side: SideInfo, isMine: boolean, tinted = true): string {
   const colors = SIDE_STYLE[side.side];
   return cn(
     "border-l-4",
     side.isLoser || side.name === null ? colors.stripeMuted : colors.stripe,
-    isMine ? "bg-primary/10" : side.isWinner && colors.winnerBg,
+    isMine ? "bg-primary/10" : tinted && side.isWinner && colors.winnerBg,
     side.isLoser && "text-muted-foreground",
   );
 }

@@ -54,12 +54,12 @@ describe('BracketView', () => {
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
-  it('shows the table of every match that is still to be played, but not of played ones', () => {
+  it('shows the table only of matches that can be played, not of played or waiting ones', () => {
     const bracket = fiveTeamBracket({ m1: finished('t4') });
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 
-    // matches 2, 3 (semi-finals) and 4 (final) are not played yet
-    expect(screen.getAllByText('Tisch folgt')).toHaveLength(3);
+    // only match 3 is ready; match 1 is played, match 2 and the final wait for their teams
+    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1);
   });
 
   it('scrolls sideways only', () => {
