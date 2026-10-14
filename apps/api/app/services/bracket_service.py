@@ -35,7 +35,7 @@ class BracketService:
         - Handles byes for non-power-of-2 team counts
         - Creates the full match tree with next_match references
         """
-        tournament = await TournamentService(self.db).get_tournament(tournament_id)
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
         if tournament.is_started:
             raise TournamentAlreadyStartedError()
 
@@ -142,8 +142,11 @@ class BracketService:
             next_match.team_b_id = team_id
 
 
-    async def _get_match(self, match_id: UUID) -> Match:
-        result = await self.db.execute(select(Match).where(Match.id == match_id))
+    async def _get_match(self, match_id: UUID, *, for_update: bool = False) -> Match:
+        stmt = select(Match).where(Match.id == match_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        result = await self.db.execute(stmt)
         match = result.scalar_one_or_none()
         if match is None:
             raise NotFoundError("Match")
@@ -178,7 +181,11 @@ class BracketService:
         - the winner must be one of the match's two teams
         - the next match must not be decided yet
         """
-        match = await self._get_match(match_id)
+        # Lock the match and its successor (always in this order) so concurrent reports for the
+        # same match or the same bracket path cannot pass the checks below at the same time
+        match = await self._get_match(match_id, for_update=True)
+        if match.next_match_id is not None:
+            await self._get_match(match.next_match_id, for_update=True)
         tournament = await TournamentService(self.db).get_tournament(match.tournament_id)
         if not tournament.is_started:
             raise TournamentNotStartedError()

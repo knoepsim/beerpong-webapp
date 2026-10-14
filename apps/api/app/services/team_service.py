@@ -32,9 +32,9 @@ class TeamService:
         return team
 
 
-    async def get_team(self, team_id: UUID) -> Team:
+    async def get_team(self, team_id: UUID, *, for_update: bool = False) -> Team:
         """Get a team by ID or raise NotFoundError. Ensures team is not deleted."""
-        team = await team_repository.get_by_id_active(self.db, team_id)
+        team = await team_repository.get_by_id_active(self.db, team_id, for_update=for_update)
         if team is None:
             raise NotFoundError("Team")
         return team
@@ -121,7 +121,8 @@ class TeamService:
         if invite is None or invite.is_used:
             raise InvalidInviteError()
 
-        team = await self.get_team(invite.team_id)
+        # Lock the team: concurrent accepts are serialized, so the capacity check below is reliable
+        team = await self.get_team(invite.team_id, for_update=True)
 
         # Check if user is already a member
         existing = await self.db.execute(
