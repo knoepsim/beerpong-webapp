@@ -158,15 +158,16 @@ async def create_tournament(
     bracket_service = BracketService(db)
     total = len((await bracket_service.get_bracket(tournament.id)).matches)
     target = round(played * total)
-    rng = random.Random()
+    # Zufällige Testdaten für lokale Dummy-Turniere, kein Sicherheitsbezug
+    rng = random.Random()  # NOSONAR
     done: set = set()
     while len(done) < target:
         matches = (await bracket_service.get_bracket(tournament.id)).matches
         ready = [m for m in matches if m.team_a_id and m.team_b_id and m.id not in done]
         match = min(ready, key=lambda m: (m.round, m.position))
-        winner = rng.choice([match.team_a_id, match.team_b_id])
+        winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
         await bracket_service.report_result(
-            match.id, ResultCreate(winner_team_id=winner, cups_left=rng.randint(1, 10)), owner.id
+            match.id, ResultCreate(winner_team_id=winner, cups_left=rng.randint(1, 10)), owner.id  # NOSONAR
         )
         done.add(match.id)
 
