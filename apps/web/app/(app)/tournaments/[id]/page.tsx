@@ -19,8 +19,7 @@ import { TournamentTimeline } from "@/components/tournament-timeline";
 import { CheckinSummary } from "@/components/checkin-summary";
 import { checkinOpensAt, phaseLabel, planStart } from "@/lib/tournament-phase";
 import { MapPin, Calendar, Users, Trophy, Trash2, Play, Share2 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Markdown } from "@/components/markdown";
 import {
   Dialog,
   DialogContent,
@@ -331,7 +330,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
             <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
               <Badge variant={tournament.phase === "running" ? "default" : "secondary"}>
-                {phaseLabel(tournament.phase, !!bracket?.champion_team_id)}
+                {phaseLabel(tournament.phase)}
               </Badge>
               {tournament.start_time && (
                 <span className="flex items-center gap-1">
@@ -352,12 +351,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
           
-          {!tournament.registration_open && !myTournamentTeam && (
-            <p className="text-sm text-muted-foreground">
-              {tournament.started_at ? "Das Turnier läuft bereits." : "Die Anmeldung ist geschlossen."}
-            </p>
-          )}
-
           {tournament.registration_open && !myTournamentTeam && (
             <Dialog open={joinDialogOpen} onOpenChange={(open) => {
               setJoinDialogOpen(open);
@@ -517,7 +510,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               <CardTitle>Turnier-Ablauf</CardTitle>
             </CardHeader>
             <CardContent>
-              <TournamentTimeline tournament={tournament} hasWinner={!!bracket?.champion_team_id} />
+              <TournamentTimeline tournament={tournament} />
             </CardContent>
           </Card>
 
@@ -527,11 +520,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <CardTitle>Beschreibung</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {tournament.description}
-                  </ReactMarkdown>
-                </div>
+                <Markdown className="text-muted-foreground">{tournament.description}</Markdown>
               </CardContent>
             </Card>
           )}

@@ -12,6 +12,7 @@ const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
     checkin_enabled: false,
     checkin_start_time: null,
     started_at: null,
+    finished_at: null,
     phase: 'registration',
     registration_open: true,
     checkin_open: false,
@@ -20,7 +21,7 @@ const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
 
 describe('TournamentTimeline', () => {
   it('has two steps without check-in', () => {
-    render(<TournamentTimeline tournament={tournament()} hasWinner={false} />)
+    render(<TournamentTimeline tournament={tournament()} />)
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
     expect(screen.queryByText('Check-in vor Ort')).not.toBeInTheDocument()
     expect(screen.getByText('Offen bis zum Start')).toBeInTheDocument()
@@ -35,7 +36,7 @@ describe('TournamentTimeline', () => {
           registration_open: false,
           phase: 'checkin',
         })}
-        hasWinner={false}
+       
       />,
     )
     const items = screen.getAllByRole('listitem')
@@ -52,7 +53,7 @@ describe('TournamentTimeline', () => {
           checkin_enabled: true,
           checkin_start_time: '2099-07-01T17:00:00Z',
         })}
-        hasWinner={false}
+       
       />,
     )
     expect(screen.getByText(/^Bis /)).toBeInTheDocument()
@@ -61,10 +62,10 @@ describe('TournamentTimeline', () => {
 
   it('shows a running and a finished tournament', () => {
     const running = tournament({ phase: 'running', registration_open: false, started_at: '2099-07-01T18:05:00Z' })
-    const { rerender } = render(<TournamentTimeline tournament={running} hasWinner={false} />)
+    const { rerender } = render(<TournamentTimeline tournament={running} />)
     expect(screen.getByText(/^Läuft/)).toBeInTheDocument()
 
-    rerender(<TournamentTimeline tournament={running} hasWinner />)
+    rerender(<TournamentTimeline tournament={{ ...running, phase: 'finished', finished_at: '2099-07-01T21:00:00Z' }} />)
     expect(screen.getByText(/^Beendet/)).toBeInTheDocument()
   })
 })

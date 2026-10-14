@@ -1,0 +1,96 @@
+import Link from "next/link";
+import { ChevronRight, MapPin, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { phaseLabel } from "@/lib/tournament-phase";
+import type { MyTournament } from "@/lib/tournament-groups";
+import { cn } from "@/lib/utils";
+import { TournamentRoleType, type TournamentPhase } from "@/types";
+
+const ROLE_LABELS: Record<TournamentRoleType, string> = {
+  [TournamentRoleType.ADMIN]: "Admin",
+  [TournamentRoleType.MANAGER]: "Manager",
+  [TournamentRoleType.REFEREE]: "Schiedsrichter",
+};
+
+const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+
+const WEEKDAY_TIME = new Intl.DateTimeFormat("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+
+/** The date of the tournament as a small calendar tile: the first thing the eye looks for in an event list. */
+function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase }>) {
+  const date = new Date(iso);
+  return (
+    <div
+      className={cn(
+        "flex size-14 shrink-0 flex-col items-center justify-center rounded-xl leading-none",
+        phase === "running" && "bg-primary text-primary-foreground",
+        phase === "finished" && "bg-muted text-muted-foreground",
+        phase !== "running" && phase !== "finished" && "bg-primary/10 text-primary",
+      )}
+      aria-hidden="true"
+    >
+      <span className="text-xl font-bold tabular-nums">{date.getDate()}</span>
+      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide">{MONTHS[date.getMonth()]}</span>
+    </div>
+  );
+}
+
+/**
+ * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in):
+ * "running" and "finished" are already said by the heading of the group the card is in.
+ */
+const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !== "finished";
+
+/**
+ * A tournament in the list: when (date tile), what (name), where and at what time, the state, and how I am
+ * involved. Nothing else; everything else is on the tournament page.
+ */
+export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
+  const { tournament: t, team, role } = item;
+  const when = t.start_time ?? t.created_at;
+
+  return (
+    <Link
+      href={`/tournaments/${t.id}`}
+      className={cn(
+        "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-none transition",
+        "hover:border-primary/40 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50",
+      )}
+    >
+      <DateTile iso={when} phase={t.phase} />
+
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <h4 className={cn("line-clamp-2 font-semibold leading-tight", t.phase === "finished" && "text-muted-foreground")}>
+          {t.name}
+        </h4>
+
+        <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <span>{WEEKDAY_TIME.format(new Date(when))} Uhr</span>
+          {t.location && (
+            <>
+              <span aria-hidden="true">·</span>
+              <MapPin className="size-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{t.location}</span>
+            </>
+          )}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          {isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
+          {team && (
+            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+              <Users className="size-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{team.name}</span>
+            </span>
+          )}
+          {role && <Badge variant="secondary">{ROLE_LABELS[role]}</Badge>}
+        </div>
+      </div>
+
+      <ChevronRight
+        className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        aria-hidden="true"
+      />
+    </Link>
+  );
+}

@@ -3,18 +3,13 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { MyTournamentsResponse, Tournament, Team } from "@/types";
-import { TournamentVisibility, TournamentRoleType } from "@/types";
+import type { MyTournamentsResponse } from "@/types";
+import { TournamentVisibility } from "@/types";
+import { TournamentCard } from "@/components/tournament-card";
+import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -39,7 +34,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
@@ -47,8 +41,6 @@ import { TournamentScheduleFields } from "@/components/tournament-schedule-field
 import { toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
 const createTournamentSchema = z.object({
   name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
@@ -64,6 +56,22 @@ const EMPTY_SCHEDULE: ScheduleValues = {
   checkin_enabled: false,
   checkin_start_time: "",
 };
+
+function TournamentSection({ title, items }: Readonly<{ title: string; items: MyTournament[] }>) {
+  if (items.length === 0) return null;
+  return (
+    <section aria-label={title} className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <ul className="space-y-3">
+        {items.map((item) => (
+          <li key={item.tournament.id}>
+            <TournamentCard item={item} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 export default function TournamentsPage() {
   const router = useRouter();
@@ -136,77 +144,8 @@ export default function TournamentsPage() {
     }
   };
 
-  const visibilityLabel = (v: TournamentVisibility) => {
-    switch (v) {
-      case TournamentVisibility.PRIVATE:
-        return "Privat";
-      case TournamentVisibility.PUBLIC_LISTED:
-        return "Öffentlich";
-      case TournamentVisibility.PUBLIC_UNLISTED:
-        return "Nicht gelistet";
-    }
-  };
-
-  const roleLabel = (r: TournamentRoleType) => {
-    switch (r) {
-      case TournamentRoleType.ADMIN:
-        return "Admin";
-      case TournamentRoleType.MANAGER:
-        return "Manager";
-      case TournamentRoleType.REFEREE:
-        return "Schiedsrichter";
-    }
-  };
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-
-  const combinedTournaments = useMemo(() => {
-    if (!data) return [];
-    
-    const map = new Map<string, { tournament: Tournament, team?: Team, role?: TournamentRoleType }>();
-    
-    data.participating.forEach(p => {
-      map.set(p.tournament.id, { tournament: p.tournament, team: p.team });
-    });
-    
-    data.managing.forEach(m => {
-      if (map.has(m.tournament.id)) {
-        map.get(m.tournament.id)!.role = m.role;
-      } else {
-        map.set(m.tournament.id, { tournament: m.tournament, role: m.role });
-      }
-    });
-    
-    return Array.from(map.values()).sort((a, b) => {
-      const aActive = a.tournament.started_at ? 1 : 0;
-      const bActive = b.tournament.started_at ? 1 : 0;
-      
-      if (aActive !== bActive) {
-        return bActive - aActive; // Active first (1 before 0)
-      }
-      
-      const dateA = a.tournament.start_time ? new Date(a.tournament.start_time).getTime() : new Date(a.tournament.created_at).getTime();
-      const dateB = b.tournament.start_time ? new Date(b.tournament.start_time).getTime() : new Date(b.tournament.created_at).getTime();
-      
-      // If active, older first (currently running). If not active, sooner first (upcoming).
-      return aActive ? dateB - dateA : dateA - dateB;
-    });
-  }, [data]);
-
-  const { activeTournaments, plannedTournaments } = useMemo(() => {
-    const active: typeof combinedTournaments = [];
-    const planned: typeof combinedTournaments = [];
-    combinedTournaments.forEach(t => {
-      if (t.tournament.started_at) active.push(t);
-      else planned.push(t);
-    });
-    return { activeTournaments: active, plannedTournaments: planned };
-  }, [combinedTournaments]);
+  const groups = useMemo(() => (data ? groupTournaments(mergeMyTournaments(data)) : null), [data]);
+  const hasTournaments = !!groups && groups.active.length + groups.planned.length + groups.finished.length > 0;
 
   if (isLoading) {
     return (
@@ -231,130 +170,19 @@ export default function TournamentsPage() {
           </div>
         )}
         
-        {combinedTournaments.length === 0 ? (
+        {groups && hasTournaments ? (
+          // a heading only appears when there is something under it
+          <div className="space-y-8">
+            <TournamentSection title="Aktive Turniere" items={groups.active} />
+            <TournamentSection title="Geplante Turniere" items={groups.planned} />
+            <TournamentSection title="Abgeschlossene Turniere" items={groups.finished} />
+          </div>
+        ) : (
           <EmptyState
             icon={Trophy}
             title="Noch keine Turniere"
             description="Du bist noch keinem Turnier beigetreten."
           />
-        ) : (
-          <Tabs defaultValue="active" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="active">Laufend / Abgeschlossen ({activeTournaments.length})</TabsTrigger>
-              <TabsTrigger value="planned">Geplant ({plannedTournaments.length})</TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="space-y-3 mt-0">
-              {activeTournaments.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground text-sm">Keine laufenden Turniere</div>
-              ) : (
-                activeTournaments.map((item) => {
-                  const t = item.tournament;
-                  return (
-                    <Card
-                      key={t.id}
-                      className="cursor-pointer transition-colors hover:bg-accent/50 mb-3"
-                      onClick={() => router.push(`/tournaments/${t.id}`)}
-                    >
-                      <CardHeader className="p-3 pb-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base">{t.name}</CardTitle>
-                          <div className="flex flex-wrap gap-1 justify-end">
-                            {item.team && (
-                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-primary/50 text-primary">
-                                Team: {item.team.name}
-                              </Badge>
-                            )}
-                            {item.role && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-                                {roleLabel(item.role)}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {t.description && (
-                          <div className="line-clamp-3 text-xs text-muted-foreground overflow-hidden prose prose-sm prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {t.description}
-                            </ReactMarkdown>
-                          </div>
-                        )}
-                      </CardHeader>
-                      <CardContent className="px-3 pb-3 pt-0 mt-2">
-                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                          {t.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {t.location}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {t.start_time ? formatDate(t.start_time) : formatDate(t.created_at)}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
-            </TabsContent>
-            
-            <TabsContent value="planned" className="space-y-3 mt-0">
-              {plannedTournaments.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground text-sm">Keine geplanten Turniere</div>
-              ) : (
-                plannedTournaments.map((item) => {
-                  const t = item.tournament;
-                  return (
-                    <Card
-                      key={t.id}
-                      className="cursor-pointer transition-colors hover:bg-accent/50 mb-3"
-                      onClick={() => router.push(`/tournaments/${t.id}`)}
-                    >
-                      <CardHeader className="p-3 pb-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base">{t.name}</CardTitle>
-                          <div className="flex flex-wrap gap-1 justify-end">
-                            {item.team && (
-                              <Badge variant="outline" className="text-[10px] h-5 px-1.5 shrink-0 border-primary/50 text-primary">
-                                Team: {item.team.name}
-                              </Badge>
-                            )}
-                            {item.role && (
-                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-                                {roleLabel(item.role)}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        {t.description && (
-                          <div className="line-clamp-3 text-xs text-muted-foreground overflow-hidden prose prose-sm prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {t.description}
-                            </ReactMarkdown>
-                          </div>
-                        )}
-                      </CardHeader>
-                      <CardContent className="px-3 pb-3 pt-0 mt-2">
-                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                          {t.location && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {t.location}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {t.start_time ? formatDate(t.start_time) : formatDate(t.created_at)}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
-            </TabsContent>
-          </Tabs>
         )}
       </div>
 

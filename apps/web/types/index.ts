@@ -68,7 +68,7 @@ export interface TournamentInvite {
   token: string;
 }
 
-export type TournamentPhase = "registration" | "registration_closed" | "checkin" | "running";
+export type TournamentPhase = "registration" | "registration_closed" | "checkin" | "running" | "finished";
 
 export interface Tournament {
   id: string;
@@ -80,7 +80,9 @@ export interface Tournament {
   checkin_enabled: boolean;
   checkin_start_time: string | null;
   started_at: string | null;
-  /** Computed by the API from the schedule: registration -> registration_closed / checkin -> running */
+  /** Set while the final has a result. */
+  finished_at: string | null;
+  /** Computed by the API from the schedule: registration -> registration_closed / checkin -> running -> finished */
   phase: TournamentPhase;
   registration_open: boolean;
   checkin_open: boolean;
