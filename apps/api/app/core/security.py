@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -62,7 +63,7 @@ def hash_sms_code(code: str) -> str:
 
 def verify_sms_code(code: str, code_hash: str) -> bool:
     """Verify an SMS code against its hash."""
-    return hashlib.sha256(code.encode()).hexdigest() == code_hash
+    return hmac.compare_digest(hashlib.sha256(code.encode()).hexdigest(), code_hash)
 
 
 def generate_sms_code() -> str:
