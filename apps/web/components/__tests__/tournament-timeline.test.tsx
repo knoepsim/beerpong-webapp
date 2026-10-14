@@ -76,6 +76,11 @@ describe('TournamentTimeline', () => {
     expect(screen.queryByText(/^Ab /)).not.toBeInTheDocument()
   })
 
+  it('shows when the tournament starts, until it has started', () => {
+    render(<TournamentTimeline tournament={tournament()} />)
+    expect(screen.getByText(/^Start /)).toBeInTheDocument()
+  })
+
   it('shows a running and a finished tournament', () => {
     const running = tournament({ phase: 'running', registration_open: false, started_at: '2099-07-01T18:05:00Z' })
     const { rerender } = render(<TournamentTimeline tournament={running} />)

@@ -45,11 +45,15 @@ function buildSteps(tournament: Tournament): Step[] {
     key: "play",
     icon: "🏓",
     label: "Turnier",
-    description: finished ? "Beendet" : started ? "Läuft" : "Wartet auf den Start",
+    description: finished ? "Beendet" : started ? "Läuft" : startDescription(tournament),
     done: finished,
     active: started && !finished,
   });
   return steps;
+}
+
+function startDescription(tournament: Tournament): string {
+  return tournament.start_time ? `Start ${formatWhen(tournament.start_time)}` : "Wartet auf den Start";
 }
 
 function checkinDescription(tournament: Tournament, started: boolean): string {
