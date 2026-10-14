@@ -3,6 +3,7 @@
 ## Setup
 - Frontend: `pnpm install && pnpm dev` (apps/web)
 - Backend: `uv sync && uv run fastapi dev` (apps/api)
+- Test-Turniere mit Dummy-Spielern/-Teams (bleiben in der DB, werden wiederverwendet): `uv run python -m scripts.seed_dummy_tournaments create --teams 28 --state running` (apps/api; `--state fresh|running|finished`, `delete` entfernt nur die Dummy-Turniere, `token N` gibt ein Bearer-Token von Dummy Spieler N aus; Dummy-Login in der App: `+49 158 99000001`, SMS-Code `123456`)
 
 ## Tests (müssen vor PR grün sein)
 - Unit: `pnpm test` (Vitest)
