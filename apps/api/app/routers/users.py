@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.schemas.user import UserResponse, UserUpdate, PhoneNumberChangeRequest, PhoneNumberChangeVerify
+from app.schemas.user import UserPublic, UserResponse, UserUpdate, PhoneNumberChangeRequest, PhoneNumberChangeVerify
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -65,9 +65,10 @@ async def verify_phone_change(
 
 @router.get(
     "/search",
-    response_model=list[UserResponse],
+    response_model=list[UserPublic],
     summary="Nutzer suchen",
-    description="Sucht Nutzer anhand des Namens (case-insensitive) für die Zuweisung von Rollen.",
+    description="Sucht Nutzer anhand des Namens (Teilstring, case-insensitive) oder einer vollständigen "
+    "Handynummer (exakter Treffer). Gibt nur ID und Namen zurück.",
 )
 async def search_users(
     query: str,

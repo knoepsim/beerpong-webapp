@@ -10,6 +10,7 @@ import type {
   TournamentCreateRequest,
   TournamentUserRole,
   User,
+  PublicUser,
   Result,
   MyTournamentsResponse,
   TournamentTeam,
@@ -139,7 +140,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     search: (query: string) =>
-      request<User[]>(`/users/search?query=${encodeURIComponent(query)}`),
+      request<PublicUser[]>(`/users/search?query=${encodeURIComponent(query)}`),
     requestPhoneChange: (new_phone_number: string) =>
       request<void>("/users/me/phone/request", {
         method: "POST",

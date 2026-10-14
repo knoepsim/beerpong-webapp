@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
+from app.core.phone import normalize_german_mobile
 from app.models.user import User
 from app.schemas.user import UserUpdate
 from app.services.auth_service import AuthService
@@ -69,18 +70,18 @@ class UserService:
         return user
 
 
-    from sqlalchemy import or_
-
     async def search_users(self, query: str) -> list[User]:
-        """Search users by name or phone."""
-        result = await self.db.execute(
-            select(User).where(
-                or_(
-                    User.name.ilike(f"%{query}%"),
-                    User.phone_number.ilike(f"%{query}%")
-                )
-            ).limit(10)
-        )
+        """Search users by name (substring) or by a complete German mobile number (exact).
+
+        Partial phone numbers are deliberately not matched, otherwise the endpoint could be
+        used to enumerate phone numbers.
+        """
+        try:
+            condition = User.phone_number == normalize_german_mobile(query)
+        except ValueError:
+            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            condition = User.name.ilike(f"%{escaped}%", escape="\\")
+        result = await self.db.execute(select(User).where(condition).order_by(User.name).limit(10))
         return list(result.scalars().all())
 
 
