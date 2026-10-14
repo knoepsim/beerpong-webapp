@@ -1,14 +1,6 @@
 import type { Tournament } from "@/types";
-import { checkinOpensAt } from "@/lib/tournament-phase";
+import { formatWhen } from "@/lib/format-when";
 
-const formatDateTime = (iso: string) =>
-  new Date(iso).toLocaleString("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 interface Step {
   key: string;
@@ -29,11 +21,11 @@ function buildSteps(tournament: Tournament): Step[] {
       label: "Anmeldung",
       description: !tournament.registration_open
         ? "Geschlossen"
-        : tournament.registration_end_time
-          ? `Bis ${formatDateTime(tournament.registration_end_time)}`
-          : "Offen bis zum Start",
+        : tournament.registration_auto_close && tournament.registration_end_time
+          ? `Offen bis ${formatWhen(tournament.registration_end_time)}`
+          : "Offen",
       done: !tournament.registration_open,
-      active: tournament.phase === "registration",
+      active: tournament.registration_open,
     },
   ];
 
@@ -43,15 +35,9 @@ function buildSteps(tournament: Tournament): Step[] {
       key: "checkin",
       icon: "✅",
       label: "Check-in vor Ort",
-      description: started
-        ? "Beendet"
-        : tournament.checkin_open
-          ? "Geöffnet"
-          : checkinOpensAt(tournament)
-            ? `Ab ${formatDateTime(checkinOpensAt(tournament)!)}`
-            : "Vor dem Start",
+      description: checkinDescription(tournament, started),
       done: started,
-      active: tournament.phase === "checkin",
+      active: tournament.checkin_open,
     });
   }
 
@@ -59,14 +45,27 @@ function buildSteps(tournament: Tournament): Step[] {
     key: "play",
     icon: "🏓",
     label: "Turnier",
-    description: finished ? "Beendet" : started ? "Läuft" : "Wartet auf den Start",
+    description: finished ? "Beendet" : started ? "Läuft" : startDescription(tournament),
     done: finished,
     active: started && !finished,
   });
   return steps;
 }
 
-/** Progress of a tournament: registration -> (check-in) -> play. Driven by the phase from the API. */
+function startDescription(tournament: Tournament): string {
+  return tournament.start_time ? `Start ${formatWhen(tournament.start_time)}` : "Wartet auf den Start";
+}
+
+function checkinDescription(tournament: Tournament, started: boolean): string {
+  if (started) return "Beendet";
+  if (tournament.checkin_open) return "Offen";
+  if (tournament.checkin_auto_open && tournament.checkin_start_time) {
+    return `Ab ${formatWhen(tournament.checkin_start_time)}`;
+  }
+  return "Geschlossen";
+}
+
+/** Progress of a tournament: registration and (optional) check-in, then play. Registration and check-in can be open at the same time. */
 export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tournament }>) {
   const steps = buildSteps(tournament);
 

@@ -5,8 +5,12 @@
 export interface ScheduleValues {
   start_time: string;
   registration_end_time: string;
+  /** Close the registration by itself at the deadline. */
+  registration_auto_close: boolean;
   checkin_enabled: boolean;
   checkin_start_time: string;
+  /** Open check-in by itself at its start time. */
+  checkin_auto_open: boolean;
 }
 
 export type ScheduleErrors = Partial<
@@ -15,7 +19,7 @@ export type ScheduleErrors = Partial<
 
 const time = (value: string) => (value ? new Date(value).getTime() : null);
 
-/** Registration closes before check-in opens, and both happen before the start. */
+/** Deadline and check-in start lie before the start; they may overlap (late teams can still register). */
 export function validateSchedule(values: ScheduleValues): ScheduleErrors {
   const errors: ScheduleErrors = {};
   const start = time(values.start_time);
@@ -27,8 +31,6 @@ export function validateSchedule(values: ScheduleValues): ScheduleErrors {
   }
   if (checkinStart !== null && start !== null && checkinStart > start) {
     errors.checkin_start_time = "Der Check-in muss vor dem Turnierstart beginnen.";
-  } else if (checkinStart !== null && registrationEnd !== null && checkinStart < registrationEnd) {
-    errors.checkin_start_time = "Der Check-in darf erst nach dem Anmeldeschluss beginnen.";
   }
   return errors;
 }
@@ -45,4 +47,20 @@ export function toLocalInput(iso: string | null | undefined): string {
 /** `datetime-local` value -> ISO timestamp for the API, `null` if empty. */
 export function toIsoOrNull(local: string): string | null {
   return local ? new Date(local).toISOString() : null;
+}
+
+/**
+ * Fields of the API for a schedule form. An automation needs its time and check-in needs to be switched on,
+ * so a time that is empty (or belongs to a disabled check-in) never carries an automation.
+ */
+export function scheduleToPayload(values: ScheduleValues) {
+  const registrationEnd = toIsoOrNull(values.registration_end_time);
+  const checkinStart = values.checkin_enabled ? toIsoOrNull(values.checkin_start_time) : null;
+  return {
+    registration_end_time: registrationEnd,
+    registration_auto_close: registrationEnd !== null && values.registration_auto_close,
+    checkin_enabled: values.checkin_enabled,
+    checkin_start_time: checkinStart,
+    checkin_auto_open: checkinStart !== null && values.checkin_auto_open,
+  };
 }

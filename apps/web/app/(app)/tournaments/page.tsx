@@ -38,7 +38,7 @@ import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
-import { toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
+import { scheduleToPayload, toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -53,8 +53,10 @@ const createTournamentSchema = z.object({
 const EMPTY_SCHEDULE: ScheduleValues = {
   start_time: "",
   registration_end_time: "",
+  registration_auto_close: false,
   checkin_enabled: false,
   checkin_start_time: "",
+  checkin_auto_open: false,
 };
 
 function TournamentSection({ title, items }: Readonly<{ title: string; items: MyTournament[] }>) {
@@ -125,9 +127,7 @@ export default function TournamentsPage() {
         location: values.location?.trim() || undefined,
         description: values.description?.trim() || undefined,
         start_time: toIsoOrNull(schedule.start_time)!,
-        registration_end_time: toIsoOrNull(schedule.registration_end_time),
-        checkin_enabled: schedule.checkin_enabled,
-        checkin_start_time: schedule.checkin_enabled ? toIsoOrNull(schedule.checkin_start_time) : null,
+        ...scheduleToPayload(schedule),
         table_count: values.table_count,
         visibility: values.visibility,
       });

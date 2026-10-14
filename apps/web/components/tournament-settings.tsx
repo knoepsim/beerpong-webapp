@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
-import { toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
+import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -75,8 +75,10 @@ export function TournamentSettings({
   const initialSchedule: ScheduleValues = {
     start_time: toLocalInput(tournament.start_time),
     registration_end_time: toLocalInput(tournament.registration_end_time),
+    registration_auto_close: tournament.registration_auto_close,
     checkin_enabled: tournament.checkin_enabled,
     checkin_start_time: toLocalInput(tournament.checkin_start_time),
+    checkin_auto_open: tournament.checkin_auto_open,
   };
   const [schedule, setSchedule] = useState<ScheduleValues>(initialSchedule);
   const scheduleErrors = validateSchedule(schedule);
@@ -100,9 +102,7 @@ export function TournamentSettings({
         table_count: parseInt(editTableCount) || 1,
         visibility: editVisibility,
         start_time: toIsoOrNull(schedule.start_time) ?? undefined,
-        registration_end_time: toIsoOrNull(schedule.registration_end_time),
-        checkin_enabled: schedule.checkin_enabled,
-        checkin_start_time: schedule.checkin_enabled ? toIsoOrNull(schedule.checkin_start_time) : null,
+        ...scheduleToPayload(schedule),
       });
       await onReload();
       toast.success("Turnier-Details erfolgreich gespeichert!");

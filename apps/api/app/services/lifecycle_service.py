@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.exceptions import NotEnoughTeamsError, TournamentAlreadyStartedError
+from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, TournamentAlreadyStartedError
 from app.models.tournament import TournamentTeam
 from app.schemas.tournament import TournamentStartResponse
 from app.services.bracket_service import BracketService
@@ -19,6 +19,26 @@ class LifecycleService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def set_registration_open(self, tournament_id: UUID, is_open: bool) -> None:
+        """Open or close the registration by hand, at any time before the start."""
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+        tournament.registration_is_open = is_open
+        tournament.registration_changed_at = datetime.now(UTC)
+        await self.db.flush()
+
+    async def set_checkin_open(self, tournament_id: UUID, is_open: bool) -> None:
+        """Open or close check-in by hand, at any time before the start."""
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
+        if tournament.is_started:
+            raise TournamentAlreadyStartedError()
+        if not tournament.checkin_enabled:
+            raise CheckinDisabledError()
+        tournament.checkin_is_open = is_open
+        tournament.checkin_changed_at = datetime.now(UTC)
+        await self.db.flush()
 
     async def start_tournament(self, tournament_id: UUID) -> TournamentStartResponse:
         """Start a tournament in one step.

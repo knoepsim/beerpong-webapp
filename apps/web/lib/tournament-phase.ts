@@ -2,6 +2,7 @@ import type { Tournament, TournamentPhase, TournamentTeam } from "@/types";
 
 const PHASE_LABELS: Record<TournamentPhase, string> = {
   registration: "Anmeldung offen",
+  registration_and_checkin: "Anmeldung & Check-in offen",
   registration_closed: "Anmeldung geschlossen",
   checkin: "Check-in läuft",
   running: "Läuft",
@@ -11,13 +12,6 @@ const PHASE_LABELS: Record<TournamentPhase, string> = {
 /** Short status text for the badge. The API decides the phase, the UI only names it. */
 export function phaseLabel(phase: TournamentPhase): string {
   return PHASE_LABELS[phase];
-}
-
-/** When check-in opens: its own start time, otherwise with the registration deadline. `null` = right away. */
-export function checkinOpensAt(
-  tournament: Pick<Tournament, "checkin_start_time" | "registration_end_time">,
-): string | null {
-  return tournament.checkin_start_time ?? tournament.registration_end_time;
 }
 
 export interface StartPlan {

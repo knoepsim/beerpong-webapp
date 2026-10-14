@@ -37,9 +37,7 @@ class TournamentService:
     async def create_tournament(self, data: TournamentCreate, creator_id: UUID) -> Tournament:
         """Create a new tournament and assign the creator as Admin."""
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
-        obj_in = data.model_dump()
-        if not data.checkin_enabled:
-            obj_in["checkin_start_time"] = None
+        obj_in = self._normalize_automation(data.model_dump())
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
@@ -104,6 +102,18 @@ class TournamentService:
         raise HTTPException(status_code=403, detail="You do not have access to this private tournament.")
 
 
+    @staticmethod
+    def _normalize_automation(values: dict) -> dict:
+        """No check-in: no check-in time. An automation without its time cannot run, so it is switched off."""
+        values = dict(values)
+        if not values["checkin_enabled"]:
+            values["checkin_start_time"] = None
+        values["registration_auto_close"] = bool(values.get("registration_auto_close")) and bool(
+            values.get("registration_end_time")
+        )
+        values["checkin_auto_open"] = bool(values.get("checkin_auto_open")) and bool(values.get("checkin_start_time"))
+        return values
+
     async def update_tournament(self, tournament_id: UUID, data: TournamentUpdate) -> Tournament:
         """Update tournament details cleanly."""
         tournament = await self.get_tournament(tournament_id)
@@ -123,8 +133,17 @@ class TournamentService:
         validate_schedule(
             merged["start_time"], merged["registration_end_time"], merged["checkin_enabled"], merged["checkin_start_time"]
         )
-        if not merged["checkin_enabled"]:
-            update_data["checkin_start_time"] = None
+        merged["registration_auto_close"] = update_data.get(
+            "registration_auto_close", tournament.registration_auto_close
+        )
+        merged["checkin_auto_open"] = update_data.get("checkin_auto_open", tournament.checkin_auto_open)
+        update_data.update(
+            {
+                key: value
+                for key, value in self._normalize_automation(merged).items()
+                if key in ("checkin_start_time", "registration_auto_close", "checkin_auto_open")
+            }
+        )
 
         return await tournament_repository.update(self.db, db_obj=tournament, obj_in=update_data)
 

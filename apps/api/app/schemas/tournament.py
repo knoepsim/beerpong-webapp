@@ -15,8 +15,10 @@ class TournamentCreate(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     start_time: datetime
     registration_end_time: datetime | None = None
+    registration_auto_close: bool = False
     checkin_enabled: bool = False
     checkin_start_time: datetime | None = None
+    checkin_auto_open: bool = False
     table_count: int = Field(default=1, ge=1, le=100)
     mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION
     visibility: TournamentVisibility = TournamentVisibility.PRIVATE
@@ -29,8 +31,10 @@ class TournamentUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     start_time: datetime | None = None
     registration_end_time: datetime | None = None
+    registration_auto_close: bool | None = None
     checkin_enabled: bool | None = None
     checkin_start_time: datetime | None = None
+    checkin_auto_open: bool | None = None
     table_count: int | None = Field(default=None, ge=1, le=100)
     visibility: TournamentVisibility | None = None
 
@@ -43,8 +47,10 @@ class TournamentResponse(BaseModel):
     description: str | None
     start_time: datetime | None
     registration_end_time: datetime | None
+    registration_auto_close: bool
     checkin_enabled: bool
     checkin_start_time: datetime | None
+    checkin_auto_open: bool
     started_at: datetime | None
     finished_at: datetime | None
     phase: TournamentPhase

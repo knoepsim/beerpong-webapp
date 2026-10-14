@@ -222,6 +222,10 @@ async def remove_team_from_tournament(
 class CheckinRequest(BaseModel):
     is_checked_in: bool
 
+
+class OpenRequest(BaseModel):
+    open: bool
+
 @router.post(
     "/{tournament_id}/teams/{team_id}/checkin",
     status_code=204,
@@ -238,6 +242,42 @@ async def checkin_team(
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).checkin_team(tournament_id, team_id, body.is_checked_in)
     await db.commit()
+
+@router.put(
+    "/{tournament_id}/registration",
+    status_code=204,
+    summary="Anmeldung öffnen/schließen",
+    description="Öffnet oder schließt die Anmeldung von Hand, jederzeit vor dem Start. Unabhängig vom Check-in. "
+    "Nur Admin und Manager.",
+)
+async def set_registration(
+    tournament_id: UUID,
+    body: OpenRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await LifecycleService(db).set_registration_open(tournament_id, body.open)
+    await db.commit()
+
+
+@router.put(
+    "/{tournament_id}/checkin",
+    status_code=204,
+    summary="Check-in öffnen/schließen",
+    description="Öffnet oder schließt den Check-in von Hand, jederzeit vor dem Start. Unabhängig von der Anmeldung. "
+    "Nur Admin und Manager.",
+)
+async def set_checkin(
+    tournament_id: UUID,
+    body: OpenRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await LifecycleService(db).set_checkin_open(tournament_id, body.open)
+    await db.commit()
+
 
 @router.post(
     "/{tournament_id}/start",
