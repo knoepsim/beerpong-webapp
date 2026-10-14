@@ -1,21 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MatchRow } from '../match-row'
-import { makeMatch } from '@/lib/test-fixtures/bracket'
-import type { MatchSlot } from '@/lib/bracket-layout'
-import type { Match, Team } from '@/types'
-
-const teamsMap: Record<string, Team> = {
-  a: { id: 'a', name: 'Alpha' } as Team,
-  b: { id: 'b', name: 'Bravo' } as Team,
-}
-
-const slot = (overrides: Partial<Match> = {}, sources: MatchSlot['sources'] = { a: null, b: null }): MatchSlot => ({
-  kind: 'match',
-  number: 7,
-  sources,
-  match: makeMatch({ id: 'm', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready', ...overrides }),
-})
+import { abTeams as teamsMap, makeSlot as slot } from '@/lib/test-fixtures/bracket'
 
 describe('MatchRow', () => {
   it('shows number, table and status in one line above both teams', () => {
@@ -60,7 +46,7 @@ describe('MatchRow', () => {
 
   it('highlights the own team', () => {
     render(<MatchRow slot={slot()} teamsMap={teamsMap} highlightTeamId="b" />)
-    expect(screen.getByRole('group').className).toContain('ring-primary')
+    expect(screen.getByRole('article').className).toContain('ring-primary')
     expect(screen.getByText('Bravo').closest('div')!.className).toContain('bg-primary/10')
   })
 

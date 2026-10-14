@@ -1,35 +1,8 @@
-import { Check, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
-import { describeSides, matchSummary, SIDE_STYLE, statusLabel, tableLabel, type SideInfo } from "@/lib/match-display";
+import { describeSides, matchSummary, sideTone, statusLabel, tableLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
-
-function SideCell({ side, isMine }: { side: SideInfo; isMine: boolean }) {
-  const colors = SIDE_STYLE[side.side];
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-1 min-h-9 min-w-0 px-2 py-1 border-l-4 text-[13px] leading-tight",
-        side.isLoser || side.name === null ? colors.stripeMuted : colors.stripe,
-        isMine ? "bg-primary/10" : side.isWinner && colors.winnerBg,
-        // the loser looks disabled and is crossed out, so the result reads without the check
-        side.isLoser && "text-muted-foreground line-through decoration-muted-foreground/60",
-      )}
-    >
-      {side.name === null ? (
-        <span className="italic text-muted-foreground">{side.placeholder}</span>
-      ) : (
-        <span className="line-clamp-2 break-words" title={side.name}>
-          {side.name}
-        </span>
-      )}
-      {side.isChampion && <Trophy className="ml-auto w-3.5 h-3.5 shrink-0 text-amber-500" aria-label="Turniersieger" />}
-      {side.isWinner && !side.isChampion && (
-        <Check className="ml-auto w-3.5 h-3.5 shrink-0 text-green-700 dark:text-green-400" aria-label="Gewinner" />
-      )}
-    </div>
-  );
-}
 
 interface MatchRowProps {
   slot: MatchSlot;
@@ -45,14 +18,14 @@ interface MatchRowProps {
  * A match as a compact list row: "Spiel 13 · Tisch 2 · Status" above, both teams side by side below.
  * Used for the list of all matches and for "my matches", so both read the same.
  */
-export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: MatchRowProps) {
+export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchRowProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
   const table = tableLabel(match);
   const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
   const className = cn(
-    "w-full block rounded-lg border bg-card text-left overflow-hidden",
+    "block w-full rounded-lg border bg-card text-left overflow-hidden",
     match.status === "ready" && "border-primary/50",
     mine && "ring-2 ring-primary/60",
     onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow",
@@ -65,13 +38,25 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
           {table && ` · ${table}`}
         </span>
         <span className={cn("shrink-0", match.status === "ready" && "font-medium text-primary")}>
-          {match.status === "ready" && <span className="inline-block size-1.5 mr-1 rounded-full bg-primary align-middle" aria-hidden="true" />}
+          {match.status === "ready" && (
+            <span className="inline-block size-1.5 mr-1 rounded-full bg-primary align-middle" aria-hidden="true" />
+          )}
           {statusLabel(match)}
         </span>
       </div>
       <div className="grid grid-cols-2 border-t divide-x">
         {sides.map((side) => (
-          <SideCell key={side.side} side={side} isMine={!!highlightTeamId && side.id === highlightTeamId} />
+          <div
+            key={side.side}
+            className={cn(
+              "flex items-center gap-1 min-h-9 min-w-0 px-2 py-1 text-[13px] leading-tight",
+              sideTone(side, !!highlightTeamId && side.id === highlightTeamId),
+              // the loser looks disabled and is crossed out, so the result reads without the check
+              side.isLoser && "line-through decoration-muted-foreground/60",
+            )}
+          >
+            <TeamLabel side={side} />
+          </div>
         ))}
       </div>
     </>
@@ -83,8 +68,8 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
       {content}
     </button>
   ) : (
-    <div className={className} role="group" aria-label={summary}>
+    <article className={className} aria-label={summary}>
       {content}
-    </div>
+    </article>
   );
 }

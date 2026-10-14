@@ -44,7 +44,7 @@ describe('MyMatches', () => {
 
     expect(screen.getByText('Garten')).toBeInTheDocument()
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
-    expect(screen.getByRole('group', { name: /Spiel 2,/ })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /Spiel 2,/ })).toBeInTheDocument()
     expect(screen.getByText('Halbfinale')).toBeInTheDocument()
     expect(screen.getByText(/Tisch folgt/)).toBeInTheDocument()
   })
@@ -53,7 +53,7 @@ describe('MyMatches', () => {
     // T4 played and won match 1, T5 lost it; match 1 must not show up for either
     const bracket = fiveTeamBracket({ m1: finished('t4') })
     const { rerender } = render(<MyMatches {...props} bracket={bracket} teamId="t4" />)
-    expect(screen.queryByRole('group', { name: /Spiel 1,/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: /Spiel 1,/ })).not.toBeInTheDocument()
 
     rerender(<MyMatches {...props} bracket={bracket} teamId="t5" />)
     expect(screen.queryByRole('listitem')).not.toBeInTheDocument()

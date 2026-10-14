@@ -39,55 +39,63 @@ export interface BracketLayout {
   rounds: RoundLayout[];
 }
 
+/** Matches inside the rounds of the bracket in the order of their numbers. */
+function orderedMatches(bracket: Bracket): Match[] {
+  return bracket.matches
+    .filter((m) => m.round >= 1 && m.round <= bracket.total_rounds)
+    .sort((a, b) => a.round - b.round || a.position - b.position);
+}
+
+/**
+ * The team that was entered straight into round two at an empty position of round one, if any:
+ * even positions play in slot a of the match of the next round, odd positions in slot b.
+ */
+function byeTeamId(parent: Match | undefined, position: number): string | null {
+  if (!parent) return null;
+  return position % 2 === 0 ? parent.team_a_id : parent.team_b_id;
+}
+
 export function buildBracketLayout(bracket: Bracket): BracketLayout {
   const total = bracket.total_rounds;
-  const matches = bracket.matches
-    .filter((m) => m.round >= 1 && m.round <= total)
-    .sort((a, b) => a.round - b.round || a.position - b.position);
+  const matches = orderedMatches(bracket);
 
-  const numberById = new Map(matches.map((m, i) => [m.id, i + 1]));
+  const numberOf = new Map(matches.map((m, i) => [m.id, i + 1]));
   const byPosition = new Map(matches.map((m) => [`${m.round}:${m.position}`, m]));
 
   // number of the match feeding slot "a" / "b" of a parent match
   const feeder = new Map<string, number>();
   for (const m of matches) {
     if (m.next_match_id && m.next_match_slot) {
-      feeder.set(`${m.next_match_id}:${m.next_match_slot}`, numberById.get(m.id)!);
+      feeder.set(`${m.next_match_id}:${m.next_match_slot}`, numberOf.get(m.id)!);
     }
   }
 
-  const rounds: RoundLayout[] = [];
-  for (let round = 1; round <= total; round++) {
-    const size = 2 ** (total - round);
-    const slots: BracketSlot[] = [];
-    for (let position = 0; position < size; position++) {
-      const match = byPosition.get(`${round}:${position}`);
-      if (match) {
-        slots.push({
-          kind: "match",
-          match,
-          number: numberById.get(match.id)!,
-          sources: {
-            a: feeder.get(`${match.id}:a`) ?? null,
-            b: feeder.get(`${match.id}:b`) ?? null,
-          },
-        });
-        continue;
-      }
-      // No match at this position of round one: the team was entered straight into round two.
-      const parent = round === 1 ? byPosition.get(`2:${position >> 1}`) : undefined;
-      const teamId = parent ? (position % 2 === 0 ? parent.team_a_id : parent.team_b_id) : null;
-      slots.push(teamId ? { kind: "bye", teamId } : { kind: "empty" });
+  const slotAt = (round: number, position: number): BracketSlot => {
+    const match = byPosition.get(`${round}:${position}`);
+    if (match) {
+      return {
+        kind: "match",
+        match,
+        number: numberOf.get(match.id)!,
+        sources: { a: feeder.get(`${match.id}:a`) ?? null, b: feeder.get(`${match.id}:b`) ?? null },
+      };
     }
+    // No match at this position of round one: the team was entered straight into round two.
+    const parent = round === 1 ? byPosition.get(`2:${position >> 1}`) : undefined;
+    const teamId = byeTeamId(parent, position);
+    return teamId ? { kind: "bye", teamId } : { kind: "empty" };
+  };
 
+  const rounds: RoundLayout[] = Array.from({ length: total }, (_, index) => {
+    const round = index + 1;
     const roundMatches = matches.filter((m) => m.round === round);
-    rounds.push({
+    return {
       round,
-      slots,
+      slots: Array.from({ length: 2 ** (total - round) }, (_, position) => slotAt(round, position)),
       matchCount: roundMatches.length,
       finishedCount: roundMatches.filter((m) => m.status === "finished").length,
-    });
-  }
+    };
+  });
   return { totalRounds: total, rounds };
 }
 

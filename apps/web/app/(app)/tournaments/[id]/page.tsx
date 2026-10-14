@@ -13,7 +13,6 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { BracketView } from "@/components/bracket-view";
 import { MatchList } from "@/components/match-list";
 import { MyMatches } from "@/components/my-matches";
-import { roundLabel } from "@/lib/utils";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";

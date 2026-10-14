@@ -1,4 +1,5 @@
 import type { MatchSlot } from "@/lib/bracket-layout";
+import { cn } from "@/lib/utils";
 import type { Match, Team } from "@/types";
 
 /**
@@ -68,17 +69,33 @@ export function statusLabel(match: Match): string {
   return match.cups_left != null ? `${match.cups_left} Becher` : "Beendet";
 }
 
+const STATUS_WORD = { waiting: "wartet", ready: "bereit", finished: null } as const;
+
+/**
+ * Classes of a team on a card or row: the colored stripe stays strong until the match is decided and then
+ * only the winner keeps it (with a tint); the loser is disabled. The own team gets the highlight color.
+ */
+export function sideTone(side: SideInfo, isMine: boolean): string {
+  const colors = SIDE_STYLE[side.side];
+  return cn(
+    "border-l-4",
+    side.isLoser || side.name === null ? colors.stripeMuted : colors.stripe,
+    isMine ? "bg-primary/10" : side.isWinner && colors.winnerBg,
+    side.isLoser && "text-muted-foreground",
+  );
+}
+
 /** One sentence for screen readers: number, teams with their colors, state, winner, cups and table. */
 export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teamsMap: Record<string, Team>): string {
   const { match, number } = slot;
-  const table = tableLabel(match);
+  const finished = match.status === "finished";
   return [
     `Spiel ${number}`,
     sides.map((s) => `${s.name ?? s.placeholder} (${SIDE_STYLE[s.side].label})`).join(" gegen "),
-    match.status === "ready" ? "bereit" : match.status === "waiting" ? "wartet" : null,
-    match.status === "finished" ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
-    match.status === "finished" && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
-    table,
+    STATUS_WORD[match.status],
+    finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
+    finished && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
+    tableLabel(match),
   ]
     .filter(Boolean)
     .join(", ");

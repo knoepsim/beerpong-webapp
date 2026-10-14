@@ -14,6 +14,12 @@ const HALF_GUTTER = GUTTER / 2;
 /** Lines of upcoming matches are light, lines of teams that have moved on are dark: the path reads like a story. */
 const lineColor = (done: boolean) => (done ? "border-foreground/50" : "border-muted-foreground/30");
 
+/** Stable key of a slot: the match or team in it, not its place in the list. */
+const slotKey = (round: number, slot: BracketSlot, position: number) => {
+  if (slot.kind === "match") return slot.match.id;
+  return slot.kind === "bye" ? `bye-${slot.teamId}` : `empty-${round}-${position}`;
+};
+
 interface BracketViewProps {
   bracket: Bracket;
   teamsMap: Record<string, Team>;
@@ -30,7 +36,7 @@ function Slot({
   advanced,
   incomingAdvanced,
   children,
-}: {
+}: Readonly<{
   position: number;
   hasNext: boolean;
   hasPrev: boolean;
@@ -39,7 +45,7 @@ function Slot({
   /** At least one of the two slots feeding this match has moved on. */
   incomingAdvanced: boolean;
   children: ReactNode;
-}) {
+}>) {
   return (
     <div className="relative flex flex-1 items-center min-h-0" style={{ paddingInline: HALF_GUTTER }}>
       <div className="relative w-full">
@@ -79,13 +85,13 @@ function SlotContent({
   championTeamId,
   highlightTeamId,
   onMatchClick,
-}: {
+}: Readonly<{
   slot: BracketSlot;
   teamsMap: Record<string, Team>;
   championTeamId: string | null;
   highlightTeamId?: string | null;
   onMatchClick?: (match: Match) => void;
-}) {
+}>) {
   if (slot.kind === "empty") return null;
   if (slot.kind === "bye") return <ByeCard teamId={slot.teamId} teamsMap={teamsMap} highlightTeamId={highlightTeamId} />;
   return (
@@ -103,7 +109,7 @@ function SlotContent({
  * Single-elimination bracket as a tree: every match sits between the two matches that feed it and is connected
  * to them by lines. All rounds are shown; the tree scrolls sideways only, the page scrolls up and down.
  */
-export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }: BracketViewProps) {
+export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }: Readonly<BracketViewProps>) {
   const layout = useMemo(() => buildBracketLayout(bracket), [bracket]);
 
   if (layout.totalRounds === 0) return null;
@@ -147,7 +153,7 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
                 <div className="flex flex-col" style={{ height: treeHeight }}>
                   {round.slots.map((slot, position) => (
                     <Slot
-                      key={position}
+                      key={slotKey(round.round, slot, position)}
                       position={position}
                       hasNext={!isLast && slot.kind !== "empty"}
                       hasPrev={!isFirst && slot.kind === "match"}

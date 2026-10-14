@@ -1,3 +1,4 @@
+import type { MatchSlot } from "@/lib/bracket-layout";
 import type { Bracket, Match, Team } from "@/types";
 
 /** Shorthand for a match with the defaults of an untouched, waiting match. */
@@ -47,3 +48,16 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
     ],
   };
 }
+
+export const abTeams: Record<string, Team> = {
+  a: { id: "a", name: "Alpha" } as Team,
+  b: { id: "b", name: "Bravo" } as Team,
+};
+
+/** A match slot of team a against team b (number 7), ready unless overridden. */
+export const makeSlot = (overrides: Partial<Match> = {}, sources: MatchSlot["sources"] = { a: null, b: null }): MatchSlot => ({
+  kind: "match",
+  number: 7,
+  sources,
+  match: makeMatch({ id: "m", round: 1, position: 0, team_a_id: "a", team_b_id: "b", status: "ready", ...overrides }),
+});

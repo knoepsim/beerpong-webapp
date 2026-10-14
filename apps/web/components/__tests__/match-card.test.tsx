@@ -1,21 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MatchCard } from '../match-card';
-import { makeMatch } from '@/lib/test-fixtures/bracket';
-import type { MatchSlot } from '@/lib/bracket-layout';
-import type { Match, Team } from '@/types';
-
-const teamsMap: Record<string, Team> = {
-  a: { id: 'a', name: 'Alpha' } as Team,
-  b: { id: 'b', name: 'Bravo' } as Team,
-};
-
-const slot = (overrides: Partial<Match> = {}, sources: MatchSlot['sources'] = { a: null, b: null }): MatchSlot => ({
-  kind: 'match',
-  number: 7,
-  sources,
-  match: makeMatch({ id: 'm', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready', ...overrides }),
-});
+import { abTeams as teamsMap, makeSlot as slot } from '@/lib/test-fixtures/bracket'
 
 describe('MatchCard', () => {
   it('shows the number and a ready match as ready, without made-up score or timer', () => {
@@ -83,7 +69,7 @@ describe('MatchCard', () => {
   it('describes the whole match for screen readers', () => {
     render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2, table_number: 4 })} teamsMap={teamsMap} />);
     expect(
-      screen.getByRole('group', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
+      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig, Tisch 4' }),
     ).toBeInTheDocument();
   });
 
@@ -108,10 +94,10 @@ describe('MatchCard', () => {
 
   it('stands out while it can be played and not afterwards', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
-    expect(screen.getByRole('group').className).toContain('border-primary/50');
+    expect(screen.getByRole('article').className).toContain('border-primary/50');
 
     rerender(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
-    expect(screen.getByRole('group').className).not.toContain('border-primary/50');
+    expect(screen.getByRole('article').className).not.toContain('border-primary/50');
   });
 
   it('becomes a button with a handler', () => {

@@ -1,36 +1,8 @@
-import { Check, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
-import { describeSides, matchSummary, SIDE_STYLE, statusLabel, tableLabel, type SideInfo } from "@/lib/match-display";
+import { describeSides, matchSummary, sideTone, statusLabel, tableLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
-
-function TeamRow({ side, isMine }: { side: SideInfo; isMine: boolean }) {
-  const colors = SIDE_STYLE[side.side];
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-1 min-h-8 px-1.5 py-1 border-t border-l-4 text-[13px] leading-tight",
-        // the stripe stays strong until the match is decided, then only the winner keeps it
-        side.isLoser || side.name === null ? colors.stripeMuted : colors.stripe,
-        isMine ? "bg-primary/10" : side.isWinner && colors.winnerBg,
-        side.isLoser && "text-muted-foreground",
-      )}
-    >
-      {side.name === null ? (
-        <span className="italic text-muted-foreground">{side.placeholder}</span>
-      ) : (
-        // long names wrap onto a second line instead of being cut off
-        <span className="line-clamp-2 break-words" title={side.name}>
-          {side.name}
-        </span>
-      )}
-      {side.isChampion && <Trophy className="ml-auto w-3.5 h-3.5 shrink-0 text-amber-500" aria-label="Turniersieger" />}
-      {side.isWinner && !side.isChampion && (
-        <Check className="ml-auto w-3.5 h-3.5 shrink-0 text-green-700 dark:text-green-400" aria-label="Gewinner" />
-      )}
-    </div>
-  );
-}
 
 interface MatchCardProps {
   slot: MatchSlot;
@@ -43,14 +15,14 @@ interface MatchCardProps {
 }
 
 /** One match in the bracket: number, table, status and both teams. The state comes from the API. */
-export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: MatchCardProps) {
+export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchCardProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
   const table = tableLabel(match);
   const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
   const className = cn(
-    "w-full rounded-lg border bg-card text-left shadow-xs overflow-hidden",
+    "block w-full rounded-lg border bg-card text-left shadow-xs overflow-hidden",
     // what can be played right now stands out
     match.status === "ready" && "border-primary/50",
     mine && "ring-2 ring-primary/60",
@@ -76,7 +48,15 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
         {table && <div className="truncate">{table}</div>}
       </div>
       {sides.map((side) => (
-        <TeamRow key={side.side} side={side} isMine={!!highlightTeamId && side.id === highlightTeamId} />
+        <div
+          key={side.side}
+          className={cn(
+            "flex items-center gap-1 min-h-8 px-1.5 py-1 border-t text-[13px] leading-tight",
+            sideTone(side, !!highlightTeamId && side.id === highlightTeamId),
+          )}
+        >
+          <TeamLabel side={side} />
+        </div>
       ))}
     </>
   );
@@ -87,9 +67,9 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
       {content}
     </button>
   ) : (
-    <div className={className} role="group" aria-label={summary}>
+    <article className={className} aria-label={summary}>
       {content}
-    </div>
+    </article>
   );
 }
 
@@ -98,24 +78,23 @@ export function ByeCard({
   teamId,
   teamsMap,
   highlightTeamId,
-}: {
+}: Readonly<{
   teamId: string;
   teamsMap: Record<string, Team>;
   highlightTeamId?: string | null;
-}) {
+}>) {
   const mine = !!highlightTeamId && teamId === highlightTeamId;
   const name = teamsMap[teamId]?.name || "Unbekannt";
   return (
-    <div
+    <article
       className={cn(
         "w-full rounded-lg border border-dashed bg-card/60 px-2 py-1.5 text-[13px] leading-none",
         mine && "ring-2 ring-primary/60 bg-primary/10",
       )}
-      role="group"
       aria-label={`${name}, Freilos: ohne Spiel direkt in der nächsten Runde`}
     >
       <p className="text-xs leading-4 text-muted-foreground">Freilos</p>
       <p className="truncate font-medium pt-1">{name}</p>
-    </div>
+    </article>
   );
 }

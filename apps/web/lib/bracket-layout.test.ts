@@ -39,7 +39,7 @@ describe('buildBracketLayout', () => {
       ...fiveTeamBracket(),
       matches: [...fiveTeamBracket().matches, makeMatch({ id: 'x', round: 9, position: 0 })],
     }
-    expect(buildBracketLayout(odd).rounds.flatMap((r) => r.slots).length).toBe(7)
+    expect(buildBracketLayout(odd).rounds.flatMap((r) => r.slots)).toHaveLength(7)
   })
 
   it('is empty without rounds', () => {

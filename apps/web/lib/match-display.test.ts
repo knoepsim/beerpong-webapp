@@ -1,20 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { describeSides, matchSummary, statusLabel, tableLabel } from './match-display'
-import { makeMatch } from './test-fixtures/bracket'
-import type { MatchSlot } from './bracket-layout'
-import type { Match, Team } from '@/types'
-
-const teamsMap: Record<string, Team> = {
-  a: { id: 'a', name: 'Alpha' } as Team,
-  b: { id: 'b', name: 'Bravo' } as Team,
-}
-
-const slot = (overrides: Partial<Match> = {}, sources: MatchSlot['sources'] = { a: null, b: null }): MatchSlot => ({
-  kind: 'match',
-  number: 5,
-  sources,
-  match: makeMatch({ id: 'm', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'ready', ...overrides }),
-})
+import { abTeams as teamsMap, makeSlot as slot } from './test-fixtures/bracket'
 
 describe('describeSides', () => {
   it('gives the first team red and the second blue', () => {
@@ -76,14 +62,14 @@ describe('matchSummary', () => {
   it('describes a ready match with colors and table', () => {
     const s = slot()
     expect(matchSummary(s, describeSides(s, teamsMap), teamsMap)).toBe(
-      'Spiel 5, Alpha (rot) gegen Bravo (blau), bereit, Tisch folgt',
+      'Spiel 7, Alpha (rot) gegen Bravo (blau), bereit, Tisch folgt',
     )
   })
 
   it('describes a finished match with winner and cups', () => {
     const s = slot({ status: 'finished', winner_team_id: 'b', cups_left: 2 })
     expect(matchSummary(s, describeSides(s, teamsMap), teamsMap)).toBe(
-      'Spiel 5, Alpha (rot) gegen Bravo (blau), beendet, Sieger Bravo, 2 Becher übrig',
+      'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Bravo, 2 Becher übrig',
     )
   })
 })

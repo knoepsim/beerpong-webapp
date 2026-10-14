@@ -15,7 +15,7 @@ interface MatchListProps {
 }
 
 /** Every match of the tournament, round by round, in the same compact row as "my matches". */
-export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick }: MatchListProps) {
+export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick }: Readonly<MatchListProps>) {
   const layout = useMemo(() => buildBracketLayout(bracket), [bracket]);
 
   return (

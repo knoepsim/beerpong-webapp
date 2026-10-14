@@ -20,7 +20,7 @@ describe('BracketView', () => {
     const round1 = screen.getByRole('region', { name: 'Viertelfinale' });
 
     expect(within(round1).getAllByText('Freilos')).toHaveLength(3);
-    expect(within(round1).getByRole('group', { name: /Team 1, Freilos/ })).toBeInTheDocument();
+    expect(within(round1).getByRole('article', { name: /Team 1, Freilos/ })).toBeInTheDocument();
   });
 
   it('names where an open slot comes from instead of "TBD"', () => {
@@ -108,14 +108,14 @@ describe('BracketView', () => {
   it('highlights the matches of the own team', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} highlightTeamId="t4" />);
 
-    const mine = screen.getByRole('group', { name: /Spiel 1,/ });
+    const mine = screen.getByRole('article', { name: /Spiel 1,/ });
     expect(mine.className).toContain('ring-primary');
-    expect(screen.getByRole('group', { name: /Spiel 3,/ }).className).not.toContain('ring-primary');
+    expect(screen.getByRole('article', { name: /Spiel 3,/ }).className).not.toContain('ring-primary');
   });
 
   it('highlights the own team when it has a bye', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} highlightTeamId="t2" />);
-    expect(screen.getByRole('group', { name: /Team 2, Freilos/ }).className).toContain('ring-primary');
+    expect(screen.getByRole('article', { name: /Team 2, Freilos/ }).className).toContain('ring-primary');
   });
 
   it('reports clicks on a match', () => {
@@ -129,7 +129,7 @@ describe('BracketView', () => {
   it('is not clickable without a handler', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
     expect(screen.queryByRole('button', { name: /Spiel 1,/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('group', { name: /Spiel 1,/ })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: /Spiel 1,/ })).toBeInTheDocument();
   });
 
   it('renders nothing without a bracket', () => {
