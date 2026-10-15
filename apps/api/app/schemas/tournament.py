@@ -30,6 +30,7 @@ class TournamentUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=200)
     description: str | None = Field(default=None, max_length=5000)
     start_time: datetime | None = None
+    slug: str | None = Field(default=None, max_length=40)
     registration_end_time: datetime | None = None
     registration_auto_close: bool | None = None
     checkin_enabled: bool | None = None
@@ -42,6 +43,7 @@ class TournamentUpdate(BaseModel):
 class TournamentResponse(BaseModel):
     """Tournament details response."""
     id: UUID
+    slug: str
     name: str
     location: str | None
     description: str | None

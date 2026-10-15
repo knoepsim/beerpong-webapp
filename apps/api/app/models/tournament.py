@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.core.slug import random_slug
 
 
 class TournamentMode(str, enum.Enum):
@@ -38,6 +39,8 @@ class Tournament(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # address /t/{slug}; unique over all tournaments, deleted ones included, so an old link never leads somewhere else
+    slug: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False, default=random_slug)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
     description: Mapped[str | None] = mapped_column(String(5000), nullable=True)
     start_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -123,6 +123,16 @@ class NotEnoughTeamsError(AppException):
         super().__init__(409, "NOT_ENOUGH_TEAMS", detail)
 
 
+class InvalidSlugError(AppException):
+    def __init__(self, detail: str):
+        super().__init__(422, "INVALID_SLUG", detail)
+
+
+class SlugTakenError(AppException):
+    def __init__(self):
+        super().__init__(409, "SLUG_TAKEN", "Diese Adresse ist schon vergeben.")
+
+
 class InvalidScheduleError(AppException):
     def __init__(self, detail: str):
         super().__init__(422, "INVALID_SCHEDULE", detail)

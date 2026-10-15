@@ -12,10 +12,12 @@ from app.core.exceptions import (
     CheckinDisabledError,
     CheckinNotOpenError,
     RegistrationClosedError,
+    SlugTakenError,
     TeamNotCompleteError,
     TournamentAlreadyStartedError,
     TournamentDeletedError,
 )
+from app.core.slug import MAX_LENGTH, normalize_slug, random_slug, slugify
 from app.models.team import Team, TeamMember
 from app.models.tournament import Tournament, TournamentTeam
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
@@ -38,6 +40,7 @@ class TournamentService:
         """Create a new tournament and assign the creator as Admin."""
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = self._normalize_automation(data.model_dump())
+        obj_in["slug"] = await self._unique_slug(slugify(data.name))
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
@@ -52,6 +55,30 @@ class TournamentService:
 
         return tournament
 
+
+    async def _slug_exists(self, slug: str) -> bool:
+        return (await self.db.execute(select(Tournament.id).where(Tournament.slug == slug))).first() is not None
+
+    async def _unique_slug(self, base: str) -> str:
+        """The title as address; a number is appended if it is taken ("sommerfest", "sommerfest-2", ...)."""
+        candidate, n = base, 1
+        while await self._slug_exists(candidate):
+            n += 1
+            suffix = f"-{n}"
+            candidate = f"{base[: MAX_LENGTH - len(suffix)].rstrip('-')}{suffix}"
+            if n > 99:
+                candidate = f"{base[: MAX_LENGTH - 8].rstrip('-')}-{random_slug(6)}"
+        return candidate
+
+    async def get_tournament_by_slug(self, slug: str) -> Tournament:
+        """Look a tournament up by its address. Unknown and deleted addresses answer the same."""
+        result = await self.db.execute(
+            select(Tournament).where(Tournament.slug == slug.lower(), Tournament.is_deleted == False)  # noqa: E712
+        )
+        tournament = result.scalar_one_or_none()
+        if tournament is None:
+            raise NotFoundError("Tournament")
+        return tournament
 
     async def get_tournament(self, tournament_id: UUID, *, for_update: bool = False) -> Tournament:
         """Get a tournament by ID. Raises NotFoundError for missing or deleted tournaments.
@@ -125,6 +152,15 @@ class TournamentService:
         new_checkin_enabled = update_data.get("checkin_enabled", tournament.checkin_enabled)
         if tournament.is_started and new_checkin_enabled != tournament.checkin_enabled:
             raise TournamentAlreadyStartedError()
+
+        if "slug" in update_data:
+            slug = normalize_slug(update_data["slug"]) if update_data["slug"] is not None else tournament.slug
+            if slug == tournament.slug:
+                del update_data["slug"]
+            elif await self._slug_exists(slug):
+                raise SlugTakenError()
+            else:
+                update_data["slug"] = slug
 
         merged = {
             field: update_data.get(field, getattr(tournament, field))

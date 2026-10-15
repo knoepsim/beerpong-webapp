@@ -135,7 +135,7 @@ export default function TournamentsPage() {
       form.reset();
       setSchedule(EMPTY_SCHEDULE);
       setShowScheduleErrors(false);
-      router.push(`/tournaments/${t.id}`);
+      router.push(`/t/${t.slug}`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Fehler beim Erstellen";
       setApiError(message);

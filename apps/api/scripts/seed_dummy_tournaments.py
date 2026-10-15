@@ -196,7 +196,7 @@ async def create_tournament(
     await db.flush()
 
     if played is None:
-        return {"id": tournament.id, "name": name, "teams": teams, "matches": 0, "rounds": 0, "played": 0}
+        return {"id": tournament.id, "slug": tournament.slug, "name": name, "teams": teams, "matches": 0, "rounds": 0, "played": 0}
 
     await LifecycleService(db).start_tournament(tournament.id)
 
@@ -219,6 +219,7 @@ async def create_tournament(
     bracket = await bracket_service.get_bracket(tournament.id)
     return {
         "id": tournament.id,
+        "slug": tournament.slug,
         "name": name,
         "teams": teams,
         "matches": total,
@@ -260,7 +261,7 @@ async def main() -> None:
                 info = await create_tournament(
                     db, teams=args.teams, played=STATES[state][1], state=state, owner_phone=args.owner
                 )
-                print(f"{info['name']}: http://localhost:3000/tournaments/{info['id']}")
+                print(f"{info['name']}: http://localhost:3000/t/{info['slug']}")
             await db.commit()
         elif args.command == "create":
             if args.teams < 2:
@@ -278,7 +279,7 @@ async def main() -> None:
             )
             await db.commit()
             print(f"{info['name']}: {info['matches']} Matches, {info['rounds']} Runden, {info['played']} gespielt")
-            print(f"http://localhost:3000/tournaments/{info['id']}")
+            print(f"http://localhost:3000/t/{info['slug']}")
         elif args.command == "delete":
             print(f"{await delete_dummy_tournaments(db)} Dummy-Turnier(e) gelöscht")
             await db.commit()

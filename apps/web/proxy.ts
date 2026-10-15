@@ -7,6 +7,7 @@ export function proxy(request: NextRequest) {
   // Protected routes
   const isProtectedRoute = 
     request.nextUrl.pathname.startsWith("/tournaments") ||
+    request.nextUrl.pathname.startsWith("/t/") ||
     request.nextUrl.pathname.startsWith("/teams") ||
     request.nextUrl.pathname.startsWith("/profile") ||
     request.nextUrl.pathname.startsWith("/admin") ||
@@ -38,7 +39,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/",
-    "/tournaments/:path*", 
+    "/tournaments/:path*",
+    "/t/:path*",
     "/teams/:path*", 
     "/profile/:path*", 
     "/admin/:path*",
