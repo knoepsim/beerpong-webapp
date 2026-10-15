@@ -101,6 +101,8 @@ export type TournamentPhase =
 
 export interface Tournament {
   id: string;
+  /** Raised by every change; the live view compares it to know whether it is up to date. */
+  revision: number;
   /** The address /t/{slug}. */
   slug: string;
   name: string;

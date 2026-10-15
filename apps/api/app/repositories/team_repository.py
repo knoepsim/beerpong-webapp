@@ -50,6 +50,20 @@ class TeamRepository(BaseRepository[Team]):
             for member, name in rows
         ]
 
+    async def get_members_with_names_for_teams(self, db: AsyncSession, team_ids: list[UUID]) -> dict[UUID, list[dict]]:
+        """The members of many teams in one query: {team_id: [member, ...]}."""
+        members: dict[UUID, list[dict]] = {team_id: [] for team_id in team_ids}
+        if not team_ids:
+            return members
+        result = await db.execute(
+            select(TeamMember, User.name)
+            .join(User, User.id == TeamMember.user_id)
+            .where(TeamMember.team_id.in_(team_ids))
+        )
+        for member, name in result.all():
+            members[member.team_id].append({"user_id": member.user_id, "joined_at": member.joined_at, "name": name})
+        return members
+
     async def get_team_member_count(self, db: AsyncSession, team_id: UUID) -> int:
         result = await db.execute(
             select(func.count()).select_from(TeamMember).where(TeamMember.team_id == team_id)

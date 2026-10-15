@@ -88,6 +88,7 @@ const mocked = {
 const tournament: Tournament = {
   id: 't1',
   slug: 'summer-cup',
+  revision: 0,
   name: 'Summer Cup',
   location: 'Garden',
   description: 'Rules',

@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # allowed on top of this, so a phone in the same network works without configuration.
     cors_origins: str = "http://localhost:3000"
 
+    # Server-Sent Events (live view): heartbeat keeps proxies from closing an idle stream, a stream is closed after
+    # sse_max_seconds (the browser reconnects, which checks access again), at most sse_max_connections at once
+    sse_heartbeat_seconds: float = 20
+    sse_max_seconds: float = 600
+    sse_max_connections: int = 500
+
     # Set ENVIRONMENT=production to refuse insecure defaults (dummy SMS, default secret key)
     environment: str = "development"
 

@@ -184,6 +184,8 @@ export const api = {
     get: (id: string) => request<Tournament>(`/tournaments/${id}`),
     getBySlug: (slug: string) => request<Tournament>(`/tournaments/by-slug/${encodeURIComponent(slug)}`),
     /** What a stranger may see of a tournament everybody may join; 404 for all others. */
+    /** Only the revision: the cheap "has anything changed?". */
+    getState: (id: string) => request<{ revision: number }>(`/tournaments/${id}/state`),
     getPreview: (slug: string) =>
       request<TournamentPreview>(`/tournaments/by-slug/${encodeURIComponent(slug)}/preview`),
     listInvites: (tournamentId: string) => request<TournamentInvite[]>(`/tournaments/${tournamentId}/invites`),
