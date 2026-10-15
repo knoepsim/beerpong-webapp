@@ -162,3 +162,20 @@ async def test_the_address_of_a_private_tournament_says_nothing_to_strangers(ctx
 async def test_the_public_list_of_tournaments_is_gone(ctx: Ctx):
     resp = await ctx.client.get("/tournaments", headers=ctx.admin)
     assert resp.status_code in (404, 405)
+
+
+@pytest.mark.asyncio
+async def test_my_tournaments_lists_what_i_play_and_what_i_organize(ctx: Ctx):
+    organized = await ctx.create(name="Meins")
+    played = await ctx.create(name="Mitgespielt")
+    assert (await ctx.join(played["id"], 0)).status_code == 201
+
+    mine = await ctx.client.get("/tournaments/me", headers=ctx.admin)
+    assert mine.status_code == 200
+    assert {t["tournament"]["id"] for t in mine.json()["managing"]} == {organized["id"], played["id"]}
+
+    players = await ctx.client.get("/tournaments/me", headers=ctx.players[0])
+    assert players.status_code == 200
+    participating = players.json()["participating"]
+    assert [t["tournament"]["id"] for t in participating] == [played["id"]]
+    assert participating[0]["team"]["id"] == ctx.team_ids[0]

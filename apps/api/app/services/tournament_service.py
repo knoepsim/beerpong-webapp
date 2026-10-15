@@ -190,6 +190,29 @@ class TournamentService:
         await tournament_repository.update(self.db, db_obj=tournament, obj_in={"is_deleted": True})
 
 
+    async def get_my_tournaments(self, user_id: UUID) -> dict:
+        """Get customized tournament groupings for the user."""
+        participating_res, managing_res = await tournament_repository.get_my_tournaments(self.db, user_id)
+
+        participating = []
+        for tournament, team in participating_res:
+            participating.append({
+                "tournament": tournament,
+                "team": team
+            })
+
+        managing = []
+        for tournament, role in managing_res:
+            managing.append({
+                "tournament": tournament,
+                "role": role
+            })
+
+        return {
+            "participating": participating,
+            "managing": managing
+        }
+
     async def join_tournament(
         self, tournament_id: UUID, team_id: UUID, invite_token: str | None = None
     ) -> TournamentTeam:
