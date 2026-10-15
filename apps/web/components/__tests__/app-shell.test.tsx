@@ -69,6 +69,22 @@ describe('AppShell', () => {
     expect(screen.queryByText('Abmelden')).not.toBeInTheDocument();
   });
 
+  it('offers a visitor without login only the login, back to the page he is on, and no navigation', () => {
+    usePathname.mockReturnValue('/t/sommerfest')
+    useCurrentUser.mockReturnValue({ user: null, isLoading: false })
+    const { container } = render(<AppShell>x</AppShell>)
+
+    const login = screen.getByText('Anmelden')
+    expect(login.closest('a')).toHaveAttribute('href', `/login?redirect=${encodeURIComponent('/t/sommerfest')}`)
+    expect(container.querySelectorAll('nav.hidden, nav.md\:hidden.hidden').length).toBeGreaterThan(0)
+  })
+
+  it('shows no login link while it is not yet known whether somebody is logged in', () => {
+    useCurrentUser.mockReturnValue({ user: null, isLoading: true })
+    render(<AppShell>x</AppShell>)
+    expect(screen.queryByText('Anmelden')).not.toBeInTheDocument()
+  })
+
   it('logs out: clears tokens and goes to the login', () => {
     const location = { href: '/teams' };
     vi.stubGlobal('location', location);

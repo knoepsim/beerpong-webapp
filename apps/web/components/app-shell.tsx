@@ -17,7 +17,9 @@ const navItems = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { user } = useCurrentUser();
+  const { user, isLoading } = useCurrentUser();
+  // somebody without login (a spectator on a public tournament) only has the page in front of him: no app navigation
+  const isGuest = !isLoading && !user;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -31,8 +33,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
 
+          {isGuest && (
+            <Link
+              href={`/login?redirect=${encodeURIComponent(pathname)}`}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+            >
+              Anmelden
+            </Link>
+          )}
+
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className={`hidden items-center gap-1 ${isGuest ? "" : "md:flex"}`}>
             {navItems.map((item) => {
               const isActive = pathname.startsWith(item.href);
               return (
@@ -92,10 +103,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 pb-20 md:pb-6">{children}</main>
+      <main className={`flex-1 md:pb-6 ${isGuest ? "pb-6" : "pb-20"}`}>{children}</main>
 
       {/* Bottom navigation — mobile only */}
-      <nav className="fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/90 backdrop-blur-md md:hidden">
+      <nav className={`fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/90 backdrop-blur-md md:hidden ${isGuest ? "hidden" : ""}`}>
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
             const isActive = pathname.startsWith(item.href);

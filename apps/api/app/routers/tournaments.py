@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import NotFoundError
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_user
 from app.models.tournament import JoinPolicy, Tournament
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
@@ -155,13 +155,13 @@ async def get_my_tournaments(
 )
 async def get_tournament_by_slug(
     slug: str,
-    current_user: Annotated[User, Depends(get_current_user)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     service = TournamentService(db)
     tournament = await service.get_tournament_by_slug(slug)
     try:
-        return await service.get_tournament_for_user(tournament.id, current_user.id)
+        return await service.get_tournament_for_user(tournament.id, viewer.id if viewer else None)
     except HTTPException:
         # a private tournament does not say that it exists
         raise NotFoundError("Tournament") from None
@@ -242,8 +242,11 @@ from app.schemas.team import TournamentTeamResponse, TeamMemberResponse
 )
 async def get_teams(
     tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    # strangers (and everybody who is neither a player nor a helper here) see the team names, not the players
+    involved = await TournamentService(db).is_involved(tournament.id, viewer.id if viewer else None)
     teams_data = await TournamentService(db).get_tournament_teams(tournament.id)
     result = []
     for team, is_checked_in in teams_data:
@@ -254,7 +257,7 @@ async def get_teams(
                 id=team.id,
                 name=team.name,
                 max_size=team.max_size,
-                members=[TeamMemberResponse.model_validate(m) for m in members],
+                members=[TeamMemberResponse.model_validate(m) for m in members] if involved else [],
                 is_complete=len(members) >= team.max_size,
                 is_deletable=is_deletable,
                 is_renamable=is_renamable,

@@ -24,6 +24,10 @@ describe('proxy', () => {
     },
   );
 
+  it.each(['/t/sommerfest', '/invite/abc2345'])('lets anonymous visitors open %s: the API decides what they see', (path) => {
+    expect(location(call(path))).toBeNull();
+  });
+
   it('lets logged-in users reach protected routes', () => {
     expect(location(call('/tournaments', 'tok'))).toBeNull();
   });

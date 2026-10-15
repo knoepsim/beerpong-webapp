@@ -22,6 +22,9 @@ class Ctx:
     async def statuses(self, who: str) -> set[int]:
         return {(await self.client.get(u, headers=self.headers[who])).status_code for u in self.urls()}
 
+    async def anonymous_statuses(self) -> set[int]:
+        return {(await self.client.get(u)).status_code for u in self.urls()}
+
 
 async def _login(client: AsyncClient, phone: str) -> dict:
     await client.post("/auth/request-code", json={"phone_number": phone})
@@ -91,3 +94,51 @@ async def test_an_invitation_link_does_not_open_the_results_of_a_private_tournam
 @pytest.mark.parametrize("who", ["admin", "referee", "p1", "p4"])
 async def test_role_holders_and_participants_always_have_access(ctx: Ctx, who: str):
     assert await ctx.statuses(who) == {200}
+
+
+@pytest.mark.asyncio
+async def test_without_login_only_public_tournaments_can_be_read(ctx: Ctx):
+    expected = {403} if ctx.visibility == "private" else {200}
+    assert await ctx.anonymous_statuses() == expected
+
+
+@pytest.mark.asyncio
+async def test_strangers_see_team_names_but_not_the_players_nor_the_helpers(ctx: Ctx):
+    if ctx.visibility == "private":
+        pytest.skip("private tournaments are not readable for strangers at all")
+    for headers in ({}, ctx.headers["outsider"]):
+        teams = (await ctx.client.get(f"/tournaments/{ctx.tid}/teams", headers=headers)).json()
+        assert sorted(t["name"] for t in teams) == ["A", "B"]
+        assert all(t["members"] == [] for t in teams)
+        assert (await ctx.client.get(f"/tournaments/{ctx.tid}/roles", headers=headers)).json() == []
+
+    # the players see each other and the helpers
+    teams = (await ctx.client.get(f"/tournaments/{ctx.tid}/teams", headers=ctx.headers["p1"])).json()
+    assert all(len(t["members"]) == 2 for t in teams)
+    assert len((await ctx.client.get(f"/tournaments/{ctx.tid}/roles", headers=ctx.headers["p1"])).json()) >= 2
+
+
+@pytest.mark.asyncio
+async def test_strangers_do_not_learn_who_entered_a_result(ctx: Ctx):
+    if ctx.visibility == "private":
+        pytest.skip("private tournaments are not readable for strangers at all")
+    bracket = (await ctx.client.get(f"/tournaments/{ctx.tid}/bracket")).json()
+    match = bracket["matches"][0]
+    resp = await ctx.client.post(
+        f"/matches/{match['id']}/results",
+        json={"winner_team_id": match["team_a_id"], "cups_left": 3},
+        headers=ctx.headers["referee"],
+    )
+    assert resp.status_code == 201, resp.text
+
+    stranger = (await ctx.client.get(f"/matches/{match['id']}/results")).json()
+    involved = (await ctx.client.get(f"/matches/{match['id']}/results", headers=ctx.headers["p1"])).json()
+    assert stranger[0]["reported_by_username"] is None
+    assert involved[0]["reported_by_username"] is not None
+
+
+@pytest.mark.asyncio
+async def test_a_wrong_or_stale_token_makes_somebody_a_stranger_not_an_error(ctx: Ctx):
+    expected = {403} if ctx.visibility == "private" else {200}
+    resp = await ctx.client.get(f"/tournaments/{ctx.tid}", headers={"Authorization": "Bearer not-a-token"})
+    assert resp.status_code in expected

@@ -6,7 +6,9 @@ import type { Team } from '@/types'
 
 const push = vi.fn()
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const useCurrentUser = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+vi.mock('@/components/user-provider', () => ({ useCurrentUser: () => useCurrentUser() }))
 vi.mock('sonner', () => ({ toast }))
 vi.mock('@/lib/api', () => ({ api: { teams: { list: vi.fn() }, tournaments: { join: vi.fn() } } }))
 
@@ -14,15 +16,32 @@ const team = (id: string, name: string): Team => ({ id, name, is_complete: true 
 const mocked = { teams: vi.mocked(api.teams.list), join: vi.mocked(api.tournaments.join) }
 
 const open = (onJoined = vi.fn(), inviteToken?: string) => {
-  render(<JoinTournament tournamentId="t1" tournamentName="Sommerfest" inviteToken={inviteToken} onJoined={onJoined} />)
+  render(<JoinTournament tournamentId="t1" tournamentName="Sommerfest" inviteToken={inviteToken} loginRedirect="/t/sommerfest" onJoined={onJoined} />)
   fireEvent.click(screen.getByText('Mit Team beitreten'))
   return onJoined
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  useCurrentUser.mockReturnValue({ user: { id: 'u1' }, isLoading: false })
+})
 afterEach(() => cleanup())
 
 describe('JoinTournament', () => {
+  it('asks somebody without login to log in first and brings them back', () => {
+    useCurrentUser.mockReturnValue({ user: null, isLoading: false })
+    render(<JoinTournament tournamentId="t1" tournamentName="Sommerfest" loginRedirect="/t/sommerfest" onJoined={vi.fn()} />)
+    const link = screen.getByRole('link', { name: 'Anmelden und beitreten' })
+    expect(link).toHaveAttribute('href', `/login?redirect=${encodeURIComponent('/t/sommerfest')}`)
+    expect(mocked.teams).not.toHaveBeenCalled()
+  })
+
+  it('shows nothing while it is not yet known whether somebody is logged in', () => {
+    useCurrentUser.mockReturnValue({ user: null, isLoading: true })
+    const { container } = render(<JoinTournament tournamentId="t1" tournamentName="X" loginRedirect="/t/x" onJoined={vi.fn()} />)
+    expect(container).toBeEmptyDOMElement()
+  })
+
   it('joins with the only team without asking, passing the invitation link', async () => {
     mocked.teams.mockResolvedValue([team('a', 'Becherhelden')])
     mocked.join.mockResolvedValue(undefined as never)

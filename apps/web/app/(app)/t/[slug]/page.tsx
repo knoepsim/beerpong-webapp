@@ -20,6 +20,7 @@ import { CheckinSummary } from "@/components/checkin-summary";
 import { TournamentTeamList } from "@/components/tournament-team-list";
 import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
+import { usePolling } from "@/hooks/use-polling";
 import { PreparationControls } from "@/components/preparation-controls";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -80,7 +81,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
 
   
 
-  const loadData = async () => {
+  const loadData = async (quiet = false) => {
     try {
       const tData = await api.tournaments.getBySlug(slug);
       const [rolesData, tTeamsData] = await Promise.all([
@@ -102,6 +103,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         setBracket(null);
       }
     } catch (err: unknown) {
+      if (quiet) return; // a failed refresh keeps showing the last state
       if (err instanceof ApiError) {
         // a tournament that is not visible to me may still be open to join: show what a stranger may see
         if (err.status === 404 || err.status === 403) {
@@ -121,6 +123,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   useEffect(() => {
     void loadData();
   }, [slug]);
+
+  // live: bracket, results and registrations refresh by themselves while the page is open
+  usePolling(() => loadData(true), 15_000);
 
   const teamsMap = useMemo(() => {
     const map: Record<string, Team> = {};
@@ -275,7 +280,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
       <main className="mx-auto max-w-md px-4 pt-8 pb-20 space-y-4">
         <TournamentPreviewCard preview={preview}>
           {preview.registration_open && (
-            <JoinTournament tournamentId={preview.tournament_id} tournamentName={preview.name} onJoined={loadData} />
+            <JoinTournament
+              tournamentId={preview.tournament_id}
+              tournamentName={preview.name}
+              loginRedirect={`/t/${slug}`}
+              onJoined={loadData}
+            />
           )}
         </TournamentPreviewCard>
       </main>
@@ -300,7 +310,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     return (
       <div className="flex flex-col items-center justify-center p-12 space-y-4">
         <div className="text-center text-destructive">{error || "Turnier nicht gefunden"}</div>
-        <Button variant="outline" onClick={loadData}>
+        <Button variant="outline" onClick={() => loadData()}>
           <RefreshCw className="mr-2 h-4 w-4" />
           Erneut versuchen
         </Button>
@@ -349,7 +359,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
           
           {tournament.registration_open && !myTournamentTeam && !canManage && (
             tournament.join_policy === JoinPolicy.OPEN ? (
-              <JoinTournament tournamentId={tournament.id} tournamentName={tournament.name} onJoined={loadData} />
+              <JoinTournament
+                tournamentId={tournament.id}
+                tournamentName={tournament.name}
+                loginRedirect={`/t/${slug}`}
+                onJoined={loadData}
+              />
             ) : (
               <p className="text-sm text-muted-foreground md:max-w-xs">
                 Beitreten kannst du nur mit einem Einladungslink vom Veranstalter.

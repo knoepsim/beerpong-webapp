@@ -28,7 +28,7 @@ from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import get_current_user, get_optional_user
 from app.models.user import User
 
 
@@ -95,33 +95,33 @@ class TournamentService:
             raise TournamentDeletedError()
         return tournament
 
-    async def get_tournament_for_user(self, tournament_id: UUID, user_id: UUID) -> Tournament:
-        """Get a tournament if the user may see it: public ones by everybody, private ones by helpers and participants."""
+    async def is_involved(self, tournament_id: UUID, user_id: UUID | None) -> bool:
+        """Does the user have a role in the tournament or play in it? Strangers (no login) never do."""
+        if user_id is None:
+            return False
+        role = await self.db.execute(
+            select(TournamentUserRole.id).where(
+                TournamentUserRole.tournament_id == tournament_id, TournamentUserRole.user_id == user_id
+            )
+        )
+        if role.first() is not None:
+            return True
+        participant = await self.db.execute(
+            select(TeamMember.id)
+            .join(TournamentTeam, TournamentTeam.team_id == TeamMember.team_id)
+            .where(TournamentTeam.tournament_id == tournament_id, TeamMember.user_id == user_id)
+        )
+        return participant.first() is not None
+
+    async def get_tournament_for_user(self, tournament_id: UUID, user_id: UUID | None) -> Tournament:
+        """Get a tournament if the viewer may see it: public ones by everybody (also without login), private ones
+        by helpers and participants."""
         tournament = await self.get_tournament(tournament_id)
 
         if tournament.visibility == TournamentVisibility.PUBLIC:
             return tournament
-
-        role = await self.db.execute(
-            select(TournamentUserRole).where(
-                TournamentUserRole.tournament_id == tournament_id,
-                TournamentUserRole.user_id == user_id
-            )
-        )
-        if role.scalar_one_or_none():
+        if await self.is_involved(tournament_id, user_id):
             return tournament
-
-        participant = await self.db.execute(
-            select(TeamMember)
-            .join(TournamentTeam, TournamentTeam.team_id == TeamMember.team_id)
-            .where(
-                TournamentTeam.tournament_id == tournament_id,
-                TeamMember.user_id == user_id
-            )
-        )
-        if participant.scalar_one_or_none():
-            return tournament
-
         raise HTTPException(status_code=403, detail="You do not have access to this private tournament.")
 
 
@@ -338,11 +338,12 @@ def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> Tour
 
 async def get_accessible_tournament(
     tournament_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
     service: Annotated[TournamentService, Depends(get_tournament_service)],
 ) -> Tournament:
     """Dependency for every read endpoint of a tournament: enforces the visibility rules.
 
-    Private tournaments are only accessible to role holders and participants.
+    Public tournaments can be read by everybody, also without login. Private ones only by role holders and
+    participants.
     """
-    return await service.get_tournament_for_user(tournament_id, current_user.id)
+    return await service.get_tournament_for_user(tournament_id, viewer.id if viewer else None)
