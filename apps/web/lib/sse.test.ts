@@ -41,6 +41,14 @@ describe('readEventStream', () => {
     expect(await read(['data: eins\ndata: zwei\n\n'])).toEqual([{ event: 'message', id: null, data: 'eins\nzwei' }])
   })
 
+  it('does not end an event early when a line break is split between two chunks', async () => {
+    const events = await read(['event: a\r\ndata: 1\r', '\n\r', '\nevent: b\r\ndata: 2\r\n\r\n'])
+    expect(events.map((e) => [e.event, e.data])).toEqual([
+      ['a', '1'],
+      ['b', '2'],
+    ])
+  })
+
   it('does not carry the name or id of one event into the next', async () => {
     const events = await read(['event: a\nid: 1\ndata: x\n\n', 'data: y\n\n'])
     expect(events[1]).toEqual({ event: 'message', id: null, data: 'y' })

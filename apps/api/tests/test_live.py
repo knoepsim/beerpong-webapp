@@ -301,6 +301,7 @@ async def test_the_teams_of_a_tournament_load_their_players_in_one_query(ctx: Ct
     finally:
         event.remove(engine.sync_engine, "before_cursor_execute", count)
 
-    assert resp.status_code == 200 and len(resp.json()) == 2
+    assert resp.status_code == 200
+    assert len(resp.json()) == 2
     member_queries = [s for s in statements if "FROM team_members" in s and "JOIN users" in s]
     assert len(member_queries) == 1

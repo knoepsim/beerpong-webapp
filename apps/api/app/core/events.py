@@ -47,7 +47,8 @@ class Subscription:
     async def next(self, timeout: float) -> Event | None:
         """The next event, or None if nothing happened within `timeout` seconds."""
         try:
-            await asyncio.wait_for(self._ready.wait(), timeout)
+            async with asyncio.timeout(timeout):
+                await self._ready.wait()
         except TimeoutError:
             return None
         name = next(iter(self._pending))
@@ -83,7 +84,7 @@ class EventBus:
                 del self._subscriptions[tournament_id]
 
     def publish(self, tournament_id: UUID, name: str, data: dict[str, Any]) -> None:
-        for subscription in list(self._subscriptions.get(tournament_id, ())):
+        for subscription in self._subscriptions.get(tournament_id, ()):
             subscription.push(Event(name, data))
 
 

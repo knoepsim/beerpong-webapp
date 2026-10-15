@@ -399,9 +399,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
       </div>
 
       {live.status === "fallback" && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <output className="block text-sm text-muted-foreground">
           Keine Live-Verbindung. Die Seite prüft alle 30 Sekunden, ob sich etwas geändert hat.
-        </p>
+        </output>
       )}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
