@@ -16,6 +16,7 @@ from app.repositories.team_repository import team_repository
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
+from app.services.revision import bump_for_team
 
 
 class TeamService:
@@ -55,6 +56,9 @@ class TeamService:
         return await team_repository.get_team_members_with_names(self.db, team_id)
 
 
+    async def get_members_with_names_for_teams(self, team_ids: list[UUID]) -> dict[UUID, list[dict]]:
+        return await team_repository.get_members_with_names_for_teams(self.db, team_ids)
+
     async def get_team_member_count(self, team_id: UUID) -> int:
         """Count the number of members in a team."""
         return await team_repository.get_team_member_count(self.db, team_id)
@@ -67,7 +71,9 @@ class TeamService:
 
     async def update_team(self, team_id: UUID, name: str) -> Team:
         team = await self.get_team(team_id)
-        return await team_repository.update(self.db, db_obj=team, obj_in={"name": name})
+        updated = await team_repository.update(self.db, db_obj=team, obj_in={"name": name})
+        await bump_for_team(self.db, team_id, "teams", "bracket")
+        return updated
 
 
     async def soft_delete_team(self, team_id: UUID) -> None:
@@ -139,6 +145,7 @@ class TeamService:
         # Add member
         member = TeamMember(team_id=team.id, user_id=user_id)
         self.db.add(member)
+        await bump_for_team(self.db, team.id, "teams")
 
         # Invalidate invite if team is now full
         new_count = member_count + 1

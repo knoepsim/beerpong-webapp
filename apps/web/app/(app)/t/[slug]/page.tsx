@@ -20,7 +20,7 @@ import { CheckinSummary } from "@/components/checkin-summary";
 import { TournamentTeamList } from "@/components/tournament-team-list";
 import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
-import { usePolling } from "@/hooks/use-polling";
+import { useTournamentLive, type LiveScope } from "@/hooks/use-tournament-live";
 import { PreparationControls } from "@/components/preparation-controls";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -81,7 +81,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
 
   
 
-  const loadData = async (quiet = false) => {
+  const loadData = async () => {
     try {
       const tData = await api.tournaments.getBySlug(slug);
       const [rolesData, tTeamsData] = await Promise.all([
@@ -103,7 +103,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         setBracket(null);
       }
     } catch (err: unknown) {
-      if (quiet) return; // a failed refresh keeps showing the last state
       if (err instanceof ApiError) {
         // a tournament that is not visible to me may still be open to join: show what a stranger may see
         if (err.status === 404 || err.status === 403) {
@@ -124,8 +123,22 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     void loadData();
   }, [slug]);
 
-  // live: bracket, results and registrations refresh by themselves while the page is open
-  usePolling(() => loadData(true), 15_000);
+  // Only the parts the server says have changed are loaded again; a failed refresh keeps showing the last state.
+  const refresh = async (scopes: LiveScope[]) => {
+    if (!tournament) return;
+    const id = tournament.id;
+    const load: Record<LiveScope, () => Promise<void>> = {
+      tournament: async () => setTournament(await api.tournaments.getBySlug(slug)),
+      teams: async () => setTournamentTeams(await api.tournaments.getTeams(id)),
+      bracket: async () => {
+        const data = await api.tournaments.getBracket(id);
+        setBracket(data.matches.length > 0 ? data : null);
+      },
+      roles: async () => setRoles(await api.roles.list(id)),
+    };
+    await Promise.allSettled(scopes.map((scope) => load[scope]()));
+  };
+  const live = useTournamentLive({ tournamentId: tournament?.id, revision: tournament?.revision, onChange: refresh });
 
   const teamsMap = useMemo(() => {
     const map: Record<string, Team> = {};
@@ -384,6 +397,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
           )}
         </div>
       </div>
+
+      {live.status === "fallback" && (
+        <output className="block text-sm text-muted-foreground">
+          Keine Live-Verbindung. Die Seite prüft alle 30 Sekunden, ob sich etwas geändert hat.
+        </output>
+      )}
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">

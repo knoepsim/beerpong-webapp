@@ -47,6 +47,8 @@ class Tournament(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # raised by every change a viewer can see (see services/revision.py); the browsers compare it to what they hold
+    revision: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     # address /t/{slug}; unique over all tournaments, deleted ones included, so an old link never leads somewhere else
     slug: Mapped[str] = mapped_column(String(40), unique=True, index=True, nullable=False, default=random_slug)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)

@@ -46,6 +46,7 @@ class TournamentResponse(BaseModel):
     """Tournament details response."""
     id: UUID
     slug: str
+    revision: int
     name: str
     location: str | None
     description: str | None
@@ -82,6 +83,11 @@ class TournamentJoinRequest(BaseModel):
     """Request body for joining a tournament with a team."""
     team_id: UUID
     invite_token: str | None = None
+
+
+class TournamentState(BaseModel):
+    """The cheap question "has anything changed?": the revision, nothing else."""
+    revision: int
 
 
 class InviteCreate(BaseModel):

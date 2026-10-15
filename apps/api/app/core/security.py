@@ -94,6 +94,17 @@ async def get_current_user(
 optional_security_scheme = HTTPBearer(auto_error=False)
 
 
+async def user_from_authorization(authorization: str | None, db: AsyncSession):
+    """The user behind an `Authorization: Bearer ...` header, None for no or an invalid token (a stranger)."""
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    try:
+        return await get_current_user(HTTPAuthorizationCredentials(scheme=scheme, credentials=token), db)
+    except HTTPException:
+        return None
+
+
 async def get_optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_security_scheme),
     db: AsyncSession = Depends(get_db),
@@ -101,10 +112,7 @@ async def get_optional_user(
     """Like get_current_user, but for pages anybody may open: no (or an invalid) token means a stranger, not an error."""
     if credentials is None:
         return None
-    try:
-        return await get_current_user(credentials, db)
-    except HTTPException:
-        return None
+    return await user_from_authorization(f"{credentials.scheme} {credentials.credentials}", db)
 
 
 async def get_current_system_admin(

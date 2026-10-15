@@ -23,6 +23,7 @@ from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
 from app.schemas.tournament import TournamentCreate, TournamentUpdate
 from app.services.invite_service import InviteService
+from app.services.revision import bump
 from app.services.schedule import validate_schedule
 from app.services.team_service import TeamService
 from fastapi import Depends
@@ -178,6 +179,7 @@ class TournamentService:
         )
 
         updated = await tournament_repository.update(self.db, db_obj=tournament, obj_in=update_data)
+        await bump(self.db, tournament_id, "tournament")
         if updated.join_policy == JoinPolicy.INVITE_ONLY:
             await InviteService(self.db).ensure_one(updated.id, updated.created_by_id)
             await self.db.refresh(updated)  # the flush reloaded server-side columns (updated_at)
@@ -188,6 +190,7 @@ class TournamentService:
         """Soft delete a tournament."""
         tournament = await self.get_tournament(tournament_id)
         await tournament_repository.update(self.db, db_obj=tournament, obj_in={"is_deleted": True})
+        await bump(self.db, tournament_id, "tournament")
 
 
     async def get_my_tournaments(self, user_id: UUID) -> dict:
@@ -249,6 +252,7 @@ class TournamentService:
 
         entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id, invite_id=invite.id if invite else None)
         self.db.add(entry)
+        await bump(self.db, tournament_id, "teams")
         return entry
 
 
@@ -288,6 +292,7 @@ class TournamentService:
                 TournamentTeam.team_id == team.id
             )
         )
+        await bump(self.db, tournament_id, "teams")
 
     async def remove_team(self, tournament_id: UUID, team_id: UUID) -> None:
         """Remove a specific team from a tournament (Admin action, only before it starts)."""
@@ -302,6 +307,7 @@ class TournamentService:
         )
         if result.rowcount == 0:
             raise HTTPException(status_code=400, detail="Team is not part of this tournament.")
+        await bump(self.db, tournament_id, "teams")
 
 
 
@@ -329,6 +335,7 @@ class TournamentService:
             raise HTTPException(status_code=404, detail="Team is not in this tournament.")
             
         tournament_team.is_checked_in = is_checked_in
+        await bump(self.db, tournament_id, "teams")
 
 
 def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TournamentService:

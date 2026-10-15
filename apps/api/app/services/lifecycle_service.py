@@ -11,6 +11,7 @@ from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, Tourn
 from app.models.tournament import TournamentTeam
 from app.schemas.tournament import TournamentStartResponse
 from app.services.bracket_service import BracketService
+from app.services.revision import bump
 from app.services.tournament_service import TournamentService
 
 
@@ -28,6 +29,7 @@ class LifecycleService:
         tournament.registration_is_open = is_open
         tournament.registration_changed_at = datetime.now(UTC)
         await self.db.flush()
+        await bump(self.db, tournament_id, "tournament")
 
     async def set_checkin_open(self, tournament_id: UUID, is_open: bool) -> None:
         """Open or close check-in by hand, at any time before the start."""
@@ -39,6 +41,7 @@ class LifecycleService:
         tournament.checkin_is_open = is_open
         tournament.checkin_changed_at = datetime.now(UTC)
         await self.db.flush()
+        await bump(self.db, tournament_id, "tournament")
 
     async def start_tournament(self, tournament_id: UUID) -> TournamentStartResponse:
         """Start a tournament in one step.
@@ -67,6 +70,7 @@ class LifecycleService:
         await BracketService(self.db).generate_bracket(tournament_id, [e.team_id for e in playing])
         tournament.started_at = datetime.now(UTC)
         await self.db.flush()
+        await bump(self.db, tournament_id, "tournament", "teams", "bracket")
 
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])
 

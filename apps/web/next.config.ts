@@ -9,6 +9,10 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
 
 const nextConfig: NextConfig = {
   allowedDevOrigins,
+  experimental: {
+    // The live view is a stream that stays open (the API ends it after 10 minutes); the proxy default is 30 s
+    proxyTimeout: 12 * 60 * 1000,
+  },
   output: "standalone",
   async rewrites() {
     return [

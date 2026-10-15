@@ -19,6 +19,7 @@ from app.models.result import Result, ResultType
 from app.schemas.match import BracketResponse, MatchResponse, MatchStatus
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import round_one_pairings
+from app.services.revision import bump
 from app.services.tournament_service import TournamentService
 from fastapi import Depends
 from typing import Annotated
@@ -193,6 +194,7 @@ class BracketService:
             await self._advance_team(match.next_match_id, match.next_match_slot, winner_team_id)
 
         await self.db.flush()
+        await bump(self.db, tournament.id, "bracket", "tournament")
         return entry
 
 

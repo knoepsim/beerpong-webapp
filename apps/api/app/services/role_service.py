@@ -9,6 +9,7 @@ from app.models.user import User
 from fastapi import Depends
 from typing import Annotated
 from app.core.database import get_db
+from app.services.revision import bump
 
 
 class RoleService:
@@ -87,6 +88,7 @@ class RoleService:
             role=role,
         )
         self.db.add(new_role)
+        await bump(self.db, tournament_id, "roles")
         await self.db.flush()
         await self.db.refresh(new_role)
         return new_role
@@ -117,6 +119,7 @@ class RoleService:
             raise InsufficientRoleError("Cannot revoke a role of equal or higher rank")
 
         await self.db.delete(role_entry)
+        await bump(self.db, tournament_id, "roles")
 
 
     async def list_roles(self, tournament_id: UUID) -> list[TournamentUserRole]:
