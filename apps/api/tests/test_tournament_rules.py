@@ -53,7 +53,7 @@ async def setup(async_client: AsyncClient) -> Setup:
 
     resp = await async_client.post(
         "/tournaments",
-        json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public_listed"},
+        json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
         headers=headers[0],
     )
     s = Setup(async_client, headers, resp.json()["id"])

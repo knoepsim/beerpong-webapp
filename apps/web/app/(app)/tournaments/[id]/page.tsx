@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -9,15 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function LegacyTournamentRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const invite = searchParams.get("invite");
     api.tournaments
-      .get(id, invite)
-      .then((t) => router.replace(`/t/${t.slug}${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`))
+      .get(id)
+      .then((t) => router.replace(`/t/${t.slug}`))
       .catch(() => router.replace("/tournaments"));
-  }, [id, router, searchParams]);
+  }, [id, router]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-6">

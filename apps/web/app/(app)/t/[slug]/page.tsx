@@ -1,12 +1,12 @@
 "use client";
 
 import { use, useEffect, useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useCurrentUser } from "@/components/user-provider";
-import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam } from "@/types";
-import { TournamentRoleType, TournamentVisibility } from "@/types";
-import { Button, buttonVariants } from "@/components/ui/button";
+import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam, TournamentPreview } from "@/types";
+import { JoinPolicy, TournamentRoleType } from "@/types";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -21,17 +21,10 @@ import { TournamentTeamList } from "@/components/tournament-team-list";
 import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
 import { PreparationControls } from "@/components/preparation-controls";
+import { JoinTournament } from "@/components/join-tournament";
+import { TournamentPreviewCard } from "@/components/tournament-preview";
 import { MapPin, Calendar, Users, Trophy, Play, Share2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -44,13 +37,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Timeline,
   TimelineContent,
@@ -67,8 +53,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 export default function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const inviteToken = searchParams.get("invite");
   const { user } = useCurrentUser();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
@@ -77,18 +61,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   const [bracket, setBracket] = useState<Bracket | null>(null);
   const [roles, setRoles] = useState<TournamentUserRole[]>([]);
 
-  const [myTeams, setMyTeams] = useState<Team[]>([]); // for joining
+  // a stranger who may join sees this instead of the tournament
+  const [preview, setPreview] = useState<TournamentPreview | null>(null);
   const [tournamentTeams, setTournamentTeams] = useState<TournamentTeam[]>([]); // Teams in this tournament
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<number | null>(null);
 
-  // Dialog states
-  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
-  const [selectedTeamId, setSelectedTeamId] = useState<string>("");
-  const [isJoining, setIsJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
   
   const [isConfirmLoading, setIsConfirmLoading] = useState(false);
   const [confirmState, setConfirmState] = useState<{title: string, description?: string, action: () => Promise<void>} | null>(null);
@@ -102,19 +82,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
 
   const loadData = async () => {
     try {
-      const tData = await api.tournaments.getBySlug(slug, inviteToken);
-      const [rolesData, myTeamsData, tTeamsData] = await Promise.all([
-        api.roles.list(tData.id, inviteToken),
-        api.teams.list(), // currently list returns user teams
-        api.tournaments.getTeams(tData.id, inviteToken)
+      const tData = await api.tournaments.getBySlug(slug);
+      const [rolesData, tTeamsData] = await Promise.all([
+        api.roles.list(tData.id),
+        api.tournaments.getTeams(tData.id),
       ]);
       setTournament(tData);
+      setPreview(null);
       setRoles(rolesData);
-      setMyTeams(myTeamsData);
       setTournamentTeams(tTeamsData);
 
       try {
-        const bData = await api.tournaments.getBracket(tData.id, inviteToken);
+        const bData = await api.tournaments.getBracket(tData.id);
         if (bData && bData.matches.length > 0) {
           setBracket(bData);
         }
@@ -124,6 +103,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
       }
     } catch (err: unknown) {
       if (err instanceof ApiError) {
+        // a tournament that is not visible to me may still be open to join: show what a stranger may see
+        if (err.status === 404 || err.status === 403) {
+          setPreview(await api.tournaments.getPreview(slug).catch(() => null));
+        }
         setErrorCode(err.status);
         setError(err.message);
       } else {
@@ -161,23 +144,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     if (!user || !tournamentTeams.length) return null;
     return tournamentTeams.find(team => team.members.some(m => m.user_id === user.id)) || null;
   }, [user, tournamentTeams]);
-
-  const handleJoin = async () => {
-    if (!selectedTeamId) return;
-    setIsJoining(true);
-    setJoinError(null);
-    try {
-      await api.tournaments.join(tournamentId, selectedTeamId, inviteToken);
-      setJoinDialogOpen(false);
-      await loadData();
-      toast.success("Turnier erfolgreich beigetreten");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Beitreten";
-      setJoinError(message);
-    } finally {
-      setIsJoining(false);
-    }
-  };
 
   const handleLeave = () => {
     setConfirmState({
@@ -304,6 +270,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
       </div>
     );
   }
+  if (!tournament && preview) {
+    return (
+      <main className="mx-auto max-w-md px-4 pt-8 pb-20 space-y-4">
+        <TournamentPreviewCard preview={preview}>
+          {preview.registration_open && (
+            <JoinTournament tournamentId={preview.tournament_id} tournamentName={preview.name} onJoined={loadData} />
+          )}
+        </TournamentPreviewCard>
+      </main>
+    );
+  }
   if (errorCode === 403 || errorCode === 404) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center space-y-4">
@@ -341,7 +318,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
-              {(tournament?.visibility === TournamentVisibility.PUBLIC_LISTED || tournament?.visibility === TournamentVisibility.PUBLIC_UNLISTED) && (
+              {tournament.join_policy === JoinPolicy.OPEN && (
                 <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8" title="Turnier teilen">
                   <Share2 className="h-4 w-4 text-muted-foreground" />
                 </Button>
@@ -370,72 +347,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
             </div>
           </div>
           
-          {tournament.registration_open && !myTournamentTeam && (
-            <Dialog open={joinDialogOpen} onOpenChange={(open) => {
-              setJoinDialogOpen(open);
-              if (open) {
-                setJoinError(null);
-                if (myTeams.length === 1 && !selectedTeamId) {
-                  setSelectedTeamId(myTeams[0].id);
-                }
-              }
-            }}>
-              <DialogTrigger className={buttonVariants()}>
-                Mit Team beitreten
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Turnier beitreten</DialogTitle>
-                  <DialogDescription>
-                    Wähle ein Team, um an {tournament.name} teilzunehmen.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  {myTeams.length === 0 ? (
-                    <div className="text-center py-6 space-y-4">
-                      <p className="text-sm text-muted-foreground">
-                        Du bist in keinem Team. Gründe zuerst ein Team, um an Turnieren teilnehmen zu können.
-                      </p>
-                      <Button variant="outline" onClick={() => router.push("/teams")}>
-                        Zu meinen Teams
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Dein Team</Label>
-                        <Select value={selectedTeamId} onValueChange={(val) => setSelectedTeamId(val || "")}>
-                          <SelectTrigger>
-                            <span className={selectedTeamId ? "text-foreground" : "text-muted-foreground"}>
-                              {selectedTeamId ? myTeams.find(t => t.id === selectedTeamId)?.name : "Team auswählen…"}
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {myTeams.map((t) => (
-                              <SelectItem key={t.id} value={t.id}>
-                                {t.name} {!t.is_complete && "(Unvollständig)"}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button 
-                        className="w-full" 
-                        onClick={handleJoin} 
-                        disabled={!selectedTeamId || isJoining}
-                      >
-                        {isJoining ? "Beitreten…" : "Jetzt teilnehmen"}
-                      </Button>
-                      {joinError && (
-                        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                          {joinError}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
+          {tournament.registration_open && !myTournamentTeam && !canManage && (
+            tournament.join_policy === JoinPolicy.OPEN ? (
+              <JoinTournament tournamentId={tournament.id} tournamentName={tournament.name} onJoined={loadData} />
+            ) : (
+              <p className="text-sm text-muted-foreground md:max-w-xs">
+                Beitreten kannst du nur mit einem Einladungslink vom Veranstalter.
+              </p>
+            )
           )}
 
           {!tournament.started_at && myTournamentTeam && (

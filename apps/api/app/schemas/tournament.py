@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.tournament import TournamentMode, TournamentPhase, TournamentVisibility
+from app.models.tournament import JoinPolicy, TournamentMode, TournamentPhase, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType
 from app.schemas.team import TeamResponse
 
@@ -21,7 +21,8 @@ class TournamentCreate(BaseModel):
     checkin_auto_open: bool = False
     table_count: int = Field(default=1, ge=1, le=100)
     mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION
-    visibility: TournamentVisibility = TournamentVisibility.PRIVATE
+    visibility: TournamentVisibility = TournamentVisibility.PUBLIC
+    join_policy: JoinPolicy = JoinPolicy.OPEN
 
 
 class TournamentUpdate(BaseModel):
@@ -38,6 +39,7 @@ class TournamentUpdate(BaseModel):
     checkin_auto_open: bool | None = None
     table_count: int | None = Field(default=None, ge=1, le=100)
     visibility: TournamentVisibility | None = None
+    join_policy: JoinPolicy | None = None
 
 
 class TournamentResponse(BaseModel):
@@ -61,6 +63,7 @@ class TournamentResponse(BaseModel):
     table_count: int
     mode: TournamentMode
     visibility: TournamentVisibility
+    join_policy: JoinPolicy
     is_deleted: bool
     created_by_id: UUID
     created_at: datetime
@@ -81,11 +84,29 @@ class TournamentJoinRequest(BaseModel):
     invite_token: str | None = None
 
 
-class TournamentInviteResponse(BaseModel):
-    """Response containing the invite link token."""
-    token: str
+class InviteCreate(BaseModel):
+    """Request body for a new invitation link."""
+    label: str | None = Field(default=None, max_length=60)
 
-    model_config = {"from_attributes": True}
+
+class InviteResponse(BaseModel):
+    """An invitation link of a tournament with the number of teams that joined through it."""
+    id: UUID
+    token: str
+    label: str | None
+    created_at: datetime
+    uses: int
+
+
+class TournamentPreview(BaseModel):
+    """What a stranger may see of a tournament before joining: enough to decide, nothing about the participants."""
+    tournament_id: UUID
+    slug: str
+    name: str
+    location: str | None
+    start_time: datetime | None
+    registration_open: bool
+    join_policy: JoinPolicy
 
 
 class ParticipatingTournament(BaseModel):

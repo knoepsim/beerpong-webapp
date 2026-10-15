@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { MyTournamentsResponse } from "@/types";
-import { TournamentVisibility } from "@/types";
+import { JoinPolicy, TournamentVisibility } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Form,
   FormControl,
   FormField,
@@ -35,6 +28,7 @@ import {
 } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react";
+import { AccessFields } from "@/components/access-fields";
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
@@ -48,6 +42,7 @@ const createTournamentSchema = z.object({
   description: z.string().optional(),
   table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(20, "Maximal 20 Tische."),
   visibility: z.nativeEnum(TournamentVisibility),
+  join_policy: z.nativeEnum(JoinPolicy),
 });
 
 const EMPTY_SCHEDULE: ScheduleValues = {
@@ -96,7 +91,8 @@ export default function TournamentsPage() {
       location: "",
       description: "",
       table_count: 1,
-      visibility: TournamentVisibility.PRIVATE,
+      visibility: TournamentVisibility.PUBLIC,
+      join_policy: JoinPolicy.OPEN,
     },
   });
 
@@ -130,6 +126,7 @@ export default function TournamentsPage() {
         ...scheduleToPayload(schedule),
         table_count: values.table_count,
         visibility: values.visibility,
+        join_policy: values.join_policy,
       });
       setDialogOpen(false);
       form.reset();
@@ -278,37 +275,15 @@ export default function TournamentsPage() {
                     )}
                   />
                   
-                  <FormField
-                    control={form.control}
-                    name="visibility"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sichtbarkeit</FormLabel>
-                        <Select 
-                          onValueChange={field.onChange} 
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Wähle die Sichtbarkeit" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value={TournamentVisibility.PRIVATE}>
-                              Privat
-                            </SelectItem>
-                            <SelectItem value={TournamentVisibility.PUBLIC_LISTED}>
-                              Öffentlich
-                            </SelectItem>
-                            <SelectItem value={TournamentVisibility.PUBLIC_UNLISTED}>
-                              Nicht gelistet
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-4 sm:col-span-2">
+                    <AccessFields
+                      values={{ visibility: form.watch("visibility"), join_policy: form.watch("join_policy") }}
+                      onChange={(patch) => {
+                        if (patch.visibility) form.setValue("visibility", patch.visibility);
+                        if (patch.join_policy) form.setValue("join_policy", patch.join_policy);
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}

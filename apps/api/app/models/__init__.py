@@ -6,11 +6,13 @@ from app.models.result import Result, ResultType
 from app.models.sms_verification import SmsVerification
 from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
-from app.models.tournament import Tournament, TournamentMode, TournamentTeam, TournamentVisibility
+from app.models.tournament import JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
+from app.models.tournament_invite import TournamentInvite
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.models.user import User
 
 __all__ = [
+    "JoinPolicy",
     "Match",
     "RefreshToken",
     "Result",
@@ -20,6 +22,7 @@ __all__ = [
     "TeamInvite",
     "TeamMember",
     "Tournament",
+    "TournamentInvite",
     "TournamentMode",
     "TournamentTeam",
     "TournamentRoleType",

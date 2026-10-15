@@ -22,7 +22,7 @@ class Ctx:
     team_ids: list[str] = field(default_factory=list)
 
     async def create(self, **overrides) -> str:
-        body = {"name": "Cup", "start_time": FUTURE, "visibility": "public_listed", **overrides}
+        body = {"name": "Cup", "start_time": FUTURE, "visibility": "public", **overrides}
         resp = await self.client.post("/tournaments", json=body, headers=self.admin)
         assert resp.status_code == 201, resp.text
         return resp.json()["id"]

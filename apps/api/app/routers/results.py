@@ -98,10 +98,9 @@ async def list_results(
     match_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
-    invite: str | None = None,
 ):
     match = await _get_match(db, match_id)
-    await TournamentService(db).get_tournament_for_user(match.tournament_id, current_user.id, invite)
+    await TournamentService(db).get_tournament_for_user(match.tournament_id, current_user.id)
     result = await db.execute(
         select(Result)
         .options(joinedload(Result.reported_by_user))

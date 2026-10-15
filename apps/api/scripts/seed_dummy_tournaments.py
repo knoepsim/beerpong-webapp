@@ -185,7 +185,7 @@ async def create_tournament(
             start_time=datetime.now(UTC) + timedelta(hours=4 if state == "registration" else 1),
             **_schedule(state),
             table_count=8,
-            visibility=TournamentVisibility.PUBLIC_LISTED,
+            visibility=TournamentVisibility.PUBLIC,
         ),
         owner.id,
     )

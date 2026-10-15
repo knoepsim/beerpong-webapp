@@ -3,14 +3,13 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-import secrets
-import string
 
 from app.core.exceptions import (
     NotFoundError,
     PlayerAlreadyInTournamentError,
     CheckinDisabledError,
     CheckinNotOpenError,
+    InviteRequiredError,
     RegistrationClosedError,
     SlugTakenError,
     TeamNotCompleteError,
@@ -19,10 +18,11 @@ from app.core.exceptions import (
 )
 from app.core.slug import MAX_LENGTH, normalize_slug, random_slug, slugify
 from app.models.team import Team, TeamMember
-from app.models.tournament import Tournament, TournamentTeam
+from app.models.tournament import JoinPolicy, Tournament, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
 from app.schemas.tournament import TournamentCreate, TournamentUpdate
+from app.services.invite_service import InviteService
 from app.services.schedule import validate_schedule
 from app.services.team_service import TeamService
 from fastapi import Depends
@@ -52,6 +52,8 @@ class TournamentService:
             role=TournamentRoleType.ADMIN,
         )
         self.db.add(admin_role)
+        if tournament.join_policy == JoinPolicy.INVITE_ONLY:
+            await InviteService(self.db).ensure_one(tournament.id, creator_id)
 
         return tournament
 
@@ -93,17 +95,11 @@ class TournamentService:
             raise TournamentDeletedError()
         return tournament
 
-    async def get_tournament_for_user(
-        self, tournament_id: UUID, user_id: UUID, invite_token: str | None = None
-    ) -> Tournament:
-        """Get tournament with visibility checks."""
+    async def get_tournament_for_user(self, tournament_id: UUID, user_id: UUID) -> Tournament:
+        """Get a tournament if the user may see it: public ones by everybody, private ones by helpers and participants."""
         tournament = await self.get_tournament(tournament_id)
 
-        from app.models.tournament import TournamentVisibility
-        if tournament.visibility != TournamentVisibility.PRIVATE:
-            return tournament
-
-        if invite_token and tournament.invite_token and invite_token == tournament.invite_token:
+        if tournament.visibility == TournamentVisibility.PUBLIC:
             return tournament
 
         role = await self.db.execute(
@@ -181,18 +177,17 @@ class TournamentService:
             }
         )
 
-        return await tournament_repository.update(self.db, db_obj=tournament, obj_in=update_data)
+        updated = await tournament_repository.update(self.db, db_obj=tournament, obj_in=update_data)
+        if updated.join_policy == JoinPolicy.INVITE_ONLY:
+            await InviteService(self.db).ensure_one(updated.id, updated.created_by_id)
+            await self.db.refresh(updated)  # the flush reloaded server-side columns (updated_at)
+        return updated
 
 
     async def delete_tournament(self, tournament_id: UUID) -> None:
         """Soft delete a tournament."""
         tournament = await self.get_tournament(tournament_id)
         await tournament_repository.update(self.db, db_obj=tournament, obj_in={"is_deleted": True})
-
-
-    async def list_tournaments(self, user_id: UUID) -> list[Tournament]:
-        """List all visible tournaments."""
-        return await tournament_repository.list_visible_for_user(self.db, user_id)
 
 
     async def get_my_tournaments(self, user_id: UUID) -> dict:
@@ -228,10 +223,9 @@ class TournamentService:
         if not tournament.registration_open:
             raise RegistrationClosedError()
 
-        from app.models.tournament import TournamentVisibility
-        if tournament.visibility == TournamentVisibility.PRIVATE:
-            if not tournament.invite_token or invite_token != tournament.invite_token:
-                raise HTTPException(status_code=403, detail="Invalid or missing invite token for private tournament.")
+        invite = await InviteService(self.db).find(tournament_id, invite_token)
+        if tournament.join_policy == JoinPolicy.INVITE_ONLY and invite is None:
+            raise InviteRequiredError()
 
         team = await TeamService(self.db).get_team(team_id)
         member_count = await TeamService(self.db).get_team_member_count(team_id)
@@ -253,7 +247,7 @@ class TournamentService:
             if existing.scalar_one_or_none() is not None:
                 raise PlayerAlreadyInTournamentError()
 
-        entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id)
+        entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id, invite_id=invite.id if invite else None)
         self.db.add(entry)
         return entry
 
@@ -266,18 +260,6 @@ class TournamentService:
             .where(TournamentTeam.tournament_id == tournament_id)
         )
         return list(result.all())
-
-    async def generate_invite_token(self, tournament_id: UUID) -> str:
-        """Generate a new invite token for a tournament."""
-        tournament = await self.get_tournament(tournament_id)
-        alphabet = string.ascii_letters + string.digits
-        token = "".join(secrets.choice(alphabet) for _ in range(32))
-        
-        tournament.invite_token = token
-        self.db.add(tournament)
-        return token
-
-
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
         """Withdraw a team from a tournament before it starts."""
@@ -358,11 +340,9 @@ async def get_accessible_tournament(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     service: Annotated[TournamentService, Depends(get_tournament_service)],
-    invite: str | None = None,
 ) -> Tournament:
     """Dependency for every read endpoint of a tournament: enforces the visibility rules.
 
-    Private tournaments are only accessible to role holders, participants and holders of
-    the invite token (passed as ?invite=...).
+    Private tournaments are only accessible to role holders and participants.
     """
-    return await service.get_tournament_for_user(tournament_id, current_user.id, invite)
+    return await service.get_tournament_for_user(tournament_id, current_user.id)

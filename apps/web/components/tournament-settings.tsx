@@ -4,12 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
+import { AccessFields } from "@/components/access-fields";
+import { InviteLinks } from "@/components/invite-links";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
-import { TournamentRoleType } from "@/types";
+import { JoinPolicy, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert, Link, Copy, Check } from "lucide-react";
+import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,9 +58,6 @@ export function TournamentSettings({
   const [isAssigning, setIsAssigning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
-  const [inviteLink, setInviteLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const [confirmState, setConfirmState] = useState<{
     title: string;
@@ -72,6 +71,7 @@ export function TournamentSettings({
   const [editDescription, setEditDescription] = useState(tournament.description || "");
   const [editTableCount, setEditTableCount] = useState(tournament.table_count.toString());
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
+  const [editJoinPolicy, setEditJoinPolicy] = useState(tournament.join_policy);
   const [editSlug, setEditSlug] = useState(tournament.slug);
   const [slugError, setSlugError] = useState<string | null>(null);
   const initialSchedule: ScheduleValues = {
@@ -92,6 +92,7 @@ export function TournamentSettings({
     editDescription !== (tournament.description || "") ||
     editTableCount !== tournament.table_count.toString() ||
     editVisibility !== tournament.visibility ||
+    editJoinPolicy !== tournament.join_policy ||
     editSlug !== tournament.slug ||
     (Object.keys(initialSchedule) as (keyof ScheduleValues)[]).some((k) => schedule[k] !== initialSchedule[k]);
 
@@ -106,6 +107,7 @@ export function TournamentSettings({
         description: editDescription || undefined,
         table_count: parseInt(editTableCount) || 1,
         visibility: editVisibility,
+        join_policy: editJoinPolicy,
         start_time: toIsoOrNull(schedule.start_time) ?? undefined,
         ...scheduleToPayload(schedule),
       });
@@ -152,23 +154,6 @@ export function TournamentSettings({
       toast.error(msg);
     } finally {
       setIsAssigning(false);
-    }
-  };
-
-  const handleGenerateInvite = async () => {
-    setIsGeneratingInvite(true);
-    try {
-      const res = await api.tournaments.generateInvite(tournament.id);
-      const link = `${window.location.origin}/t/${tournament.slug}?invite=${res.token}`;
-      setInviteLink(link);
-      await navigator.clipboard.writeText(link);
-      setCopied(true);
-      toast.success("Link kopiert!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err: unknown) {
-      toast.error("Fehler beim Generieren des Einladungslinks");
-    } finally {
-      setIsGeneratingInvite(false);
     }
   };
 
@@ -254,18 +239,14 @@ export function TournamentSettings({
                 <Label>Anzahl Tische</Label>
                 <Input type="number" min="1" value={editTableCount} onChange={e => setEditTableCount(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Sichtbarkeit</Label>
-                <Select value={editVisibility} onValueChange={(v: any) => setEditVisibility(v)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public_listed">Öffentlich (sichtbar für alle)</SelectItem>
-                    <SelectItem value="private">Privat (nur mit Link/Einladung)</SelectItem>
-                    <SelectItem value="public_unlisted">Versteckt (nur mit Link)</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="md:col-span-2">
+                <AccessFields
+                  values={{ visibility: editVisibility, join_policy: editJoinPolicy }}
+                  onChange={(patch) => {
+                    if (patch.visibility) setEditVisibility(patch.visibility);
+                    if (patch.join_policy) setEditJoinPolicy(patch.join_policy);
+                  }}
+                />
               </div>
             </div>
             <TournamentScheduleFields
@@ -308,36 +289,17 @@ export function TournamentSettings({
         </Card>
       )}
 
-      {tournament.visibility === "private" && (userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
+      {tournament.join_policy === JoinPolicy.INVITE_ONLY && (userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
         <Card>
           <CardHeader>
-            <CardTitle>Einladungslink (Privates Turnier)</CardTitle>
+            <CardTitle>Einladungslinks</CardTitle>
             <CardDescription>
-              Da dieses Turnier privat ist, können Teams nur mit einem Einladungslink beitreten.
+              Wer einen dieser Links öffnet, kann dem Turnier mit einem Team beitreten. Lege für jeden Kanal einen
+              eigenen Link an und sieh, wie viele Teams darüber gekommen sind.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleGenerateInvite}
-                disabled={isGeneratingInvite}
-                variant="secondary"
-                className="w-full sm:w-auto"
-              >
-                {isGeneratingInvite ? (
-                  "Generiere..."
-                ) : copied ? (
-                  <><Check className="mr-2 h-4 w-4" /> Kopiert</>
-                ) : (
-                  <><Link className="mr-2 h-4 w-4" /> Link generieren & kopieren</>
-                )}
-              </Button>
-            </div>
-            {inviteLink && (
-              <div className="mt-4 p-3 bg-muted rounded-md text-sm break-all font-mono">
-                {inviteLink}
-              </div>
-            )}
+            <InviteLinks tournamentId={tournament.id} />
           </CardContent>
         </Card>
       )}

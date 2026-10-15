@@ -112,7 +112,7 @@ async def test_player_cannot_enter_a_tournament_with_two_teams_concurrently(clie
     tid = (
         await client.post(
             "/tournaments",
-            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public_listed"},
+            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
             headers=admin,
         )
     ).json()["id"]
@@ -135,7 +135,7 @@ async def test_match_result_cannot_be_reported_twice_concurrently(client: AsyncC
     tid = (
         await client.post(
             "/tournaments",
-            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public_listed"},
+            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
             headers=admin,
         )
     ).json()["id"]

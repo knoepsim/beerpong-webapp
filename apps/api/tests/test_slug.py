@@ -56,7 +56,7 @@ async def organizer(async_client: AsyncClient) -> dict:
 
 async def _create(client: AsyncClient, headers: dict, name: str) -> dict:
     resp = await client.post(
-        "/tournaments", json={"name": name, "start_time": FUTURE, "visibility": "public_listed"}, headers=headers
+        "/tournaments", json={"name": name, "start_time": FUTURE, "visibility": "public"}, headers=headers
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
