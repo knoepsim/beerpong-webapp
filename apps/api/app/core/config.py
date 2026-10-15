@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     sms_max_requests_per_hour: int = 5
     sms_max_verify_attempts: int = 5
 
+    # Browser origins that may call the API directly (comma separated). Outside production, any http(s) origin is
+    # allowed on top of this, so a phone in the same network works without configuration.
+    cors_origins: str = "http://localhost:3000"
+
     # Set ENVIRONMENT=production to refuse insecure defaults (dummy SMS, default secret key)
     environment: str = "development"
 
