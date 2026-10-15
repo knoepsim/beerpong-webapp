@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.routers import admin, auth, invites, results, roles, teams, tournaments, users
 
@@ -12,8 +13,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_origin_regex="https?://.*", # Erlaubt Zugriff von lokalen IPs (Handy)
+    allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
+    # development: also local IPs (phone in the same network); production: only the configured origins
+    allow_origin_regex=None if settings.environment == "production" else "https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
