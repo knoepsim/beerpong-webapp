@@ -44,10 +44,10 @@ class Subscription:
         self._pending[event.name] = _merge(event.name, old, event.data) if old is not None else event.data
         self._ready.set()
 
-    async def next(self, timeout: float) -> Event | None:
-        """The next event, or None if nothing happened within `timeout` seconds."""
+    async def next(self, idle_seconds: float) -> Event | None:
+        """The next event, or None if nothing happened within `idle_seconds`."""
         try:
-            async with asyncio.timeout(timeout):
+            async with asyncio.timeout(idle_seconds):
                 await self._ready.wait()
         except TimeoutError:
             return None
