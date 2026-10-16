@@ -19,7 +19,8 @@ describe('BracketView', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
     const round1 = screen.getByRole('region', { name: 'Viertelfinale' });
 
-    expect(within(round1).getAllByText('Freilos')).toHaveLength(3);
+    expect(within(round1).getAllByRole('article', { name: /Freilos/ })).toHaveLength(3);
+    expect(within(round1).queryByText('Freilos')).not.toBeInTheDocument(); // the box with the team says enough
     expect(within(round1).getByRole('article', { name: /Team 1, Freilos/ })).toBeInTheDocument();
   });
 

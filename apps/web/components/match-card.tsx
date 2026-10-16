@@ -86,13 +86,13 @@ export function ByeCard({
   return (
     <article
       className={cn(
-        "w-full rounded-lg border border-dashed bg-card/60 px-2 py-1.5 text-[13px] leading-none",
+        "w-full rounded-lg border border-dashed bg-card/60 px-2 py-2 text-[13px] leading-none",
         mine && "ring-2 ring-primary/60 bg-primary/10",
       )}
       aria-label={`${name}, Freilos: ohne Spiel direkt in der nächsten Runde`}
     >
-      <p className="text-xs leading-4 text-muted-foreground">Freilos</p>
-      <p className="truncate font-medium pt-1">{name}</p>
+      {/* just the team: the dashed box without a match says enough; screen readers hear "Freilos" */}
+      <p className="truncate font-medium">{name}</p>
     </article>
   );
 }
