@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import { useCurrentUser } from "./user-provider";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { clearTokens } from "@/lib/auth";
+import { logout } from "@/lib/auth";
 
 const navItems = [
   { href: "/tournaments", label: "Turniere", icon: Trophy },
@@ -87,10 +87,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     className="cursor-pointer text-destructive focus:text-destructive"
-                    onClick={() => {
-                      clearTokens();
-                      window.location.href = "/login";
-                    }}
+                    onClick={() => void logout()}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     Abmelden

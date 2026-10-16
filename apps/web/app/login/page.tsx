@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { clearTokens, getRedirectParam, setTokens } from "@/lib/auth";
+import { getRedirectParam } from "@/lib/auth";
 import { RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,10 +76,9 @@ export default function LoginPage() {
     setIsLoading(true);
     setApiError(null);
     try {
-      const result = await api.auth.verify(toE164(currentPhone), values.code);
-      setTokens(result.access_token, result.refresh_token);
-      
-      const user = await api.users.me();
+      await api.auth.verify(toE164(currentPhone), values.code);
+
+            const user = await api.users.me();
       const redirectUrl = getRedirectParam();
       
       if (!user.email || !user.name || user.name === user.phone_number) {
@@ -254,7 +253,7 @@ export default function LoginPage() {
                   variant="outline" 
                   className="w-full" 
                   onClick={() => {
-                    clearTokens();
+                    void api.auth.logout().catch(() => undefined);
                     setStep("phone");
                     setCurrentPhone("");
                     phoneForm.reset();

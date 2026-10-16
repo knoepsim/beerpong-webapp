@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { clearTokens } from "@/lib/auth";
+import { logout } from "@/lib/auth";
 import { useCurrentUser } from "@/components/user-provider";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -114,10 +114,7 @@ export default function ProfilePage() {
     }
   };
 
-  const handleLogout = () => {
-    clearTokens();
-    window.location.href = "/login";
-  };
+  const handleLogout = () => void logout();
 
   async function onSubmitPhone(values: z.infer<typeof phoneSchema>) {
     setIsPhoneLoading(true);
