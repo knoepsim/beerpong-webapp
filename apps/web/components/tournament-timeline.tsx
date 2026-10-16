@@ -83,7 +83,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
               {/* Connector + circle: horizontal on desktop, vertical on mobile */}
               <div className="flex sm:flex-row flex-col items-center sm:w-full self-stretch sm:self-auto">
                 <div
-                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[1rem] ${i === 0 ? "opacity-0" : steps[i - 1].done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${i === 0 ? "opacity-0" : steps[i - 1].done ? "bg-primary" : "bg-border"}`}
                 />
                 <div
                   className={`relative z-10 flex items-center justify-center size-9 rounded-full border-2 shrink-0 text-base transition-colors ${
@@ -97,7 +97,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
                   <span aria-hidden="true">{step.done ? "✓" : step.icon}</span>
                 </div>
                 <div
-                  className={`sm:h-1 sm:flex-1 w-1 flex-1 min-h-[1rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
                 />
               </div>
 
