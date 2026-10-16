@@ -1,5 +1,10 @@
 """The table planner on its own: who plays next and where."""
-from app.services.table_planner import PlanMatch, assign_free_tables, certain_next_tables, plan
+from app.services.table_planner import (
+    PlanMatch,
+    assign_free_tables,
+    certain_next_tables,
+    plan,
+)
 
 TABLES = ["T1", "T2"]
 
