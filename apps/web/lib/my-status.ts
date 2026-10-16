@@ -1,5 +1,6 @@
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { formatWhen } from "@/lib/format-when";
+import { minutesSince } from "@/lib/minutes";
 import type { Match, Team, Tournament, TournamentTeam } from "@/types";
 
 /**
@@ -69,7 +70,7 @@ export function statusBeforeStart(tournament: Tournament, team: TournamentTeam, 
 /** ", seit 8 Minuten" for a running match (real data, no forecast: everybody knows how long a match takes). */
 function runningFor(startedAt: string | null, now: Date): string {
   if (!startedAt) return "";
-  const minutes = Math.floor((now.getTime() - Date.parse(startedAt)) / 60_000);
+  const minutes = minutesSince(startedAt, now);
   if (minutes < 1) return ", gerade gestartet";
   return minutes === 1 ? ", seit 1 Minute" : `, seit ${minutes} Minuten`;
 }

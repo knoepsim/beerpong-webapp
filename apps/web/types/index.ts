@@ -199,6 +199,8 @@ export interface Match {
   /** A match still waiting for a team whose table is already certain (towards the end, when nothing queues). */
   upcoming_table_id: string | null;
   upcoming_table_name: string | null;
+  /** Since when it is at its table (ready or live). */
+  on_table_at: string | null;
   /** When it was started at its table (only while live). */
   started_at: string | null;
   created_at: string;

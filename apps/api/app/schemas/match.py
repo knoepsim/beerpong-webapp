@@ -32,6 +32,8 @@ class MatchResponse(BaseModel):
     # a match still waiting for a team whose table is already certain (towards the end, when nothing queues)
     upcoming_table_id: UUID | None = None
     upcoming_table_name: str | None = None
+    # since when it is at its table (ready or live): a long wait without a start shows teams that do not come
+    on_table_at: datetime | None = None
     started_at: datetime | None = None
     created_at: datetime
     status: MatchStatus = MatchStatus.WAITING

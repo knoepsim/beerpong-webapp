@@ -14,6 +14,8 @@ interface MatchRowProps {
   highlightTeamId?: string | null;
   /** Organizers open the result dialog by clicking a match. */
   onClick?: (match: Match) => void;
+  /** Without the right-hand side, where status and table are shown around the row already (the tables tab). */
+  aside?: boolean;
 }
 
 /** The right-hand side of a row: the status and the table to go to, or the cups of a finished match. */
@@ -36,7 +38,7 @@ function Aside({ match }: Readonly<{ match: Match }>) {
  * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out; "Bereit" and
  * the table only exist for matches that can be played; the cups only for finished ones.
  */
-export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchRowProps>) {
+export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick, aside = true }: Readonly<MatchRowProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
 
@@ -67,7 +69,7 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
           </div>
         ))}
       </div>
-      <Aside match={match} />
+      {aside && <Aside match={match} />}
     </>
   );
   const summary = matchSummary(slot, sides, teamsMap);

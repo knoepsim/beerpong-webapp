@@ -67,7 +67,7 @@ class TableService:
         )
         self.db.add(table)
         await self.db.flush()
-        await self._replan(tournament_id)
+        await self._changed(tournament_id)
         return table
 
     async def rename(self, tournament_id: UUID, table_id: UUID, name: str) -> TournamentTable:
@@ -77,6 +77,7 @@ class TableService:
         self._ensure_free(chosen, others)
         table.name = chosen
         await self.db.flush()
+        await self._changed(tournament_id, replan=False)
         return table
 
     async def delete(self, tournament_id: UUID, table_id: UUID) -> None:
@@ -90,19 +91,19 @@ class TableService:
             raise LastTableError()
         await self.db.delete(table)
         await self.db.flush()
-        await self._replan(tournament_id)
+        await self._changed(tournament_id)
 
-    async def _replan(self, tournament_id: UUID) -> None:
-        """A table more or less changes who plays where (only while the tournament runs)."""
+    async def _changed(self, tournament_id: UUID, replan: bool = True) -> None:
+        """Every change of the tables is shown live; a table more or less also changes who plays where (once started)."""
         # imported here: the bracket uses the tables
         from app.services.bracket_service import BracketService
         from app.services.revision import bump
         from app.services.tournament_service import TournamentService
 
         tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
-        if tournament.is_started:
+        if replan and tournament.is_started:
             await BracketService(self.db).assign_tables(tournament_id)
-            await bump(self.db, tournament_id, "bracket")
+        await bump(self.db, tournament_id, "bracket")
 
     async def _get(self, tournament_id: UUID, table_id: UUID) -> TournamentTable:
         result = await self.db.execute(

@@ -4,7 +4,7 @@ import { use, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useCurrentUser } from "@/components/user-provider";
-import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam, TournamentPreview } from "@/types";
+import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam, TournamentPreview, TournamentTable } from "@/types";
 import { JoinPolicy, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { BracketView } from "@/components/bracket-view";
 import { MatchList } from "@/components/match-list";
 import { ParticipantStatus } from "@/components/participant-status";
+import { TablesBoard } from "@/components/tables-board";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
@@ -56,6 +57,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   // a stranger who may join sees this instead of the tournament
   const [preview, setPreview] = useState<TournamentPreview | null>(null);
   const [tournamentTeams, setTournamentTeams] = useState<TournamentTeam[]>([]); // Teams in this tournament
+  const [tables, setTables] = useState<TournamentTable[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,14 +77,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   const loadData = async () => {
     try {
       const tData = await api.tournaments.getBySlug(slug);
-      const [rolesData, tTeamsData] = await Promise.all([
+      const [rolesData, tTeamsData, tablesData] = await Promise.all([
         api.roles.list(tData.id),
         api.tournaments.getTeams(tData.id),
+        api.tournaments.listTables(tData.id),
       ]);
       setTournament(tData);
       setPreview(null);
       setRoles(rolesData);
       setTournamentTeams(tTeamsData);
+      setTables(tablesData);
 
       try {
         const bData = await api.tournaments.getBracket(tData.id);
@@ -121,9 +125,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     const load: Record<LiveScope, () => Promise<void>> = {
       tournament: async () => setTournament(await api.tournaments.getBySlug(slug)),
       teams: async () => setTournamentTeams(await api.tournaments.getTeams(id)),
+      // the tables belong to the bracket: who plays where
       bracket: async () => {
-        const data = await api.tournaments.getBracket(id);
+        const [data, tablesData] = await Promise.all([api.tournaments.getBracket(id), api.tournaments.listTables(id)]);
         setBracket(data.matches.length > 0 ? data : null);
+        setTables(tablesData);
       },
       roles: async () => setRoles(await api.roles.list(id)),
     };
@@ -384,6 +390,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
+          {bracket && <TabsTrigger value="tables" className="flex-1">Tische</TabsTrigger>}
           <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
         </TabsList>
         {canManage && (
@@ -502,6 +509,19 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
             </CardContent>
           </Card>
         </TabsContent>
+
+        {bracket && (
+          <TabsContent value="tables" className="mt-6">
+            <TablesBoard
+              bracket={bracket}
+              tables={tables}
+              teamsMap={teamsMap}
+              highlightTeamId={myTournamentTeam?.id}
+              onResult={canReferee ? handleMatchClick : undefined}
+              onChanged={() => refresh(["bracket"])}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="teams" className="mt-6 space-y-4">
           {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
