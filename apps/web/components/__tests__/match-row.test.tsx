@@ -29,17 +29,19 @@ describe('MatchRow', () => {
     expect(container.textContent).not.toMatch(/Tisch/)
   })
 
-  it('shows every piece of information once: winner bold, loser dimmed and crossed out, cups, no table', () => {
+  it('shows every piece of information once: winner bold, loser dimmed and crossed out, the score, no table', () => {
     render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
 
-    const winner = screen.getByText('Bravo').closest('div')!
-    const loser = screen.getByText('Alpha').closest('div')!
+    const winner = screen.getByText('Bravo')
+    const loser = screen.getByText('Alpha')
     expect(winner.className).toContain('font-semibold')
     expect(winner.className).not.toContain('line-through')
     expect(loser.className).toContain('line-through')
-    expect(loser.className).toContain('text-muted-foreground')
+    expect(loser.closest('div')!.className).toContain('text-muted-foreground')
 
-    expect(screen.getByText('4 Becher übrig')).toBeInTheDocument()
+    expect(winner.parentElement).toHaveTextContent(/Bravo4$/)
+    expect(loser.parentElement).toHaveTextContent(/Alpha0$/)
+    expect(screen.queryByText(/Becher/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Gewinner')).not.toBeInTheDocument() // no extra check mark
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument()
     expect(screen.queryByText('Bereit')).not.toBeInTheDocument()

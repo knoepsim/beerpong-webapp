@@ -11,11 +11,11 @@ describe('Schedule', () => {
     expect(screen.getByRole('region', { name: 'Halbfinale' })).toBeInTheDocument() // the tree
 
     fireEvent.click(screen.getByRole('tab', { name: 'Liste' }))
-    expect(screen.queryByText('3 Becher übrig')).not.toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: /3 Becher übrig/ })).not.toBeInTheDocument()
     expect(screen.getByText('Team 2')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Beendete Spiele (1)' }))
-    expect(screen.getByText('3 Becher übrig')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /3 Becher übrig/ })).toBeInTheDocument()
   })
 
   it('tells organizers what tapping a match does, players get no hint', () => {

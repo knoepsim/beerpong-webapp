@@ -3,7 +3,7 @@ import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { MatchTable } from "@/components/match-table";
-import { describeSides, matchSummary, sideTone, statusLabel } from "@/lib/match-display";
+import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchCardProps {
@@ -39,11 +39,6 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
         <MatchTable match={match} className="min-w-0" />
         <span className="flex-1" />
         <MatchStatusBadge match={match} />
-        {match.status === "finished" && (
-          <span className="shrink-0" title="Becher, die dem Sieger übrig blieben">
-            {statusLabel(match)}
-          </span>
-        )}
       </div>
       {sides.map((side) => (
         <div

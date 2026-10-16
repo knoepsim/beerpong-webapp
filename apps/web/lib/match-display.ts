@@ -24,6 +24,8 @@ export interface SideInfo {
   isChampion: boolean;
   /** Played and lost: shown as disabled. */
   isLoser: boolean;
+  /** Cups the team had left at the end (the winner its cups, the loser none); null before the result. */
+  score: number | null;
 }
 
 const teamName = (teamsMap: Record<string, Team>, id: string | null) =>
@@ -48,6 +50,7 @@ export function describeSides(
       isWinner,
       isChampion: id !== null && id === championTeamId,
       isLoser: finished && id !== null && !isWinner,
+      score: finished && match.cups_left != null && id !== null ? (isWinner ? match.cups_left : 0) : null,
     };
   };
   return [build("a", match.team_a_id, sources.a), build("b", match.team_b_id, sources.b)];

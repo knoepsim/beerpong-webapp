@@ -18,7 +18,7 @@ describe('MatchList', () => {
 
   it('shows results, the table of playable matches and the open sources', () => {
     render(<MatchList bracket={fiveTeamBracket({ m1: finished('t4', 6) })} teamsMap={fiveTeams} />)
-    expect(screen.getByText('6 Becher übrig')).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /6 Becher übrig/ })).toBeInTheDocument()
     expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1) // only match 3 is ready
     expect(screen.getByText('Sieger Spiel 2')).toBeInTheDocument()
   })

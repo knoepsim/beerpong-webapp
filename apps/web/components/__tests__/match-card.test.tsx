@@ -54,12 +54,13 @@ describe('MatchCard', () => {
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
   });
 
-  it('marks the winner with an icon and text, not only a color, and shows the cups left', () => {
+  it('shows the score like a scoreboard: cups left next to each team, winner bold, loser crossed out', () => {
     render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 3 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('3 Becher')).toBeInTheDocument();
-    expect(screen.getAllByLabelText('Gewinner')).toHaveLength(1);
-    expect(screen.getByText('Bravo').closest('div')).toContainElement(screen.getByLabelText('Gewinner'));
-    expect(screen.getByText('Alpha').closest('div')!.className).toContain('text-muted-foreground');
+    expect(screen.getByText('Bravo').className).toContain('font-semibold');
+    expect(screen.getByText('Alpha').className).toContain('line-through'); // not only by color
+    expect(screen.getByText('Bravo').parentElement).toHaveTextContent(/Bravo3$/);
+    expect(screen.getByText('Alpha').parentElement).toHaveTextContent(/Alpha0$/);
+    expect(screen.queryByText('3 Becher')).not.toBeInTheDocument();
   });
 
   it('does not mark anybody while the match is open', () => {
@@ -67,9 +68,10 @@ describe('MatchCard', () => {
     expect(screen.queryByLabelText('Gewinner')).not.toBeInTheDocument();
   });
 
-  it('says "Beendet" when no cups were recorded', () => {
+  it('marks the winner without a score when no cups were recorded', () => {
     render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a' })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Beendet')).toBeInTheDocument();
+    expect(screen.getByText('Alpha').className).toContain('font-semibold');
+    expect(screen.getByText('Alpha').parentElement).toHaveTextContent(/^Alpha$/);
   });
 
   it('describes the whole match for screen readers', () => {
