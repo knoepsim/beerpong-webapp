@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activeRounds, allMatchSlots, buildBracketLayout, isAdvanced, isMatchSlot } from './bracket-layout'
+import { activeRounds, allMatchSlots, buildBracketLayout, focusRound, isAdvanced, isMatchSlot } from './bracket-layout'
 import { fiveTeamBracket, makeMatch } from './test-fixtures/bracket'
 import type { Bracket } from '@/types'
 
@@ -85,5 +85,24 @@ describe('allMatchSlots', () => {
     const [bye, match] = layout.rounds[0].slots
     expect(isMatchSlot(bye)).toBe(false)
     expect(isMatchSlot(match)).toBe(true)
+  })
+})
+
+describe('focusRound', () => {
+  const layout = (overrides = {}) => buildBracketLayout(fiveTeamBracket(overrides))
+
+  it('opens at the round of my next match', () => {
+    expect(focusRound(layout(), 't1')).toBe(2) // T1 waits in the semi-final
+    expect(focusRound(layout(), 't4')).toBe(1)
+  })
+
+  it('opens at the first round with something to play without a team of mine', () => {
+    expect(focusRound(layout(), null)).toBe(1)
+    expect(focusRound(layout({ m1: { status: 'finished', winner_team_id: 't4' } }), 'nobody')).toBe(2)
+  })
+
+  it('opens at the final when everything is played', () => {
+    const done = { status: 'finished' as const, winner_team_id: 'x' }
+    expect(focusRound(layout({ m1: done, m2: done, m3: done, m4: done }))).toBe(3)
   })
 })

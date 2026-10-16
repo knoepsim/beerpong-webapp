@@ -9,9 +9,8 @@ import { JoinPolicy, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { BracketView } from "@/components/bracket-view";
-import { MatchList } from "@/components/match-list";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Schedule } from "@/components/schedule";
 import { ParticipantStatus } from "@/components/participant-status";
 import { TablesBoard } from "@/components/tables-board";
 import { MatchResultDialog } from "@/components/match-result-dialog";
@@ -466,48 +465,20 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         </TabsContent>
 
         <TabsContent value="bracket" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Turnierbaum</CardTitle>
-              {canReferee && <CardDescription>Klicke auf ein Match, um das Ergebnis einzutragen.</CardDescription>}
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center p-8">
-                  <div className="space-y-4 w-full max-w-3xl">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                  </div>
-                </div>
-              ) : !bracket ? (
-                <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
-                  <Trophy className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
-                  <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  <BracketView
-                    bracket={bracket}
-                    teamsMap={teamsMap}
-                    onMatchClick={canReferee ? handleMatchClick : undefined}
-                    highlightTeamId={myTournamentTeam?.id}
-                  />
-                  
-                  <div className="border-t pt-6">
-                    <h3 className="font-semibold mb-4">Alle Spiele</h3>
-                    <MatchList
-                      bracket={bracket}
-                      teamsMap={teamsMap}
-                      highlightTeamId={myTournamentTeam?.id}
-                      onMatchClick={canReferee ? handleMatchClick : undefined}
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {bracket ? (
+            <Schedule
+              bracket={bracket}
+              teamsMap={teamsMap}
+              highlightTeamId={myTournamentTeam?.id}
+              onMatchClick={canReferee ? handleMatchClick : undefined}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
+              <Trophy className="h-12 w-12 mb-4 opacity-50" aria-hidden="true" />
+              <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
+              <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
+            </div>
+          )}
         </TabsContent>
 
         {bracket && (
