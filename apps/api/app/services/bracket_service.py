@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
     InvalidWinnerError,
+    MatchNotAtTableError,
     MatchNotReadyError,
     NotFoundError,
     ResultConflictError,
@@ -253,9 +254,11 @@ class BracketService:
                 m.ready_at = m.table_id = m.on_table_at = None
             elif m.ready_at is None:
                 m.ready_at = now
-            # a match that is over or lost its table is not at a table
+            # a match that is over or lost its table is not at a table (and so not live either)
             if m.id in results or m.table_id not in table_ids:
                 m.on_table_at = None
+            if m.on_table_at is None:
+                m.started_at = None
         await self.db.flush()
 
         _, planned, _, _ = await self._plan_input(tournament_id)
@@ -267,6 +270,24 @@ class BracketService:
                 match.on_table_at = now
         await self.db.flush()
 
+
+    async def set_started(self, match_id: UUID, started: bool) -> None:
+        """Start a match at its table (live), or take the start back. A result can be reported without a start."""
+        tournament_id = (await self._get_match(match_id)).tournament_id
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
+        match = await self._get_match(match_id, for_update=True)
+        if not tournament.is_started:
+            raise TournamentNotStartedError()
+        if await self._has_active_result(match_id):
+            raise ResultConflictError("Das Spiel hat schon ein Ergebnis.")
+        if started and match.on_table_at is None:
+            raise MatchNotAtTableError()
+        if started and match.started_at is None:
+            match.started_at = datetime.now(UTC)
+        elif not started:
+            match.started_at = None
+        await self.db.flush()
+        await bump(self.db, tournament.id, "bracket")
 
     async def report_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
         """Report the first result for a match and advance the winner."""
@@ -326,10 +347,14 @@ class BracketService:
     def _to_response(match: Match, current: Result | None) -> MatchResponse:
         if current is not None:
             status = MatchStatus.FINISHED
-        elif match.team_a_id is not None and match.team_b_id is not None:
+        elif match.team_a_id is None or match.team_b_id is None:
+            status = MatchStatus.WAITING
+        elif match.started_at is not None:
+            status = MatchStatus.LIVE
+        elif match.on_table_at is not None:
             status = MatchStatus.READY
         else:
-            status = MatchStatus.WAITING
+            status = MatchStatus.QUEUED
         return MatchResponse.model_validate(match).model_copy(
             update={
                 "status": status,

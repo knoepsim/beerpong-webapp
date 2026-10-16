@@ -603,8 +603,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
 
       {selectedMatch && matchTeamA && matchTeamB && (
         <MatchResultDialog
-          matchId={selectedMatch.id}
-          nextMatchId={selectedMatch.next_match_id}
+          match={selectedMatch}
           teamA={{ id: matchTeamA.id, name: matchTeamA.name }}
           teamB={{ id: matchTeamB.id, name: matchTeamB.name }}
           open={!!selectedMatch}

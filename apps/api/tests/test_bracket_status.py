@@ -15,6 +15,8 @@ from main import app
 from tests.helpers import generate_started_tournament
 
 USER = uuid.uuid4()
+# both teams known, no result: at a table or waiting for one (depends on the tables of the test tournament)
+PLAYABLE = (MatchStatus.QUEUED, MatchStatus.READY)
 
 
 def _by_round(bracket, round_number: int):
@@ -27,7 +29,7 @@ async def test_fresh_bracket_has_ready_and_waiting_matches_and_no_winner():
         service, tournament, _ = await generate_started_tournament(db, 4)
         bracket = await service.get_bracket(tournament.id)
 
-        assert [m.status for m in _by_round(bracket, 1)] == [MatchStatus.READY, MatchStatus.READY]
+        assert all(m.status in PLAYABLE for m in _by_round(bracket, 1))
         assert _by_round(bracket, 2)[0].status == MatchStatus.WAITING
         assert all(m.winner_team_id is None and m.cups_left is None for m in bracket.matches)
         assert bracket.champion_team_id is None
@@ -60,7 +62,8 @@ async def test_modified_and_deleted_results_are_followed():
 
         await service.delete_result(first.id, USER)
         match = next(m for m in (await service.get_bracket(tournament.id)).matches if m.id == first.id)
-        assert (match.status, match.winner_team_id, match.cups_left) == (MatchStatus.READY, None, None)
+        assert match.status in PLAYABLE
+        assert (match.winner_team_id, match.cups_left) == (None, None)
 
 
 @pytest.mark.asyncio
@@ -70,7 +73,7 @@ async def test_champion_is_the_winner_of_the_final():
         for match in _by_round(await service.get_bracket(tournament.id), 1):
             await service.report_result(match.id, ResultCreate(winner_team_id=match.team_a_id), USER)
         final = _by_round(await service.get_bracket(tournament.id), 2)[0]
-        assert final.status == MatchStatus.READY
+        assert final.status in PLAYABLE
 
         await service.report_result(final.id, ResultCreate(winner_team_id=final.team_b_id, cups_left=1), USER)
 
@@ -116,8 +119,8 @@ async def test_a_match_fed_by_two_byes_is_ready_from_the_start():
         bracket = await service.get_bracket(tournament.id)
 
         round_two = _by_round(bracket, 2)
-        assert any(m.status == MatchStatus.READY for m in round_two)
-        assert all(m.status in (MatchStatus.READY, MatchStatus.WAITING) for m in bracket.matches)
+        assert any(m.status in PLAYABLE for m in round_two)
+        assert all(m.status in (*PLAYABLE, MatchStatus.WAITING) for m in bracket.matches)
 
 
 @pytest.mark.asyncio
@@ -138,5 +141,5 @@ async def test_api_returns_the_new_fields(async_client: AsyncClient):
     assert resp.status_code == 200
     body = resp.json()
     assert body["champion_team_id"] is None
-    assert body["matches"][0]["status"] == "ready"
+    assert body["matches"][0]["status"] in ("queued", "ready")
     assert {"winner_team_id", "cups_left"} <= set(body["matches"][0])

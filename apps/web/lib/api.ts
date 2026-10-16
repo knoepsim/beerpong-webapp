@@ -287,6 +287,12 @@ export const api = {
       }),
   },
 
+  matches: {
+    /** Start a match at its table (live); a result can also be reported without a start. */
+    start: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "POST" }),
+    undoStart: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "DELETE" }),
+  },
+
   results: {
     list: (matchId: string) => request<Result[]>(`/matches/${matchId}/results`),
     create: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>

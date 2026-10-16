@@ -176,7 +176,11 @@ export interface MyTournamentsResponse {
   managing: ManagedTournament[];
 }
 
-export type MatchStatus = "waiting" | "ready" | "finished";
+/**
+ * Decided by the API: waiting (a team is still in another match), queued (waiting for a free table),
+ * ready (at its table, not started), live (started), finished (has a result).
+ */
+export type MatchStatus = "waiting" | "queued" | "ready" | "live" | "finished";
 
 export interface Match {
   id: string;
@@ -192,8 +196,9 @@ export interface Match {
   table_name: string | null;
   /** A ready match without a table: its place in the queue for the next free table (1 = next). */
   queue_position: number | null;
+  /** When it was started at its table (only while live). */
+  started_at: string | null;
   created_at: string;
-  /** waiting: a team is still open, ready: both teams known, finished: has a result */
   status: MatchStatus;
   winner_team_id: string | null;
   /** cups the winner had left */

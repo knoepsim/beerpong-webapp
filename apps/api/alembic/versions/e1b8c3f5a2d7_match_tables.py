@@ -1,4 +1,4 @@
-"""matches get a table of the tournament (planned), when they became ready and since when they are at a table
+"""matches get a table of the tournament (planned), when they became ready, since when they are at a table and when they started
 
 Revision ID: e1b8c3f5a2d7
 Revises: d0a7b2e4f6c1
@@ -25,6 +25,7 @@ def upgrade() -> None:
     )
     op.add_column('matches', sa.Column('ready_at', sa.DateTime(timezone=True), nullable=True))
     op.add_column('matches', sa.Column('on_table_at', sa.DateTime(timezone=True), nullable=True))
+    op.add_column('matches', sa.Column('started_at', sa.DateTime(timezone=True), nullable=True))
     # matches that can be played already count as ready since now; the tables follow with the next result
     op.execute("UPDATE matches SET ready_at = now() WHERE team_a_id IS NOT NULL AND team_b_id IS NOT NULL")
     op.drop_column('matches', 'table_number')
@@ -32,6 +33,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.add_column('matches', sa.Column('table_number', sa.Integer(), nullable=True))
+    op.drop_column('matches', 'started_at')
     op.drop_column('matches', 'on_table_at')
     op.drop_column('matches', 'ready_at')
     op.drop_constraint('fk_matches_table_id', 'matches', type_='foreignkey')

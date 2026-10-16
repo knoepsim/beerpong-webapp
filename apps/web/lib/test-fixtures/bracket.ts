@@ -11,6 +11,7 @@ export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round"
   table_id: null,
   table_name: null,
   queue_position: null,
+  started_at: null,
   created_at: "",
   status: "waiting",
   winner_team_id: null,

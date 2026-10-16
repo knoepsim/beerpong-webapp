@@ -34,4 +34,6 @@ class Match(Base):
     # when both teams became known (the queue for the tables goes by it) and since when it is at its table
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     on_table_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # when the match was started at its table (live); only while it is at a table
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

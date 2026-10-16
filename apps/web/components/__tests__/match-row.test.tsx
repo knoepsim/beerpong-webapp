@@ -14,21 +14,21 @@ describe('MatchRow', () => {
   })
 
   it('shows the place in the queue of a match without a table', () => {
-    render(<MatchRow slot={slot({ table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
-    expect(screen.getByText('Als Nächstes')).toBeInTheDocument()
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument()
+    render(<MatchRow slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
+    expect(screen.getByText('Wartet auf Tisch')).toBeInTheDocument()
+    expect(screen.getByText('Warteschlange #1')).toBeInTheDocument()
   })
 
-  it('says nothing about state or table for a match that waits for its teams', () => {
+  it('says for a match that waits for its teams which ones are still playing, and no table', () => {
     const { container } = render(
       <MatchRow slot={slot({ status: 'waiting', team_a_id: null, team_b_id: null }, { a: 3, b: 4 })} teamsMap={teamsMap} />,
     )
     expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument()
     expect(screen.getByText('Sieger Spiel 4')).toBeInTheDocument()
     expect(screen.queryByText('Bereit')).not.toBeInTheDocument()
-    expect(screen.queryByText('Wartet')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument()
-    expect(container.querySelector('.border-l.px-2')).toBeNull() // no empty column
+    expect(screen.getByText('Wartet auf Team')).toBeInTheDocument()
+    expect(screen.getByText('Beide Teams offen')).toBeInTheDocument()
+    expect(container.textContent).not.toMatch(/Tisch/)
   })
 
   it('shows every piece of information once: winner bold, loser dimmed and crossed out, cups, no table', () => {

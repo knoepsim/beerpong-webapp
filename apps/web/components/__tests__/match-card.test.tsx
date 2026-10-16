@@ -6,7 +6,7 @@ import { abTeams as teamsMap, makeSlot as slot } from '@/lib/test-fixtures/brack
 describe('MatchCard', () => {
   it('shows the number and a ready match as ready, without made-up score or timer', () => {
     render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
-    expect(screen.getByText('Spiel 7')).toBeInTheDocument();
+    expect(screen.getByTitle('Spiel 7')).toHaveTextContent('7');
     expect(screen.getByText('Bereit')).toBeInTheDocument();
     expect(screen.queryByText('12:34')).not.toBeInTheDocument();
     expect(screen.queryByText('10')).not.toBeInTheDocument();
@@ -28,15 +28,22 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the table of a match that can be played, or its place in the queue', () => {
+  it('shows status and second line for every state', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Warteplatz 2')).toBeInTheDocument();
+    rerender(<MatchCard slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Wartet auf Tisch')).toBeInTheDocument();
+    expect(screen.getByText('Warteschlange #2')).toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument(); // nothing to tell yet
+    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null, table_id: null, table_name: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Wartet auf Team')).toBeInTheDocument();
+    expect(screen.getByText('Blau noch in Spiel 3')).toBeInTheDocument();
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ status: 'live' })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 3')).toBeInTheDocument();

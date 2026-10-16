@@ -53,26 +53,60 @@ export function describeSides(
   return [build("a", match.team_a_id, sources.a), build("b", match.team_b_id, sources.b)];
 }
 
-/**
- * Where a match that can be played right now stands: at its table, or its place in the queue for the next free
- * one (the API decides both and the place never gets worse). A match waiting for its teams has nothing to tell
- * and a finished one does not need its table anymore.
- */
-export function tableLabel(match: Match): string | null {
-  if (match.status !== "ready") return null;
-  if (match.table_name) return match.table_name;
-  if (match.queue_position === 1) return "Als Nächstes";
-  return match.queue_position != null ? `Warteplatz ${match.queue_position}` : null;
+/** Both teams are known and there is no result yet: queued, at its table or live. */
+export function isOpen(match: Match): boolean {
+  return match.status === "queued" || match.status === "ready" || match.status === "live";
 }
 
-/** Short status for the corner of a card: Wartet / Bereit / "9 Becher" (cups the winner had left). */
+/** The status in a few words: "Wartet auf Team", "Wartet auf Tisch", "Bereit", "Live" or the cups of the winner. */
 export function statusLabel(match: Match): string {
-  if (match.status === "waiting") return "Wartet";
-  if (match.status === "ready") return "Bereit";
-  return match.cups_left != null ? `${match.cups_left} Becher` : "Beendet";
+  switch (match.status) {
+    case "waiting":
+      return "Wartet auf Team";
+    case "queued":
+      return "Wartet auf Tisch";
+    case "ready":
+      return "Bereit";
+    case "live":
+      return "Live";
+    default:
+      return match.cups_left != null ? `${match.cups_left} Becher` : "Beendet";
+  }
 }
 
-const STATUS_WORD = { waiting: "wartet", ready: "bereit", finished: null } as const;
+/** Badge colors by status: grey waits for a team, amber for a table, green can start, red is live. */
+export const STATUS_STYLE: Record<Exclude<Match["status"], "finished">, string> = {
+  waiting: "bg-muted text-muted-foreground",
+  queued: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
+  ready: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
+  live: "bg-red-600 text-white", // white on red-600 keeps 4.5:1 in both themes
+};
+
+const capitalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+
+/**
+ * The second line of a match, only what the status does not say: whom it waits for (by color, the team is not
+ * known yet), its place in the queue, or the table to go to. Nothing for a finished match.
+ */
+export function statusDetail(slot: MatchSlot): string | null {
+  const { match, sources } = slot;
+  switch (match.status) {
+    case "waiting": {
+      const missing = (["a", "b"] as const).filter((side) => (side === "a" ? match.team_a_id : match.team_b_id) === null);
+      const where = (side: Side) => (sources[side] === null ? "offen" : `noch in Spiel ${sources[side]}`);
+      // both: the rows below already name the matches they come from
+      if (missing.length === 2) return "Beide Teams offen";
+      return `${capitalize(SIDE_STYLE[missing[0]].label)} ${where(missing[0])}`;
+    }
+    case "queued":
+      return match.queue_position != null ? `Warteschlange #${match.queue_position}` : null;
+    case "ready":
+    case "live":
+      return match.table_name;
+    default:
+      return null;
+  }
+}
 
 /**
  * Classes of a team on a card or row: the colored stripe stays strong until the match is decided and then
@@ -88,17 +122,17 @@ export function sideTone(side: SideInfo, isMine: boolean, tinted = true): string
   );
 }
 
-/** One sentence for screen readers: number, teams with their colors, state, winner, cups and table. */
+/** One sentence for screen readers: number, teams with their colors, state and what it waits for, winner, cups. */
 export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teamsMap: Record<string, Team>): string {
   const { match, number } = slot;
   const finished = match.status === "finished";
   return [
     `Spiel ${number}`,
     sides.map((s) => `${s.name ?? s.placeholder} (${SIDE_STYLE[s.side].label})`).join(" gegen "),
-    STATUS_WORD[match.status],
+    finished ? null : statusLabel(match),
+    statusDetail(slot),
     finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
     finished && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
-    tableLabel(match),
   ]
     .filter(Boolean)
     .join(", ");

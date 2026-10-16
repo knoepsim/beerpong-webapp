@@ -160,6 +160,11 @@ class ResultConflictError(AppException):
         super().__init__(409, "RESULT_CONFLICT", detail)
 
 
+class MatchNotAtTableError(AppException):
+    def __init__(self):
+        super().__init__(409, "MATCH_NOT_AT_TABLE", "Das Spiel hat noch keinen Tisch und kann noch nicht starten.")
+
+
 class InvalidTableNameError(AppException):
     def __init__(self, detail: str):
         super().__init__(422, "INVALID_TABLE_NAME", detail)

@@ -172,3 +172,92 @@ async def test_with_more_tables_than_matches_everybody_plays_at_once(async_clien
     first = await ctx.round(1)
     assert [x["table_name"] for x in first] == ["Tisch 1", "Tisch 2"]
     assert all(x["queue_position"] is None for x in first)
+
+
+# -- status and start ------------------------------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_the_status_tells_who_waits_for_what(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+
+    assert [x["status"] for x in await ctx.round(1)] == ["ready", "ready", "queued", "queued"]
+    assert {x["status"] for x in await ctx.round(2)} == {"waiting"}
+
+
+@pytest.mark.asyncio
+async def test_a_match_at_its_table_can_be_started_and_the_start_taken_back(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    first = (await ctx.round(1))[0]
+
+    assert (await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)).status_code == 204
+    live = await ctx.by_id(first["id"])
+    assert (live["status"], live["table_name"]) == ("live", "Tisch 1")
+    assert live["started_at"] is not None
+
+    assert (await ctx.client.delete(f"/matches/{first['id']}/start", headers=ctx.admin)).status_code == 204
+    back = await ctx.by_id(first["id"])
+    assert (back["status"], back["started_at"]) == ("ready", None)
+
+
+@pytest.mark.asyncio
+async def test_a_match_without_a_table_cannot_start(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    queued = (await ctx.round(1))[2]
+
+    resp = await ctx.client.post(f"/matches/{queued['id']}/start", headers=ctx.admin)
+
+    assert resp.status_code == 409
+    assert (await ctx.by_id(queued["id"]))["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_a_result_can_be_reported_without_a_start_also_for_a_queued_match(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    queued = (await ctx.round(1))[2]
+
+    await ctx.win(queued)
+
+    statuses = [x["status"] for x in await ctx.round(1)]
+    assert statuses == ["ready", "ready", "finished", "queued"]  # the tables stay with the matches at them
+
+
+@pytest.mark.asyncio
+async def test_a_live_match_ends_with_its_result_and_frees_the_table(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    first = (await ctx.round(1))[0]
+    await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)
+
+    await ctx.win(first)
+
+    done = await ctx.by_id(first["id"])
+    assert (done["status"], done["started_at"]) == ("finished", None)
+    third = (await ctx.round(1))[2]
+    assert (third["status"], third["table_name"]) == ("ready", "Tisch 1")
+    resp = await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)
+    assert resp.status_code == 409  # a finished match does not start again
+
+
+@pytest.mark.asyncio
+async def test_a_live_match_whose_table_is_deleted_waits_again(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    second = (await ctx.round(1))[1]
+    await ctx.client.post(f"/matches/{second['id']}/start", headers=ctx.admin)
+    table_two = (await ctx.tables())[1]
+
+    await ctx.client.delete(f"/tournaments/{ctx.tid}/tables/{table_two['id']}", headers=ctx.admin)
+
+    back = await ctx.by_id(second["id"])
+    assert (back["status"], back["started_at"], back["queue_position"]) == ("queued", None, 1)
+
+
+@pytest.mark.asyncio
+async def test_only_the_organization_starts_matches(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    first = (await ctx.round(1))[0]
+    with patch("app.services.auth_service.generate_sms_code", return_value="123456"):
+        outsider = await _login(ctx.client, 90)
+
+    resp = await ctx.client.post(f"/matches/{first['id']}/start", headers=outsider)
+
+    assert resp.status_code == 403

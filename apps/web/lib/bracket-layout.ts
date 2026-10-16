@@ -1,3 +1,4 @@
+import { isOpen } from "@/lib/match-display";
 import type { Bracket, Match } from "@/types";
 
 /**
@@ -101,7 +102,7 @@ export function isAdvanced(slot: BracketSlot | undefined): boolean {
 
 /** The rounds with a match that can be played right now. Several rounds can be active at the same time. */
 export function activeRounds(layout: BracketLayout): Set<number> {
-  const active = layout.rounds.filter((r) => r.slots.some((s) => s.kind === "match" && s.match.status === "ready"));
+  const active = layout.rounds.filter((r) => r.slots.some((s) => s.kind === "match" && isOpen(s.match)));
   return new Set(active.map((r) => r.round));
 }
 

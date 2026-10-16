@@ -33,7 +33,7 @@ describe('BracketView', () => {
 
   it('numbers the matches', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
-    ['Spiel 1', 'Spiel 2', 'Spiel 3', 'Spiel 4'].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+    ['Spiel 1', 'Spiel 2', 'Spiel 3', 'Spiel 4'].forEach((label) => expect(screen.getByTitle(label)).toHaveTextContent(label.slice(6)));
   });
 
   it('falls back to "Unbekannt" for a team that is not in the map', () => {
