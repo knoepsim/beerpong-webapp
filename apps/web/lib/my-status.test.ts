@@ -70,6 +70,12 @@ describe('statusInBracket', () => {
     expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 (Spiel 1 – läuft an Tisch 1).')
   })
 
+  it('shows no place in the queue while waiting for the opponent, the queue is the other match', () => {
+    const s = inBracket(fiveTeamBracket({ m1: { status: 'queued', table_id: null, table_name: null, queue_position: 2 } }), 't1')!
+    expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 (Spiel 1 – wartet auf einen Tisch).')
+    expect(s.slot?.match.queue_position).toBeNull()
+  })
+
   it('gives the place of a team that is out, and the winner its trophy', () => {
     const out = inBracket(fiveTeamBracket({ m1: finished('t4') }), 't5')!
     expect([out.icon, out.title]).toEqual(['award', 'Du bist ausgeschieden: Platz 5 mit Team 5.'])

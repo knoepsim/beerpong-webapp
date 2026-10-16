@@ -78,7 +78,8 @@ function opponentSource(slot: MatchSlot, slots: MatchSlot[], teamId: string, tea
   const progress: Partial<Record<Match["status"], string>> = {
     live: match.table_name ? ` – läuft an ${match.table_name}` : " – läuft",
     ready: match.table_name ? ` – gleich an ${match.table_name}` : "",
-    queued: match.queue_position != null ? ` – Platz ${match.queue_position} in der Warteschlange` : "",
+    // no place in the queue here: it belongs to the other match and would read as my own
+    queued: " – wartet auf einen Tisch",
   };
   return `Dein Gegner: ${pair} (Spiel ${feeder.number}${progress[match.status] ?? ""}).`;
 }
