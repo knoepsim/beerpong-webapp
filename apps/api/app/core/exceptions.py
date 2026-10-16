@@ -160,6 +160,26 @@ class ResultConflictError(AppException):
         super().__init__(409, "RESULT_CONFLICT", detail)
 
 
+class InvalidTableNameError(AppException):
+    def __init__(self, detail: str):
+        super().__init__(422, "INVALID_TABLE_NAME", detail)
+
+
+class TableNameTakenError(AppException):
+    def __init__(self):
+        super().__init__(409, "TABLE_NAME_TAKEN", "Einen Tisch mit diesem Namen gibt es schon.")
+
+
+class LastTableError(AppException):
+    def __init__(self):
+        super().__init__(409, "LAST_TABLE", "Ein Turnier braucht mindestens einen Tisch.")
+
+
+class TooManyTablesError(AppException):
+    def __init__(self, maximum: int):
+        super().__init__(409, "TOO_MANY_TABLES", f"Ein Turnier kann höchstens {maximum} Tische haben.")
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """Register the global AppException handler on the FastAPI app."""
 

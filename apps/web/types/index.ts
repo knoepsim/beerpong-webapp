@@ -121,7 +121,6 @@ export interface Tournament {
   phase: TournamentPhase;
   registration_open: boolean;
   checkin_open: boolean;
-  table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
   join_policy: JoinPolicy;
@@ -136,6 +135,13 @@ export interface TournamentStartResponse {
   removed_team_ids: string[];
 }
 
+/** A table of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
+export interface TournamentTable {
+  id: string;
+  name: string;
+  position: number;
+}
+
 export interface TournamentCreateRequest {
   name: string;
   slug?: string;
@@ -147,6 +153,7 @@ export interface TournamentCreateRequest {
   checkin_enabled?: boolean;
   checkin_start_time?: string | null;
   checkin_auto_open?: boolean;
+  /** How many tables are created with the tournament; they are managed one by one afterwards. */
   table_count?: number;
   mode?: TournamentMode;
   visibility?: TournamentVisibility;

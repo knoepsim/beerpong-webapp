@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
 import { AccessFields } from "@/components/access-fields";
 import { InviteLinks } from "@/components/invite-links";
+import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
 import { JoinPolicy, TournamentRoleType } from "@/types";
@@ -69,7 +70,6 @@ export function TournamentSettings({
   const [editName, setEditName] = useState(tournament.name);
   const [editLocation, setEditLocation] = useState(tournament.location || "");
   const [editDescription, setEditDescription] = useState(tournament.description || "");
-  const [editTableCount, setEditTableCount] = useState(tournament.table_count.toString());
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
   const [editJoinPolicy, setEditJoinPolicy] = useState(tournament.join_policy);
   const [editSlug, setEditSlug] = useState(tournament.slug);
@@ -90,7 +90,6 @@ export function TournamentSettings({
     editName !== tournament.name ||
     editLocation !== (tournament.location || "") ||
     editDescription !== (tournament.description || "") ||
-    editTableCount !== tournament.table_count.toString() ||
     editVisibility !== tournament.visibility ||
     editJoinPolicy !== tournament.join_policy ||
     editSlug !== tournament.slug ||
@@ -105,7 +104,6 @@ export function TournamentSettings({
         slug: editSlug,
         location: editLocation || undefined,
         description: editDescription || undefined,
-        table_count: parseInt(editTableCount) || 1,
         visibility: editVisibility,
         join_policy: editJoinPolicy,
         start_time: toIsoOrNull(schedule.start_time) ?? undefined,
@@ -235,10 +233,6 @@ export function TournamentSettings({
                 <Label>Ort (Optional)</Label>
                 <Input value={editLocation} onChange={e => setEditLocation(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>Anzahl Tische</Label>
-                <Input type="number" min="1" value={editTableCount} onChange={e => setEditTableCount(e.target.value)} />
-              </div>
               <div className="md:col-span-2">
                 <AccessFields
                   values={{ visibility: editVisibility, join_policy: editJoinPolicy }}
@@ -285,6 +279,17 @@ export function TournamentSettings({
             <Button onClick={handleUpdateTournament} disabled={isUpdating || !editName.trim() || !schedule.start_time || Object.keys(scheduleErrors).length > 0 || !isDirty}>
               {isUpdating ? "Speichern..." : (isDirty ? "Änderungen speichern" : "Gespeichert")}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {(userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tische</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TableManager tournamentId={tournament.id} />
           </CardContent>
         </Card>
       )}

@@ -21,6 +21,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -40,7 +41,7 @@ const createTournamentSchema = z.object({
   name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
   location: z.string().optional(),
   description: z.string().optional(),
-  table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(20, "Maximal 20 Tische."),
+  table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
   visibility: z.nativeEnum(TournamentVisibility),
   join_policy: z.nativeEnum(JoinPolicy),
 });
@@ -266,10 +267,11 @@ export default function TournamentsPage() {
                     name="table_count"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Tische</FormLabel>
+                        <FormLabel>Anzahl Tische</FormLabel>
                         <FormControl>
-                          <Input type="number" min={1} max={20} {...field} />
+                          <Input type="number" inputMode="numeric" min={1} max={100} {...field} />
                         </FormControl>
+                        <FormDescription>Du kannst sie später benennen, hinzufügen und löschen.</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

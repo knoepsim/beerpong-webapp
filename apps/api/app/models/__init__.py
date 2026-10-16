@@ -8,6 +8,7 @@ from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
 from app.models.tournament import JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_invite import TournamentInvite
+from app.models.tournament_table import TournamentTable
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.models.user import User
 
@@ -24,6 +25,7 @@ __all__ = [
     "Tournament",
     "TournamentInvite",
     "TournamentMode",
+    "TournamentTable",
     "TournamentTeam",
     "TournamentRoleType",
     "TournamentUserRole",

@@ -17,7 +17,7 @@ vi.mock('remark-gfm', () => ({ default: () => {} }));
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
-    tournaments: { update: vi.fn(), delete: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn() },
+    tournaments: { update: vi.fn(), delete: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn(), listTables: vi.fn() },
     users: { search: vi.fn() },
     roles: { assign: vi.fn(), revoke: vi.fn() },
   },
@@ -79,6 +79,7 @@ vi.mock('@/components/ui/alert-dialog', () => {
 const mocked = {
   update: vi.mocked(api.tournaments.update),
   invites: vi.mocked(api.tournaments.listInvites),
+  tables: vi.mocked(api.tournaments.listTables),
   remove: vi.mocked(api.tournaments.delete),
   search: vi.mocked(api.users.search),
   assign: vi.mocked(api.roles.assign),
@@ -103,7 +104,6 @@ const tournament: Tournament = {
   phase: 'registration',
   registration_open: true,
   checkin_open: false,
-  table_count: 4,
   mode: TournamentMode.SINGLE_ELIMINATION,
   visibility: TournamentVisibility.PUBLIC,
   join_policy: JoinPolicy.OPEN,
@@ -141,6 +141,7 @@ const nameInput = () => screen.getByDisplayValue('Summer Cup');
 beforeEach(() => {
   vi.clearAllMocks();
   onReload.mockResolvedValue(undefined);
+  mocked.tables.mockResolvedValue([{ id: 'x1', name: 'Tisch 1', position: 1 }]);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
 });
 afterEach(() => cleanup());
@@ -188,7 +189,6 @@ describe('editing the tournament details', () => {
 
   it.each([
     ['location', () => screen.getByDisplayValue('Garden'), 'Beach'],
-    ['table count', () => screen.getByDisplayValue('4'), '6'],
     ['start time', () => screen.getByDisplayValue('2026-07-01T18:00'), '2026-07-02T18:00'],
     ['registration end', () => screen.getByDisplayValue('2026-06-30T18:00'), '2026-06-29T18:00'],
   ])('marks %s changes as dirty', (_name, field, value) => {
@@ -221,7 +221,6 @@ describe('editing the tournament details', () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
-    fireEvent.change(screen.getByDisplayValue('4'), { target: { value: '' } });
     fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
     fireEvent.click(screen.getByText('Nur mit Einladungslink', { selector: 'span' }));
     fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
@@ -233,7 +232,6 @@ describe('editing the tournament details', () => {
       slug: 'summer-cup',
       location: undefined,
       description: 'Rules',
-      table_count: 1,
       visibility: 'private',
       join_policy: 'invite_only',
       start_time: new Date('2026-07-01T18:00').toISOString(),
@@ -358,6 +356,26 @@ describe('editing the tournament details', () => {
     setup(TournamentRoleType.ADMIN, { description: null });
     fireEvent.click(screen.getByText('Vorschau'));
     expect(screen.getByText('Keine Beschreibung...')).toBeInTheDocument();
+  });
+});
+
+describe('tables', () => {
+  it('are managed by organisers, one card each', async () => {
+    mocked.tables.mockResolvedValue([
+      { id: 'x1', name: 'Tisch 1', position: 1 },
+      { id: 'x2', name: 'Terrasse', position: 2 },
+    ]);
+    setup(TournamentRoleType.MANAGER);
+    expect(await screen.findByText('Terrasse')).toBeInTheDocument();
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument();
+    expect(mocked.tables).toHaveBeenCalledWith('t1');
+    expect(screen.queryByText('Anzahl Tische')).not.toBeInTheDocument(); // no number to type any more
+  });
+
+  it('are not shown to referees', () => {
+    setup(TournamentRoleType.REFEREE);
+    expect(screen.queryByRole('button', { name: 'Tisch hinzufügen' })).not.toBeInTheDocument();
+    expect(mocked.tables).not.toHaveBeenCalled();
   });
 });
 
