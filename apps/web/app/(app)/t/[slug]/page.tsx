@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { BracketView } from "@/components/bracket-view";
 import { MatchList } from "@/components/match-list";
-import { MyMatches } from "@/components/my-matches";
+import { ParticipantStatus } from "@/components/participant-status";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
@@ -38,17 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Timeline,
-  TimelineContent,
-  TimelineDate,
-  TimelineHeader,
-  TimelineIndicator,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineTitle,
-} from "@/components/reui/timeline";
-import { Check, X, RefreshCw, ShieldAlert } from "lucide-react";
+import { RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -164,15 +154,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   }, [user, tournamentTeams]);
 
   const handleLeave = () => {
+    if (!myTournamentTeam) return;
     setConfirmState({
-      title: "Möchtest du dein Team wirklich aus dem Turnier abmelden?",
+      title: "Turnier verlassen?",
+      description: `${myTournamentTeam.name} wird vom Turnier abgemeldet. Solange die Anmeldung offen ist, kannst du wieder beitreten.`,
       action: async () => {
         try {
           await api.tournaments.leave(tournamentId);
           await loadData();
-          toast.success("Erfolgreich abgemeldet");
+          toast.success("Du hast das Turnier verlassen.");
         } catch (err: unknown) {
-          toast.error("Fehler beim Abmelden");
+          toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
         }
       }
     });
@@ -369,33 +361,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
               <span className="flex items-center gap-1"><Users className="h-4 w-4" /> {tournamentTeams.length} {tournamentTeams.length === 1 ? 'Team' : 'Teams'}</span>
             </div>
           </div>
-          
-          {tournament.registration_open && !myTournamentTeam && !canManage && (
-            tournament.join_policy === JoinPolicy.OPEN ? (
-              <JoinTournament
-                tournamentId={tournament.id}
-                tournamentName={tournament.name}
-                loginRedirect={`/t/${slug}`}
-                onJoined={loadData}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground md:max-w-xs">
-                Beitreten kannst du nur mit einem Einladungslink vom Veranstalter.
-              </p>
-            )
-          )}
-
-          {!tournament.started_at && myTournamentTeam && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground hidden sm:inline">
-                Angemeldet mit <strong className="text-foreground">{myTournamentTeam.name}</strong>
-              </span>
-              <Button variant="outline" onClick={handleLeave}>
-                Team abmelden
-              </Button>
-            </div>
-          )}
-        </div>
+                  </div>
       </div>
 
       {live.status === "fallback" && (
@@ -403,6 +369,18 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
           Keine Live-Verbindung. Die Seite prüft alle 30 Sekunden, ob sich etwas geändert hat.
         </output>
       )}
+
+      {/* what concerns me right now, in every phase at the same place and on every tab */}
+      <ParticipantStatus
+        tournament={tournament}
+        team={myTournamentTeam}
+        bracket={bracket}
+        teamsMap={teamsMap}
+        canManage={canManage}
+        slug={slug}
+        onJoined={loadData}
+        onLeave={handleLeave}
+      />
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
@@ -460,24 +438,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
             </Card>
           )}
 
-          {myTournamentTeam && !tournament.started_at && tournament.checkin_enabled && (
-            <Card className={myTournamentTeam.is_checked_in ? "border-green-600/40 bg-green-50 dark:bg-green-950/20" : "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20"}>
-              <CardContent className="py-4 text-sm">
-                {myTournamentTeam.is_checked_in ? (
-                  <p className="font-medium flex items-center gap-2">
-                    <Check className="h-4 w-4 text-green-600" aria-hidden="true" />
-                    Dein Team ist eingecheckt.
-                  </p>
-                ) : (
-                  <p>
-                    <span className="font-medium">Dein Team ist noch nicht eingecheckt.</span>{" "}
-                    Melde dich vor Ort beim Orga-Team, sonst wirst du beim Start aus dem Turnier entfernt.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>Turnier-Ablauf</CardTitle>
@@ -498,22 +458,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
             </Card>
           )}
 
-          {myTournamentTeam && bracket && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Was betrifft mich gerade?</CardTitle>
-                <CardDescription>Deine anstehenden Spiele</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MyMatches
-                  bracket={bracket}
-                  teamsMap={teamsMap}
-                  teamId={myTournamentTeam.id}
-                  onMatchClick={canReferee ? handleMatchClick : undefined}
-                />
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
         <TabsContent value="bracket" className="mt-6">
