@@ -22,7 +22,11 @@ class MatchResponse(BaseModel):
     team_b_id: UUID | None
     next_match_id: UUID | None
     next_match_slot: str | None
-    table_number: int | None
+    # the table it is played at (also kept once it is finished); None while it has none
+    table_id: UUID | None = None
+    table_name: str | None = None
+    # a ready match without a table: its place in the queue for the next free table (1 = next)
+    queue_position: int | None = None
     created_at: datetime
     status: MatchStatus = MatchStatus.WAITING
     winner_team_id: UUID | None = None

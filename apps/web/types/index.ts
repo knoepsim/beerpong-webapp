@@ -187,7 +187,11 @@ export interface Match {
   team_b_id: string | null;
   next_match_id: string | null;
   next_match_slot: string | null;
-  table_number: number | null;
+  /** The table it is played at (kept once it is finished); null while it has none. Decided by the API. */
+  table_id: string | null;
+  table_name: string | null;
+  /** A ready match without a table: its place in the queue for the next free table (1 = next). */
+  queue_position: number | null;
   created_at: string;
   /** waiting: a team is still open, ready: both teams known, finished: has a result */
   status: MatchStatus;

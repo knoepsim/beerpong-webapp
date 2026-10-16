@@ -28,20 +28,22 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the table of a match that can be played, with a placeholder until one is assigned', () => {
+  it('shows the table of a match that can be played, or its place in the queue', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Warteplatz 2')).toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument(); // nothing to tell yet
 
-    rerender(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
+    rerender(<MatchCard slot={slot({ table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 3')).toBeInTheDocument();
-    expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument();
   });
 
   it('shows no table for a finished match', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_number: 2 })} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_id: 't2', table_name: 'Tisch 2' })} teamsMap={teamsMap} />);
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
   });
 

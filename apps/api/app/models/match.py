@@ -27,5 +27,11 @@ class Match(Base):
         UUID(as_uuid=True), ForeignKey("matches.id"), nullable=True
     )
     next_match_slot: Mapped[str | None] = mapped_column(String(1), nullable=True)  # "a" or "b"
-    table_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # the table it is played at (or was played at): decided by the table planner when the match gets a table
+    table_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tournament_tables.id", ondelete="SET NULL"), nullable=True
+    )
+    # when both teams became known (the queue for the tables goes by it) and since when it is at its table
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    on_table_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

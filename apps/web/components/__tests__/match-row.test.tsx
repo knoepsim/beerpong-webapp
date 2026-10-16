@@ -10,13 +10,13 @@ describe('MatchRow', () => {
     expect(screen.getByText('Alpha')).toBeInTheDocument()
     expect(screen.getByText('Bravo')).toBeInTheDocument()
     expect(screen.getByText('Bereit')).toBeInTheDocument()
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument()
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument()
   })
 
-  it('shows an assigned table', () => {
-    render(<MatchRow slot={slot({ table_number: 2 })} teamsMap={teamsMap} />)
-    expect(screen.getByText('Tisch 2')).toBeInTheDocument()
-    expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument()
+  it('shows the place in the queue of a match without a table', () => {
+    render(<MatchRow slot={slot({ table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
+    expect(screen.getByText('Als Nächstes')).toBeInTheDocument()
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument()
   })
 
   it('says nothing about state or table for a match that waits for its teams', () => {
@@ -32,7 +32,7 @@ describe('MatchRow', () => {
   })
 
   it('shows every piece of information once: winner bold, loser dimmed and crossed out, cups, no table', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_number: 3 })} teamsMap={teamsMap} />)
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
 
     const winner = screen.getByText('Bravo').closest('div')!
     const loser = screen.getByText('Alpha').closest('div')!

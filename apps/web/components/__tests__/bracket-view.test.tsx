@@ -59,7 +59,7 @@ describe('BracketView', () => {
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 
     // only match 3 is ready; match 1 is played, match 2 and the final wait for their teams
-    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1);
+    expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1);
   });
 
   it('scrolls sideways only', () => {

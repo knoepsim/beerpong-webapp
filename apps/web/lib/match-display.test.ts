@@ -35,22 +35,22 @@ describe('describeSides', () => {
 })
 
 describe('tableLabel', () => {
-  it('shows the assigned table', () => {
-    expect(tableLabel(slot({ table_number: 4 }).match)).toBe('Tisch 4')
+  it('shows the table a match is played at', () => {
+    expect(tableLabel(slot({ table_id: 't4', table_name: 'Terrasse' }).match)).toBe('Terrasse')
   })
 
-  it('says the table follows for a match that can be played now', () => {
-    expect(tableLabel(slot().match)).toBe('Tisch folgt')
+  it('shows the place in the queue of a match without a table', () => {
+    expect(tableLabel(slot({ table_id: null, table_name: null, queue_position: 1 }).match)).toBe('Als Nächstes')
+    expect(tableLabel(slot({ table_id: null, table_name: null, queue_position: 3 }).match)).toBe('Warteplatz 3')
   })
 
   it('has nothing to say for a match that waits for its teams', () => {
     expect(tableLabel(slot({ status: 'waiting' }).match)).toBeNull()
-    expect(tableLabel(slot({ status: 'waiting', table_number: 2 }).match)).toBe('Tisch 2')
   })
 
   it('shows nothing for a finished match, even if it had a table', () => {
     expect(tableLabel(slot({ status: 'finished', winner_team_id: 'a' }).match)).toBeNull()
-    expect(tableLabel(slot({ status: 'finished', winner_team_id: 'a', table_number: 2 }).match)).toBeNull()
+    expect(tableLabel(slot({ status: 'finished', winner_team_id: 'a', table_name: 'Tisch 2' }).match)).toBeNull()
   })
 })
 
@@ -67,7 +67,7 @@ describe('matchSummary', () => {
   it('describes a ready match with colors and table', () => {
     const s = slot()
     expect(matchSummary(s, describeSides(s, teamsMap), teamsMap)).toBe(
-      'Spiel 7, Alpha (rot) gegen Bravo (blau), bereit, Tisch folgt',
+      'Spiel 7, Alpha (rot) gegen Bravo (blau), bereit, Tisch 1',
     )
   })
 

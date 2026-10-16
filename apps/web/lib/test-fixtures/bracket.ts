@@ -8,7 +8,9 @@ export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round"
   team_b_id: null,
   next_match_id: null,
   next_match_slot: null,
-  table_number: null,
+  table_id: null,
+  table_name: null,
+  queue_position: null,
   created_at: "",
   status: "waiting",
   winner_team_id: null,
@@ -34,7 +36,8 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
     matches: [
       makeMatch({
         id: "m1", round: 1, position: 1, team_a_id: "t4", team_b_id: "t5",
-        next_match_id: "m2", next_match_slot: "b", status: "ready", ...overrides.m1,
+        next_match_id: "m2", next_match_slot: "b", status: "ready",
+        table_id: "x1", table_name: "Tisch 1", ...overrides.m1,
       }),
       makeMatch({
         id: "m2", round: 2, position: 0, team_a_id: "t1", team_b_id: null,
@@ -42,7 +45,8 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
       }),
       makeMatch({
         id: "m3", round: 2, position: 1, team_a_id: "t2", team_b_id: "t3",
-        next_match_id: "m4", next_match_slot: "b", status: "ready", ...overrides.m3,
+        next_match_id: "m4", next_match_slot: "b", status: "ready",
+        table_id: "x2", table_name: "Tisch 2", ...overrides.m3,
       }),
       makeMatch({ id: "m4", round: 3, position: 0, ...overrides.m4 }),
     ],
@@ -54,10 +58,11 @@ export const abTeams: Record<string, Team> = {
   b: { id: "b", name: "Bravo" } as Team,
 };
 
-/** A match slot of team a against team b (number 7), ready unless overridden. */
+/** A match slot of team a against team b (number 7), ready at "Tisch 1" unless overridden. */
 export const makeSlot = (overrides: Partial<Match> = {}, sources: MatchSlot["sources"] = { a: null, b: null }): MatchSlot => ({
   kind: "match",
   number: 7,
   sources,
-  match: makeMatch({ id: "m", round: 1, position: 0, team_a_id: "a", team_b_id: "b", status: "ready", ...overrides }),
+  match: makeMatch({ id: "m", round: 1, position: 0, team_a_id: "a", team_b_id: "b", status: "ready",
+    table_id: "x1", table_name: "Tisch 1", ...overrides }),
 });

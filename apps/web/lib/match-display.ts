@@ -54,14 +54,15 @@ export function describeSides(
 }
 
 /**
- * The table of a match, only where it helps: a match that is waiting for teams has none to tell, a finished
- * match does not need one anymore. A match that can be played right now says "Tisch folgt" until the table
- * logic has assigned one.
+ * Where a match that can be played right now stands: at its table, or its place in the queue for the next free
+ * one (the API decides both and the place never gets worse). A match waiting for its teams has nothing to tell
+ * and a finished one does not need its table anymore.
  */
 export function tableLabel(match: Match): string | null {
-  if (match.status === "finished") return null;
-  if (match.table_number != null) return `Tisch ${match.table_number}`;
-  return match.status === "ready" ? "Tisch folgt" : null;
+  if (match.status !== "ready") return null;
+  if (match.table_name) return match.table_name;
+  if (match.queue_position === 1) return "Als Nächstes";
+  return match.queue_position != null ? `Warteplatz ${match.queue_position}` : null;
 }
 
 /** Short status for the corner of a card: Wartet / Bereit / "9 Becher" (cups the winner had left). */
