@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api, request } from './api';
-import { clearTokens, getAccessToken, setTokens } from './auth';
 
 type FakeResponse = { ok: boolean; status: number; statusText?: string; json?: () => Promise<unknown> };
 
@@ -21,7 +20,6 @@ const fail = (status: number, body: unknown): FakeResponse => ({
 beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
-  clearTokens();
 });
 
 afterEach(() => {
@@ -50,15 +48,16 @@ describe('ApiError', () => {
 });
 
 describe('request', () => {
-  it('adds the bearer token when logged in', async () => {
-    setTokens('access', 'refresh');
+  it('sends the session cookies and the header that marks our own pages, no token', async () => {
     fetchMock.mockResolvedValue(ok({ fine: true }));
 
     await expect(request('/thing')).resolves.toEqual({ fine: true });
 
     const [url, options] = fetchMock.mock.calls[0];
     expect(url).toMatch(/\/thing$/);
-    expect((options.headers as Headers).get('Authorization')).toBe('Bearer access');
+    expect(options.credentials).toBe('include');
+    expect((options.headers as Headers).get('X-Requested-With')).toBe('fetch');
+    expect((options.headers as Headers).has('Authorization')).toBe(false);
     expect(options.cache).toBe('no-store');
   });
 
@@ -111,27 +110,55 @@ describe('request: expired access token', () => {
     vi.stubGlobal('location', originalLocation);
   });
 
-  it('refreshes the token and retries the request once', async () => {
-    setTokens('old', 'refresh');
+  it('renews the session with the refresh cookie and retries the request once', async () => {
     fetchMock
-      .mockResolvedValueOnce(fail(401, {}))
-      .mockResolvedValueOnce(ok({ access_token: 'new', refresh_token: 'refresh2' }))
+      .mockResolvedValueOnce(fail(401, {})) // the access token expired
+      .mockResolvedValueOnce(fail(401, {})) // still (the check whether another tab renewed it)
+      .mockResolvedValueOnce(ok(undefined, 204)) // POST /auth/refresh
       .mockResolvedValueOnce(ok({ data: 1 }));
 
     await expect(request('/secure')).resolves.toEqual({ data: 1 });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(fetchMock.mock.calls[1][0]).toMatch(/\/auth\/refresh$/);
-    expect((fetchMock.mock.calls[2][1].headers as Headers).get('Authorization')).toBe('Bearer new');
-    expect(getAccessToken()).toBe('new');
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    const [url, options] = fetchMock.mock.calls[2];
+    expect(url).toMatch(/\/auth\/refresh$/);
+    expect(options.method).toBe('POST');
+    expect(options.credentials).toBe('include');
+    expect(options.headers).toEqual({ 'X-Requested-With': 'fetch' });
+  });
+
+  it('does not renew when another tab did it meanwhile: the second try already works', async () => {
+    fetchMock.mockResolvedValueOnce(fail(401, {})).mockResolvedValueOnce(ok({ data: 2 }));
+
+    await expect(request('/secure')).resolves.toEqual({ data: 2 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('renews one at a time, in all tabs, when the browser can lock', async () => {
+    const order: string[] = [];
+    const locks = {
+      request: vi.fn(async (_name: string, task: () => Promise<unknown>) => {
+        order.push('lock');
+        return task();
+      }),
+    };
+    vi.stubGlobal('navigator', { locks });
+    fetchMock.mockResolvedValueOnce(fail(401, {})).mockResolvedValueOnce(ok({ data: 3 }));
+
+    await request('/secure');
+
+    expect(locks.request).toHaveBeenCalledTimes(1);
+    expect(locks.request.mock.calls[0][0]).toBe('beerpong-session');
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   it.each([
     ['refresh endpoint rejects', () => fetchMock.mockResolvedValueOnce(fail(401, {}))],
     ['refresh request throws', () => fetchMock.mockRejectedValueOnce(new Error('offline'))],
-  ])('clears tokens and redirects to login when %s', async (_name, arrange) => {
-    setTokens('old', 'refresh');
-    fetchMock.mockResolvedValueOnce(fail(401, {}));
+  ])('goes to the login when %s', async (_name, arrange) => {
+    fetchMock.mockResolvedValueOnce(fail(401, {})).mockResolvedValueOnce(fail(401, {}));
     arrange();
 
     // The request never settles because the browser is navigating away.
@@ -139,33 +166,25 @@ describe('request: expired access token', () => {
     await vi.waitFor(() =>
       expect(window.location.href).toBe('/login?redirect=%2Fteams%3Fpage%3D2'),
     );
-    expect(getAccessToken()).toBeNull();
   });
 
-  it('redirects to login when the retried request is still unauthorized', async () => {
-    setTokens('old', 'refresh');
+  it('goes to the login when the retried request is still unauthorized', async () => {
     fetchMock
       .mockResolvedValueOnce(fail(401, {}))
-      .mockResolvedValueOnce(ok({ access_token: 'new', refresh_token: 'r' }))
+      .mockResolvedValueOnce(fail(401, {}))
+      .mockResolvedValueOnce(ok(undefined, 204))
       .mockResolvedValueOnce(fail(401, {}));
 
     void request('/secure');
     await vi.waitFor(() => expect(window.location.href).toContain('/login?redirect='));
   });
 
-  it('redirects without refreshing when there is no stored refresh token', async () => {
-    fetchMock.mockResolvedValueOnce(fail(401, {}));
-    void request('/secure');
-    await vi.waitFor(() => expect(window.location.href).toContain('/login?redirect='));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+  it('answers a guest request with the error instead of going to the login', async () => {
+    fetchMock.mockResolvedValue(fail(401, { detail: 'Not authenticated' }));
 
-  it('redirects without refreshing for anonymous 401 responses', async () => {
-    setTokens('', 'refresh');
-    fetchMock.mockResolvedValueOnce(fail(401, {}));
-    void request('/secure');
-    await vi.waitFor(() => expect(window.location.href).toContain('/login?redirect='));
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await expect(request('/users/me', { guest: true })).rejects.toMatchObject({ status: 401 });
+
+    expect(window.location.href).toBe('http://localhost:3000/teams?page=2');
   });
 });
 
@@ -175,7 +194,8 @@ describe('api endpoints', () => {
   // [call, expected method, expected path, expected JSON body]
   const cases: Array<[string, () => Promise<unknown>, string, string, unknown]> = [
     ['auth.requestCode', () => api.auth.requestCode('+49123'), 'POST', '/auth/request-code', { phone_number: '+49123' }],
-    ['auth.verify', () => api.auth.verify('+49123', '123456'), 'POST', '/auth/verify', { phone_number: '+49123', code: '123456' }],
+    ['auth.verify', () => api.auth.verify('+49123', '123456'), 'POST', '/auth/verify', { phone_number: '+49123', code: '123456', cookie_session: true }],
+    ['auth.logout', () => api.auth.logout(), 'POST', '/auth/logout', undefined],
     ['users.me', () => api.users.me(), 'GET', '/users/me', undefined],
     ['users.updateMe', () => api.users.updateMe({ name: 'N' }), 'PATCH', '/users/me', { name: 'N' }],
     ['users.search', () => api.users.search('a b'), 'GET', '/users/search?query=a%20b', undefined],

@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { User } from "@/types";
 import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 
 interface UserContextValue {
   user: User | null;
@@ -26,12 +25,8 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
-    if (!getAccessToken()) {
-      setIsLoading(false);
-      return;
-    }
     try {
-      const u = await api.users.me();
+      const u = await api.users.me({ guest: true });
       setUser(u);
     } catch {
       setUser(null);

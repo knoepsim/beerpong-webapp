@@ -1,5 +1,4 @@
 import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/config";
 import { readEventStream } from "@/lib/sse";
 
@@ -106,9 +105,9 @@ export class LiveConnection {
   }
 
   private async readStream(signal: AbortSignal) {
-    const token = getAccessToken();
+    // the session cookie goes along by itself
     const response = await fetch(`${API_BASE_URL}/tournaments/${this.options.tournamentId}/events`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: "include",
       signal,
       cache: "no-store",
     });

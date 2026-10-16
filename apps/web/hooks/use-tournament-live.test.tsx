@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 import { useTournamentLive } from './use-tournament-live'
 import { api } from '@/lib/api'
-import { setTokens, clearTokens } from '@/lib/auth'
 
 vi.mock('@/lib/api', () => ({ api: { tournaments: { getState: vi.fn() } } }))
 
@@ -40,7 +39,6 @@ beforeEach(() => {
   fetchMock = vi.fn()
   vi.stubGlobal('fetch', fetchMock)
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
-  clearTokens()
   vi.mocked(api.tournaments.getState).mockReset()
 })
 afterEach(() => {
@@ -59,8 +57,7 @@ const setup = (props: { revision?: number } = {}) => {
 }
 
 describe('useTournamentLive', () => {
-  it('opens the stream of the tournament, with the token if somebody is logged in, and says it is live', async () => {
-    setTokens('abc', 'ref')
+  it('opens the stream of the tournament with the session cookie, and says it is live', async () => {
     const stream = openStream()
     fetchMock.mockResolvedValue(stream.response)
 
@@ -70,15 +67,9 @@ describe('useTournamentLive', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toMatch(/\/tournaments\/t1\/events$/)
-    expect(init.headers).toEqual({ Authorization: 'Bearer abc' })
+    expect(init.credentials).toBe('include')
+    expect(init.headers).toBeUndefined() // no token to send: the session is a cookie
     expect(result.current.status).toBe('live')
-  })
-
-  it('opens it without a token for a stranger', async () => {
-    fetchMock.mockResolvedValue(openStream().response)
-    setup()
-    await flush()
-    expect(fetchMock.mock.calls[0][1].headers).toEqual({})
   })
 
   it('passes on what changed when the revision is newer', async () => {

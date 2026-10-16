@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { QueryProvider } from '../query-provider';
 import { ThemeProvider } from '../theme-provider';
 import { UserProvider, useCurrentUser } from '../user-provider';
-import { clearTokens, setTokens } from '@/lib/auth';
 import { api } from '@/lib/api';
 import type { User } from '@/types';
 
@@ -26,24 +25,22 @@ function Probe() {
 describe('UserProvider', () => {
   beforeEach(() => {
     me.mockReset();
-    clearTokens();
   });
 
-  it('stays anonymous without an access token', async () => {
+  it('is anonymous for a visitor without a session, who is asked as a guest (no redirect to the login)', async () => {
+    me.mockRejectedValue(new Error('Not authenticated'));
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
-    expect(me).not.toHaveBeenCalled();
+    expect(me).toHaveBeenCalledWith({ guest: true });
   });
 
   it('loads the current user when logged in', async () => {
-    setTokens('a', 'r');
     me.mockResolvedValue(aUser);
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
   });
 
   it('falls back to anonymous when loading fails and can reload', async () => {
-    setTokens('a', 'r');
     me.mockRejectedValueOnce(new Error('boom'));
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
