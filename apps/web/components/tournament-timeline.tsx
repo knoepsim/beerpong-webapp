@@ -1,10 +1,11 @@
+import { Check, ClipboardPen, MapPinCheck, Trophy, type LucideIcon } from "lucide-react";
 import type { Tournament } from "@/types";
 import { formatWhen } from "@/lib/format-when";
 
 
 interface Step {
   key: string;
-  icon: string;
+  icon: LucideIcon;
   label: string;
   description: string;
   done: boolean;
@@ -17,7 +18,7 @@ function buildSteps(tournament: Tournament): Step[] {
   const steps: Step[] = [
     {
       key: "registration",
-      icon: "📋",
+      icon: ClipboardPen,
       label: "Anmeldung",
       description: !tournament.registration_open
         ? "Geschlossen"
@@ -33,7 +34,7 @@ function buildSteps(tournament: Tournament): Step[] {
   if (tournament.checkin_enabled) {
     steps.push({
       key: "checkin",
-      icon: "✅",
+      icon: MapPinCheck,
       label: "Check-in vor Ort",
       description: checkinDescription(tournament, started),
       done: started,
@@ -43,7 +44,7 @@ function buildSteps(tournament: Tournament): Step[] {
 
   steps.push({
     key: "play",
-    icon: "🏓",
+    icon: Trophy,
     label: "Turnier",
     description: finished ? "Beendet" : started ? "Läuft" : startDescription(tournament),
     done: finished,
@@ -73,6 +74,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
     <ol className="flex flex-col sm:flex-row w-full gap-0 mt-2" aria-label="Turnier-Ablauf">
       {steps.map((step, i) => {
         const isLast = i === steps.length - 1;
+        const Icon = step.done ? Check : step.icon;
         return (
           <li
             key={step.key}
@@ -94,7 +96,7 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
                         : "bg-muted border-border text-muted-foreground"
                   }`}
                 >
-                  <span aria-hidden="true">{step.done ? "✓" : step.icon}</span>
+                  <Icon className="size-4" aria-hidden="true" />
                 </div>
                 <div
                   className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
