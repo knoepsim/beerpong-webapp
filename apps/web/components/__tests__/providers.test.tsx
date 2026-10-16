@@ -4,10 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { QueryProvider } from '../query-provider';
 import { ThemeProvider } from '../theme-provider';
 import { UserProvider, useCurrentUser } from '../user-provider';
-import { api } from '@/lib/api';
+import { api, NetworkError } from '@/lib/api';
 import type { User } from '@/types';
 
-vi.mock('@/lib/api', () => ({ api: { users: { me: vi.fn() } } }));
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
+  api: { users: { me: vi.fn() } },
+}));
 
 const me = vi.mocked(api.users.me);
 const aUser = { id: 'u1', name: 'Ada', is_system_admin: false } as User;
@@ -49,6 +52,21 @@ describe('UserProvider', () => {
     screen.getByText('reload').click();
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
   });
+
+  it('keeps the user it knows when the network fails, and asks again when it is back', async () => {
+    me.mockResolvedValueOnce(aUser)
+    render(<UserProvider><Probe /></UserProvider>)
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'))
+
+    me.mockRejectedValueOnce(new NetworkError())
+    screen.getByText('reload').click()
+    await waitFor(() => expect(me).toHaveBeenCalledTimes(2))
+    expect(screen.getByTestId('state')).toHaveTextContent('Ada')
+
+    me.mockResolvedValue({ ...aUser, name: 'Ada Neu' })
+    window.dispatchEvent(new Event('online'))
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada Neu'))
+  })
 
   it('exposes a loading default context without provider', () => {
     render(<Probe />);

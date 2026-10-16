@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, api, request } from './api';
+import { ApiError, NetworkError, api, request } from './api';
 
 type FakeResponse = { ok: boolean; status: number; statusText?: string; json?: () => Promise<unknown> };
 
@@ -155,9 +155,9 @@ describe('request: expired access token', () => {
   });
 
   it.each([
-    ['refresh endpoint rejects', () => fetchMock.mockResolvedValueOnce(fail(401, {}))],
-    ['refresh request throws', () => fetchMock.mockRejectedValueOnce(new Error('offline'))],
-  ])('goes to the login when %s', async (_name, arrange) => {
+    ['the refresh endpoint refuses', () => fetchMock.mockResolvedValueOnce(fail(401, {}))],
+    ['the refresh endpoint forbids', () => fetchMock.mockResolvedValueOnce(fail(403, {}))],
+  ])('goes to the login when %s: the session is over', async (_name, arrange) => {
     fetchMock.mockResolvedValueOnce(fail(401, {})).mockResolvedValueOnce(fail(401, {}));
     arrange();
 
@@ -167,6 +167,29 @@ describe('request: expired access token', () => {
       expect(window.location.href).toBe('/login?redirect=%2Fteams%3Fpage%3D2'),
     );
   });
+
+  it.each([
+    ['the refresh request cannot be sent', () => fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))],
+    ['the refresh endpoint is down', () => fetchMock.mockResolvedValueOnce(fail(502, {}))],
+    ['the refresh endpoint fails', () => fetchMock.mockResolvedValueOnce(fail(500, {}))],
+  ])('stays on the page and reports the connection when %s: that says nothing about the session', async (_name, arrange) => {
+    fetchMock.mockResolvedValueOnce(fail(401, {})).mockResolvedValueOnce(fail(401, {}))
+    arrange()
+
+    await expect(request('/secure')).rejects.toBeInstanceOf(NetworkError)
+
+    expect(window.location.href).toBe('http://localhost:3000/teams?page=2')
+  })
+
+  it('reports the connection in German when the request itself cannot be sent', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await expect(request('/x')).rejects.toThrow('Keine Verbindung zum Server')
+  })
+
+  it('lets a deliberate abort through unchanged', async () => {
+    fetchMock.mockRejectedValueOnce(new DOMException('aborted', 'AbortError'))
+    await expect(request('/x')).rejects.toMatchObject({ name: 'AbortError' })
+  })
 
   it('goes to the login when the retried request is still unauthorized', async () => {
     fetchMock

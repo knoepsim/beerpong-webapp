@@ -46,16 +46,29 @@ function exclusively<T>(task: () => Promise<T>): Promise<T> {
     : task();
 }
 
-async function renewSession(): Promise<boolean> {
+/** The server cannot be reached (no network, a hiccup): no reason to doubt the session, try again later. */
+export class NetworkError extends Error {
+  constructor() {
+    super("Keine Verbindung zum Server. Prüfe dein Netz und versuche es noch einmal.");
+    this.name = "NetworkError";
+  }
+}
+
+/**
+ * Renews the session with the refresh cookie. Only a refusal ends the session ("ended"); that the server cannot be
+ * reached or answers with an error is not the answer of the server to the session ("unreachable").
+ */
+async function renewSession(): Promise<"renewed" | "ended" | "unreachable"> {
   try {
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: "POST",
       headers: CSRF_HEADER,
       credentials: "include",
     });
-    return res.ok;
+    if (res.ok) return "renewed";
+    return res.status === 401 || res.status === 403 ? "ended" : "unreachable";
   } catch {
-    return false;
+    return "unreachable";
   }
 }
 
@@ -67,7 +80,11 @@ interface FetchOptions extends RequestInit {
 async function fetchWithAuth(url: string, { guest = false, ...options }: FetchOptions = {}): Promise<Response> {
   const headers = new Headers(options.headers || {});
   for (const [name, value] of Object.entries(CSRF_HEADER)) headers.set(name, value);
-  const send = () => fetch(url, { ...options, headers, credentials: "include" });
+  const send = () =>
+    fetch(url, { ...options, headers, credentials: "include" }).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new NetworkError();
+    });
 
   let res = await send();
 
@@ -77,7 +94,9 @@ async function fetchWithAuth(url: string, { guest = false, ...options }: FetchOp
     res = await exclusively(async () => {
       const again = await send();
       if (again.status !== 401) return again;
-      return (await renewSession()) ? send() : again;
+      const outcome = await renewSession();
+      if (outcome === "unreachable") throw new NetworkError(); // stay where you are, the session may well be fine
+      return outcome === "renewed" ? send() : again;
     });
   }
 
