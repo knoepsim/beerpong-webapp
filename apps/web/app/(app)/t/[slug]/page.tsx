@@ -21,6 +21,7 @@ import { TournamentTeamList } from "@/components/tournament-team-list";
 import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
 import { useTournamentLive, type LiveScope } from "@/hooks/use-tournament-live";
+import { highestRole } from "@/lib/roles";
 import { PreparationControls } from "@/components/preparation-controls";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -136,11 +137,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     return map;
   }, [tournamentTeams]);
 
-  const userRole = useMemo(() => {
-    if (!user) return null;
-    const roleObj = roles.find((r) => r.user_id === user.id);
-    return roleObj ? roleObj.role : null;
-  }, [roles, user]);
+  // a user can hold several roles in a tournament: the strongest one counts
+  const userRole = useMemo(() => highestRole(roles, user?.id), [roles, user]);
 
   const startPlan = tournament ? planStart(tournament, tournamentTeams) : null;
 
