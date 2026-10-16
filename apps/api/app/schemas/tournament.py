@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.models.tournament import JoinPolicy, TournamentMode, TournamentPhase, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType
+from app.schemas.match import MatchResponse
 from app.schemas.team import TeamResponse
 
 
@@ -135,6 +136,10 @@ class TournamentPreview(BaseModel):
 class ParticipatingTournament(BaseModel):
     tournament: TournamentResponse
     team: TeamResponse
+    # what the list shows about my part, without loading the bracket: check-in, the next match, the place at the end
+    is_checked_in: bool = False
+    next_match: MatchResponse | None = None  # the team's next match that is not finished (once started)
+    place: int | None = None  # out or won: the place (1 = winner; knock-out places are shared: 3, 5, 9 ...)
 
     model_config = {"from_attributes": True}
 

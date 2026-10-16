@@ -34,6 +34,46 @@ export interface MyStatus {
 const name = (teamsMap: Record<string, Team>, id: string | null) =>
   (id && teamsMap[id]?.name) || "Unbekannt";
 
+/** A status in two or three words for the list of my tournaments: only when there is something to know. */
+export interface ShortStatus {
+  tone: StatusTone;
+  icon: StatusIcon;
+  text: string;
+}
+
+/**
+ * The short form of the status card for the list of my tournaments, from what the list API brings along (no
+ * bracket): check in now, go to your table, you are next, a break, the place at the end. Nothing when all is fine
+ * and nothing is to do (registered, check-in not open yet): the team badge says that already.
+ */
+export function listStatus(
+  tournament: Tournament,
+  participation: { is_checked_in: boolean; next_match: Match | null; place: number | null },
+): ShortStatus | null {
+  const { is_checked_in, next_match: match, place } = participation;
+  if (place === 1) return { tone: "done", icon: "trophy", text: "Gewonnen" };
+  if (place !== null) return { tone: "done", icon: "award", text: `Platz ${place}` };
+  if (!tournament.started_at) {
+    if (!tournament.checkin_enabled) return null;
+    if (is_checked_in) return { tone: "done", icon: "check", text: "Eingecheckt" };
+    return tournament.checkin_open ? { tone: "urgent", icon: "alert", text: "Jetzt einchecken" } : null;
+  }
+  switch (match?.status) {
+    case "ready":
+      return { tone: "urgent", icon: "go", text: `Jetzt zu ${match.table_name ?? "deinem Tisch"}` };
+    case "live":
+      return { tone: "active", icon: "play", text: `Spielt an ${match.table_name ?? "einem Tisch"}` };
+    case "queued":
+      return match.queue_position === 1
+        ? { tone: "attention", icon: "queue", text: "Als Nächstes dran" }
+        : { tone: "relaxed", icon: "queue", text: `Warteschlange #${match.queue_position ?? "–"}` };
+    case "waiting":
+      return { tone: "relaxed", icon: "pause", text: "Pause" };
+    default:
+      return null;
+  }
+}
+
 /** Place of a team that lost in `round` of a knock-out with `totalRounds` rounds: final 2, semi-final 3, ... */
 export function knockoutPlace(round: number, totalRounds: number): number {
   return 2 ** (totalRounds - round) + 1;

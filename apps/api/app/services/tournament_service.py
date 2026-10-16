@@ -202,11 +202,13 @@ class TournamentService:
         participating_res, managing_res = await tournament_repository.get_my_tournaments(self.db, user_id)
 
         participating = []
-        for tournament, team, frozen_name in participating_res:
+        for tournament, team, frozen_name, is_checked_in in participating_res:
             # a tournament that started shows the team under the name it had then
             participating.append({
                 "tournament": tournament,
                 "team": TeamResponse.model_validate(team).model_copy(update={"name": frozen_name or team.name}),
+                "is_checked_in": is_checked_in,
+                **(await self._my_progress(tournament, team.id) if tournament.is_started else {}),
             })
 
         managing = []
@@ -220,6 +222,21 @@ class TournamentService:
             "participating": participating,
             "managing": managing
         }
+
+    async def _my_progress(self, tournament: Tournament, team_id: UUID) -> dict:
+        """The next match of a team in a started tournament, or its place once it is out or has won."""
+        from app.services.bracket_service import BracketService  # imported here: the bracket uses this service
+
+        bracket = await BracketService(self.db).get_bracket(tournament.id)
+        mine = sorted(
+            (m for m in bracket.matches if team_id in (m.team_a_id, m.team_b_id)), key=lambda m: (m.round, m.position)
+        )
+        if bracket.champion_team_id == team_id:
+            return {"place": 1}
+        lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
+        if lost is not None:
+            return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
+        return {"next_match": next((m for m in mine if m.winner_team_id is None), None)}
 
     async def join_tournament(
         self, tournament_id: UUID, team_id: UUID, invite_token: str | None = None

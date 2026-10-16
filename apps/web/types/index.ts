@@ -174,6 +174,11 @@ export interface TournamentCreateRequest {
 export interface ParticipatingTournament {
   tournament: Tournament;
   team: Team;
+  is_checked_in: boolean;
+  /** The team's next match that is not finished (once started). */
+  next_match: Match | null;
+  /** Out or won: the place (1 = winner). */
+  place: number | null;
 }
 
 export interface ManagedTournament {

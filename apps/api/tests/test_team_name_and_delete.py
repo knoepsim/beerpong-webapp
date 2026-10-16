@@ -104,3 +104,27 @@ async def test_a_team_playing_cannot_be_deleted_until_the_tournament_is_over(ctx
     assert (await ctx.delete()).status_code == 204
     # the finished tournament keeps the team
     assert await ctx.tournament_names() == ["Alpha", "Bravo"]
+
+
+# -- my part in the list of my tournaments --------------------------------------------------------------------------
+
+
+async def _mine(ctx: Ctx, player: int) -> dict:
+    return (await ctx.client.get("/tournaments/me", headers=ctx.players[player])).json()["participating"][0]
+
+
+@pytest.mark.asyncio
+async def test_my_tournaments_carry_the_next_match_and_at_the_end_the_place(ctx: Ctx):
+    before = await _mine(ctx, 0)
+    assert (before["is_checked_in"], before["next_match"], before["place"]) == (False, None, None)
+
+    await ctx.start()
+    running = await _mine(ctx, 0)
+    assert running["next_match"]["status"] == "ready"
+    assert running["next_match"]["table_name"] == "Tisch 1"
+
+    await ctx.finish()  # team a of the final wins
+    final = (await ctx.client.get(f"/tournaments/{ctx.tid}/bracket", headers=ctx.admin)).json()["matches"][0]
+    winner = 0 if final["team_a_id"] == ctx.team_ids[0] else 2
+    assert ((await _mine(ctx, winner))["place"], (await _mine(ctx, 2 - winner))["place"]) == (1, 2)
+    assert (await _mine(ctx, 0))["next_match"] is None

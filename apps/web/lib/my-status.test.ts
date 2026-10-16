@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { allMatchSlots, buildBracketLayout } from './bracket-layout'
-import { knockoutPlace, statusBeforeStart, statusInBracket } from './my-status'
+import { knockoutPlace, listStatus, statusBeforeStart, statusInBracket } from './my-status'
 import { fiveTeamBracket, fiveTeams } from './test-fixtures/bracket'
 import { makeTournament as tournament, makeTournamentTeam as team } from './test-fixtures/tournament'
 import type { Bracket, Match } from '@/types'
@@ -99,5 +99,33 @@ describe('statusInBracket', () => {
 describe('knockoutPlace', () => {
   it('counts places from the final down', () => {
     expect([3, 2, 1].map((round) => knockoutPlace(round, 3))).toEqual([2, 3, 5])
+  })
+})
+
+describe('listStatus', () => {
+  const started = tournament({ started_at: '2099-07-01T18:00:00Z', registration_open: false, phase: 'running' })
+  const part = (overrides = {}) => ({ is_checked_in: false, next_match: null, place: null, ...overrides })
+  const match = (overrides: Partial<Match>) => fiveTeamBracket({ m1: overrides }).matches[0]
+
+  it('says only what matters before the start: check in now, or checked in', () => {
+    expect(listStatus(tournament(), part())).toBeNull() // registered, nothing to do
+    expect(listStatus(tournament({ checkin_enabled: true, checkin_open: true }), part())).toEqual({
+      tone: 'urgent', icon: 'alert', text: 'Jetzt einchecken',
+    })
+    expect(listStatus(tournament({ checkin_enabled: true }), part({ is_checked_in: true }))?.text).toBe('Eingecheckt')
+    expect(listStatus(tournament({ checkin_enabled: true }), part())).toBeNull() // check-in not open yet
+  })
+
+  it('says where to go and how urgent while it runs', () => {
+    expect(listStatus(started, part({ next_match: match({}) }))).toEqual({ tone: 'urgent', icon: 'go', text: 'Jetzt zu Tisch 1' })
+    expect(listStatus(started, part({ next_match: match({ status: 'live' }) }))?.text).toBe('Spielt an Tisch 1')
+    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 1 }) }))?.tone).toBe('attention')
+    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 4 }) }))?.text).toBe('Warteschlange #4')
+    expect(listStatus(started, part({ next_match: match({ status: 'waiting' }) }))?.text).toBe('Pause')
+  })
+
+  it('gives the place at the end', () => {
+    expect(listStatus(started, part({ place: 1 }))).toEqual({ tone: 'done', icon: 'trophy', text: 'Gewonnen' })
+    expect(listStatus(started, part({ place: 5 }))?.text).toBe('Platz 5')
   })
 })

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ChevronRight, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { STATUS_ICONS } from "@/components/status-icons";
+import { listStatus, type StatusTone } from "@/lib/my-status";
 import { phaseLabel } from "@/lib/tournament-phase";
 import type { MyTournament } from "@/lib/tournament-groups";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,15 @@ function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase
   );
 }
 
+/** Like the status card: tinted and bordered by urgency, the icon carries the color, the text stays readable. */
+const TONE: Record<StatusTone, { pill: string; icon: string }> = {
+  urgent: { pill: "border-destructive/50 bg-destructive/10", icon: "text-destructive" },
+  attention: { pill: "border-warning/50 bg-warning/10", icon: "text-warning" },
+  active: { pill: "border-primary/50 bg-primary/10", icon: "text-primary" },
+  relaxed: { pill: "", icon: "text-muted-foreground" },
+  done: { pill: "border-success/50 bg-success/10", icon: "text-success" },
+};
+
 /**
  * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in):
  * "running" and "finished" are already said by the heading of the group the card is in.
@@ -46,8 +57,10 @@ const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !==
  * involved (a badge with my team if I play, a badge per role if I organize; both if I do both). Nothing else; everything else is on the tournament page.
  */
 export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
-  const { tournament: t, team, role } = item;
+  const { tournament: t, team, role, participation } = item;
   const when = t.start_time ?? t.created_at;
+  const status = participation ? listStatus(t, participation) : null;
+  const StatusIcon = status ? STATUS_ICONS[status.icon] : null;
 
   return (
     <Link
@@ -76,6 +89,12 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
         </p>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          {status && StatusIcon && (
+            <Badge variant="outline" className={cn("font-semibold", TONE[status.tone].pill)}>
+              <StatusIcon className={TONE[status.tone].icon} aria-hidden="true" />
+              {status.text}
+            </Badge>
+          )}
           {isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
           {team && (
             <Badge variant="secondary" className="max-w-full">

@@ -1,9 +1,11 @@
-import type { MyTournamentsResponse, Team, Tournament, TournamentRoleType } from "@/types";
+import type { MyTournamentsResponse, ParticipatingTournament, Team, Tournament, TournamentRoleType } from "@/types";
 
 /** A tournament of the logged-in user with the way they are involved: with a team, with a role, or both. */
 export interface MyTournament {
   tournament: Tournament;
   team?: Team;
+  /** How my team is doing (check-in, next match, place); only when I play. */
+  participation?: Pick<ParticipatingTournament, "is_checked_in" | "next_match" | "place">;
   role?: TournamentRoleType;
 }
 
@@ -16,8 +18,8 @@ export interface TournamentGroups {
 /** One entry per tournament, even if the user plays in it and manages it. */
 export function mergeMyTournaments(data: MyTournamentsResponse): MyTournament[] {
   const byId = new Map<string, MyTournament>();
-  for (const { tournament, team } of data.participating) {
-    byId.set(tournament.id, { tournament, team });
+  for (const { tournament, team, ...participation } of data.participating) {
+    byId.set(tournament.id, { tournament, team, participation });
   }
   for (const { tournament, role } of data.managing) {
     byId.set(tournament.id, { ...byId.get(tournament.id), tournament, role });

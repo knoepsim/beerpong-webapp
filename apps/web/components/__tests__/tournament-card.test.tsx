@@ -86,4 +86,20 @@ describe('TournamentCard', () => {
     expect(container.querySelector('.bg-primary.text-primary-foreground')).toBeNull()
     expect(screen.getByRole('heading').className).toContain('text-muted-foreground')
   })
+
+  it('shows my status in a few words when there is something to know, nothing otherwise', () => {
+    const team = { id: 'x', name: 'Becherhelden' } as Team
+    const { rerender } = card(
+      { team, participation: { is_checked_in: false, next_match: null, place: null } },
+      { checkin_enabled: true, checkin_open: true },
+    )
+    expect(screen.getByText('Jetzt einchecken')).toBeInTheDocument()
+
+    rerender(
+      <TournamentCard
+        item={{ tournament: tournament(), team, participation: { is_checked_in: false, next_match: null, place: null } }}
+      />,
+    )
+    expect(screen.queryByText('Jetzt einchecken')).not.toBeInTheDocument()
+  })
 })

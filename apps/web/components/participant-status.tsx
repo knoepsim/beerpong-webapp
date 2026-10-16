@@ -1,42 +1,18 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import {
-  Award,
-  CalendarClock,
-  CircleCheck,
-  Coffee,
-  Hourglass,
-  LogOut,
-  MapPin,
-  Play,
-  TriangleAlert,
-  Trophy,
-  UserPlus,
-  type LucideIcon,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { MatchRow } from "@/components/match-row";
+import { STATUS_ICONS } from "@/components/status-icons";
 import { useNow } from "@/hooks/use-now";
 import { JoinTournament } from "@/components/join-tournament";
 import { allMatchSlots, buildBracketLayout } from "@/lib/bracket-layout";
 import { formatWhen } from "@/lib/format-when";
-import { statusBeforeStart, statusInBracket, type MyStatus, type StatusIcon, type StatusTone } from "@/lib/my-status";
+import { statusBeforeStart, statusInBracket, type MyStatus, type StatusTone } from "@/lib/my-status";
 import { JoinPolicy, type Bracket, type Team, type Tournament, type TournamentTeam } from "@/types";
 
-const ICONS: Record<StatusIcon, LucideIcon> = {
-  go: MapPin,
-  play: Play,
-  queue: Hourglass,
-  pause: Coffee,
-  award: Award,
-  trophy: Trophy,
-  check: CircleCheck,
-  alert: TriangleAlert,
-  calendar: CalendarClock,
-  join: UserPlus,
-};
 
 /** The tone as the variant of the alert; the sentence says the same in words (never color alone). */
 const VARIANTS: Record<StatusTone, "error" | "warning" | "info" | "default" | "success"> = {
@@ -48,7 +24,7 @@ const VARIANTS: Record<StatusTone, "error" | "warning" | "info" | "default" | "s
 };
 
 function StatusCard({ status, children }: Readonly<{ status: MyStatus; children?: ReactNode }>) {
-  const Icon = ICONS[status.icon];
+  const Icon = STATUS_ICONS[status.icon];
   return (
     // a lasting state, announced politely (not role="alert", which interrupts)
     <Alert variant={VARIANTS[status.tone]} role="status" className="gap-x-3 rounded-xl px-4 py-3">
