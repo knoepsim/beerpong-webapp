@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { api } from "@/lib/api";
-import type { Result } from "@/types";
+import type { Match, Result } from "@/types";
 import { ResultType } from "@/types";
-import { History, Play, Clock, Hash, Trophy } from "lucide-react";
+import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
+import { MatchStatusBadge } from "@/components/match-status-badge";
 import { BeerpongTable } from "@/components/BeerpongTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,24 +26,31 @@ interface TeamBasic {
 }
 
 interface MatchResultDialogProps {
-  matchId: string;
+  match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  nextMatchId?: string | null;
 }
 
+const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+
+/**
+ * The organization's view of a match: start it at its table (or take the start back) and report its result.
+ * A result can always be reported, also without a start.
+ */
 export function MatchResultDialog({
-  matchId,
+  match,
   teamA,
   teamB,
   open,
   onOpenChange,
   onSuccess,
-  nextMatchId,
 }: MatchResultDialogProps) {
+  const matchId = match.id;
+  const nextMatchId = match.next_match_id;
+  const [isStarting, setIsStarting] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [cupsLeft, setCupsLeft] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,6 +127,21 @@ export function MatchResultDialog({
     }
   };
 
+  const changeStart = async (start: boolean) => {
+    setIsStarting(true);
+    setError(null);
+    try {
+      await (start ? api.matches.start(matchId) : api.matches.undoStart(matchId));
+      toast.success(start ? "Spiel gestartet" : "Start zurückgenommen");
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Das Spiel konnte nicht gestartet werden. Versuch es noch einmal.");
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
   const handleDelete = async () => {
     setIsDeleting(true);
     setError(null);
@@ -151,27 +175,28 @@ export function MatchResultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="grid-cols-[minmax(0,1fr)] sm:max-w-md">
         {/* Custom Header with team colors */}
         <DialogHeader className="space-y-3">
           <DialogTitle className="sr-only">Ergebnis eintragen</DialogTitle>
 
-          {/* Meta badges row */}
-          <div className="flex items-center justify-center gap-2">
-            <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
-              <Hash className="w-3 h-3" />
-              Tisch 12
-            </Badge>
-            <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
-              <Clock className="w-3 h-3" />
-              12:34
-            </Badge>
-          </div>
+          {/* Status and table of an open match */}
+          {match.status !== "finished" && (
+            <div className="flex items-center justify-center gap-2">
+              <MatchStatusBadge match={match} className="text-xs" />
+              {match.table_name && (match.status === "ready" || match.status === "live") && (
+                <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
+                  <MapPin className="w-3 h-3" aria-hidden="true" />
+                  {match.table_name}
+                </Badge>
+              )}
+            </div>
+          )}
 
           {/* VS Header */}
           <div className="flex items-center gap-3">
             {/* Team A */}
-            <div className="flex-1 text-right">
+            <div className="flex-1 min-w-0 text-right">
               <div className="flex items-center justify-end gap-2">
                 <span className="font-semibold text-sm truncate">{teamA.name}</span>
                 <div className="w-3 h-3 rounded-full bg-red-500 shrink-0 shadow-[0_0_6px_rgba(239,68,68,0.5)]" />
@@ -186,7 +211,7 @@ export function MatchResultDialog({
             </div>
 
             {/* Team B */}
-            <div className="flex-1 text-left">
+            <div className="flex-1 min-w-0 text-left">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
                 <span className="font-semibold text-sm truncate">{teamB.name}</span>
@@ -204,15 +229,40 @@ export function MatchResultDialog({
             </div>
           ) : (
             <>
-              {/* Spiel starten button */}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mb-3 gap-2 border-green-600/30 text-green-700 dark:text-green-400 hover:bg-green-500/10 hover:border-green-500/50"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                Spiel starten
-              </Button>
+              {/* Start at the table: only for a match at its table; a live one can take the start back */}
+              {match.status === "ready" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => changeStart(true)}
+                  disabled={isStarting}
+                  className="w-full h-11 mb-3 gap-2 border-emerald-600/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-500/50"
+                >
+                  <Play className="w-4 h-4 fill-current" aria-hidden="true" />
+                  {isStarting ? "Wird gestartet..." : "Spiel starten"}
+                </Button>
+              )}
+              {match.status === "live" && (
+                <div className="mb-3 flex items-center justify-between gap-2 text-sm">
+                  {match.started_at && (
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <Timer className="w-4 h-4" aria-hidden="true" />
+                      seit {timeOf(match.started_at)} Uhr
+                    </span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => changeStart(false)}
+                    disabled={isStarting}
+                    className="gap-1.5 text-muted-foreground"
+                  >
+                    <Undo2 className="w-4 h-4" aria-hidden="true" />
+                    Start zurücknehmen
+                  </Button>
+                </div>
+              )}
 
               {/* History toggle */}
               {allResults.length > 0 && (

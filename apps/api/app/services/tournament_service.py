@@ -25,6 +25,7 @@ from app.schemas.tournament import TournamentCreate, TournamentUpdate
 from app.services.invite_service import InviteService
 from app.services.revision import bump
 from app.services.schedule import validate_schedule
+from app.services.table_service import TableService
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
@@ -41,10 +42,12 @@ class TournamentService:
         """Create a new tournament and assign the creator as Admin."""
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = self._normalize_automation(data.model_dump())
+        table_count = obj_in.pop("table_count")
         obj_in["slug"] = await self._unique_slug(slugify(data.name))
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
+        await TableService(self.db).create_default_tables(tournament.id, table_count)
 
         # Assign Admin role to the creator
         admin_role = TournamentUserRole(

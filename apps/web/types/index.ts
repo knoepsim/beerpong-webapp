@@ -121,7 +121,6 @@ export interface Tournament {
   phase: TournamentPhase;
   registration_open: boolean;
   checkin_open: boolean;
-  table_count: number;
   mode: TournamentMode;
   visibility: TournamentVisibility;
   join_policy: JoinPolicy;
@@ -136,6 +135,13 @@ export interface TournamentStartResponse {
   removed_team_ids: string[];
 }
 
+/** A table of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
+export interface TournamentTable {
+  id: string;
+  name: string;
+  position: number;
+}
+
 export interface TournamentCreateRequest {
   name: string;
   slug?: string;
@@ -147,6 +153,7 @@ export interface TournamentCreateRequest {
   checkin_enabled?: boolean;
   checkin_start_time?: string | null;
   checkin_auto_open?: boolean;
+  /** How many tables are created with the tournament; they are managed one by one afterwards. */
   table_count?: number;
   mode?: TournamentMode;
   visibility?: TournamentVisibility;
@@ -169,7 +176,11 @@ export interface MyTournamentsResponse {
   managing: ManagedTournament[];
 }
 
-export type MatchStatus = "waiting" | "ready" | "finished";
+/**
+ * Decided by the API: waiting (a team is still in another match), queued (waiting for a free table),
+ * ready (at its table, not started), live (started), finished (has a result).
+ */
+export type MatchStatus = "waiting" | "queued" | "ready" | "live" | "finished";
 
 export interface Match {
   id: string;
@@ -180,9 +191,14 @@ export interface Match {
   team_b_id: string | null;
   next_match_id: string | null;
   next_match_slot: string | null;
-  table_number: number | null;
+  /** The table it is played at (kept once it is finished); null while it has none. Decided by the API. */
+  table_id: string | null;
+  table_name: string | null;
+  /** A ready match without a table: its place in the queue for the next free table (1 = next). */
+  queue_position: number | null;
+  /** When it was started at its table (only while live). */
+  started_at: string | null;
   created_at: string;
-  /** waiting: a team is still open, ready: both teams known, finished: has a result */
   status: MatchStatus;
   winner_team_id: string | null;
   /** cups the winner had left */

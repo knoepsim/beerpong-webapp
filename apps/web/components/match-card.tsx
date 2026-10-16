@@ -1,7 +1,9 @@
 import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
-import { describeSides, matchSummary, sideTone, statusLabel, tableLabel } from "@/lib/match-display";
+import { MatchStatusBadge } from "@/components/match-status-badge";
+import { MatchTable } from "@/components/match-table";
+import { describeSides, matchSummary, sideTone, statusLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchCardProps {
@@ -18,13 +20,12 @@ interface MatchCardProps {
 export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchCardProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
-  const table = tableLabel(match);
   const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
   const className = cn(
     "block w-full rounded-lg border bg-card text-left shadow-xs overflow-hidden",
-    // what can be played right now stands out
-    match.status === "ready" && "border-primary/50",
+    // what is played right now or can start stands out
+    (match.status === "ready" || match.status === "live") && "border-primary/50",
     mine && "ring-2 ring-primary/60",
     onClick && "cursor-pointer hover:border-primary/50 hover:shadow-md transition-shadow",
   );
@@ -32,20 +33,17 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
     <>
       <div className="px-2 pt-1 pb-1 text-xs leading-4 text-muted-foreground">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate">Spiel {number}</span>
-          {match.status === "ready" && (
-            <span className="inline-flex items-center gap-1 shrink-0 font-medium text-primary">
-              <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
-              {statusLabel(match)}
-            </span>
-          )}
+          <span className="truncate tabular-nums" title={`Spiel ${number}`}>
+            {number}
+          </span>
+          <MatchStatusBadge match={match} />
           {match.status === "finished" && (
             <span className="shrink-0" title="Becher, die dem Sieger übrig blieben">
               {statusLabel(match)}
             </span>
           )}
         </div>
-        {table && <div className="truncate">{table}</div>}
+        <MatchTable match={match} className="flex" />
       </div>
       {sides.map((side) => (
         <div

@@ -37,7 +37,6 @@ class TournamentUpdate(BaseModel):
     checkin_enabled: bool | None = None
     checkin_start_time: datetime | None = None
     checkin_auto_open: bool | None = None
-    table_count: int | None = Field(default=None, ge=1, le=100)
     visibility: TournamentVisibility | None = None
     join_policy: JoinPolicy | None = None
 
@@ -61,7 +60,6 @@ class TournamentResponse(BaseModel):
     phase: TournamentPhase
     registration_open: bool
     checkin_open: bool
-    table_count: int
     mode: TournamentMode
     visibility: TournamentVisibility
     join_policy: JoinPolicy
@@ -83,6 +81,25 @@ class TournamentJoinRequest(BaseModel):
     """Request body for joining a tournament with a team."""
     team_id: UUID
     invite_token: str | None = None
+
+
+class TableCreate(BaseModel):
+    """Request body for a new table: without a name it is called "Tisch {n}"."""
+    name: str | None = Field(default=None, max_length=200)
+
+
+class TableRename(BaseModel):
+    """Request body for renaming a table."""
+    name: str = Field(max_length=200)
+
+
+class TableResponse(BaseModel):
+    """A table of a tournament."""
+    id: UUID
+    name: str
+    position: int
+
+    model_config = {"from_attributes": True}
 
 
 class TournamentState(BaseModel):

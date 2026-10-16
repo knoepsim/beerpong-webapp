@@ -67,9 +67,11 @@ class LifecycleService:
         for entry in removed:
             await self.db.delete(entry)
 
-        await BracketService(self.db).generate_bracket(tournament_id, [e.team_id for e in playing])
+        bracket = BracketService(self.db)
+        await bracket.generate_bracket(tournament_id, [e.team_id for e in playing])
         tournament.started_at = datetime.now(UTC)
         await self.db.flush()
+        await bracket.assign_tables(tournament_id)
         await bump(self.db, tournament_id, "tournament", "teams", "bracket")
 
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])

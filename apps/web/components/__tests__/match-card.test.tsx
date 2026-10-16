@@ -6,7 +6,7 @@ import { abTeams as teamsMap, makeSlot as slot } from '@/lib/test-fixtures/brack
 describe('MatchCard', () => {
   it('shows the number and a ready match as ready, without made-up score or timer', () => {
     render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
-    expect(screen.getByText('Spiel 7')).toBeInTheDocument();
+    expect(screen.getByTitle('Spiel 7')).toHaveTextContent('7');
     expect(screen.getByText('Bereit')).toBeInTheDocument();
     expect(screen.queryByText('12:34')).not.toBeInTheDocument();
     expect(screen.queryByText('10')).not.toBeInTheDocument();
@@ -28,20 +28,29 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the table of a match that can be played, with a placeholder until one is assigned', () => {
+  it('shows the status with icon and short text, and the table only where to go', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument();
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null })} teamsMap={teamsMap} />);
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument(); // nothing to tell yet
+    rerender(<MatchCard slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
+    expect(screen.getByTitle('Wartet auf Tisch, Platz 2 in der Warteschlange')).toHaveTextContent('Platz 2');
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ table_number: 3 })} teamsMap={teamsMap} />);
+    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null, table_id: null, table_name: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
+    expect(screen.getByTitle('Wartet auf Team')).toHaveTextContent('Wartet');
+    expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument(); // the row says where the team comes from
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ status: 'live' })} teamsMap={teamsMap} />);
+    expect(screen.getByText('Live')).toBeInTheDocument();
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument();
+
+    rerender(<MatchCard slot={slot({ table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 3')).toBeInTheDocument();
-    expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument();
   });
 
   it('shows no table for a finished match', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_number: 2 })} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_id: 't2', table_name: 'Tisch 2' })} teamsMap={teamsMap} />);
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
   });
 

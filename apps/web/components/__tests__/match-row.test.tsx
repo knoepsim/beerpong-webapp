@@ -10,29 +10,27 @@ describe('MatchRow', () => {
     expect(screen.getByText('Alpha')).toBeInTheDocument()
     expect(screen.getByText('Bravo')).toBeInTheDocument()
     expect(screen.getByText('Bereit')).toBeInTheDocument()
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument()
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument()
   })
 
-  it('shows an assigned table', () => {
-    render(<MatchRow slot={slot({ table_number: 2 })} teamsMap={teamsMap} />)
-    expect(screen.getByText('Tisch 2')).toBeInTheDocument()
-    expect(screen.queryByText('Tisch folgt')).not.toBeInTheDocument()
+  it('shows the place in the queue of a match without a table', () => {
+    render(<MatchRow slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
+    expect(screen.getByTitle('Wartet auf Tisch, Platz 1 in der Warteschlange')).toHaveTextContent('Platz 1')
   })
 
-  it('says nothing about state or table for a match that waits for its teams', () => {
+  it('shows a waiting match as waiting, the rows name where the teams come from, no table', () => {
     const { container } = render(
       <MatchRow slot={slot({ status: 'waiting', team_a_id: null, team_b_id: null }, { a: 3, b: 4 })} teamsMap={teamsMap} />,
     )
     expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument()
     expect(screen.getByText('Sieger Spiel 4')).toBeInTheDocument()
     expect(screen.queryByText('Bereit')).not.toBeInTheDocument()
-    expect(screen.queryByText('Wartet')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument()
-    expect(container.querySelector('.border-l.px-2')).toBeNull() // no empty column
+    expect(screen.getByTitle('Wartet auf Team')).toHaveTextContent('Wartet')
+    expect(container.textContent).not.toMatch(/Tisch/)
   })
 
   it('shows every piece of information once: winner bold, loser dimmed and crossed out, cups, no table', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_number: 3 })} teamsMap={teamsMap} />)
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
 
     const winner = screen.getByText('Bravo').closest('div')!
     const loser = screen.getByText('Alpha').closest('div')!

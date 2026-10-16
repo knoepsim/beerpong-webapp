@@ -33,7 +33,7 @@ describe('BracketView', () => {
 
   it('numbers the matches', () => {
     render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />);
-    ['Spiel 1', 'Spiel 2', 'Spiel 3', 'Spiel 4'].forEach((label) => expect(screen.getByText(label)).toBeInTheDocument());
+    ['Spiel 1', 'Spiel 2', 'Spiel 3', 'Spiel 4'].forEach((label) => expect(screen.getByTitle(label)).toHaveTextContent(label.slice(6)));
   });
 
   it('falls back to "Unbekannt" for a team that is not in the map', () => {
@@ -59,7 +59,7 @@ describe('BracketView', () => {
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 
     // only match 3 is ready; match 1 is played, match 2 and the final wait for their teams
-    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1);
+    expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1);
   });
 
   it('scrolls sideways only', () => {

@@ -9,6 +9,7 @@ import type {
   TournamentInvite,
   TournamentPreview,
   TournamentStartResponse,
+  TournamentTable,
   TournamentUserRole,
   User,
   PublicUser,
@@ -210,6 +211,20 @@ export const api = {
     getState: (id: string) => request<{ revision: number }>(`/tournaments/${id}/state`),
     getPreview: (slug: string) =>
       request<TournamentPreview>(`/tournaments/by-slug/${encodeURIComponent(slug)}/preview`),
+    listTables: (tournamentId: string) => request<TournamentTable[]>(`/tournaments/${tournamentId}/tables`),
+    /** Without a name the new table is called "Tisch {n}". */
+    addTable: (tournamentId: string, name?: string) =>
+      request<TournamentTable>(`/tournaments/${tournamentId}/tables`, {
+        method: "POST",
+        body: JSON.stringify({ name: name || null }),
+      }),
+    renameTable: (tournamentId: string, tableId: string, name: string) =>
+      request<TournamentTable>(`/tournaments/${tournamentId}/tables/${tableId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      }),
+    deleteTable: (tournamentId: string, tableId: string) =>
+      request<void>(`/tournaments/${tournamentId}/tables/${tableId}`, { method: "DELETE" }),
     listInvites: (tournamentId: string) => request<TournamentInvite[]>(`/tournaments/${tournamentId}/invites`),
     createInvite: (tournamentId: string, label?: string) =>
       request<TournamentInvite>(`/tournaments/${tournamentId}/invites`, {
@@ -270,6 +285,12 @@ export const api = {
       request<void>(`/tournaments/${tournamentId}/roles/${roleId}`, {
         method: "DELETE",
       }),
+  },
+
+  matches: {
+    /** Start a match at its table (live); a result can also be reported without a start. */
+    start: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "POST" }),
+    undoStart: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "DELETE" }),
   },
 
   results: {

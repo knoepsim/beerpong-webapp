@@ -20,7 +20,7 @@ describe('MatchList', () => {
   it('shows results, the table of playable matches and the open sources', () => {
     render(<MatchList bracket={fiveTeamBracket({ m1: finished('t4', 6) })} teamsMap={fiveTeams} />)
     expect(screen.getByText('6 Becher übrig')).toBeInTheDocument()
-    expect(screen.getAllByText('Tisch folgt')).toHaveLength(1) // only match 3 is ready
+    expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1) // only match 3 is ready
     expect(screen.getByText('Sieger Spiel 2')).toBeInTheDocument()
   })
 
@@ -50,7 +50,7 @@ describe('MyMatches', () => {
 
   it('shows where to play for a match that is ready, and nothing about the venue', () => {
     render(<MyMatches {...props} bracket={fiveTeamBracket()} teamId="t4" />)
-    expect(screen.getByText('Tisch folgt')).toBeInTheDocument()
+    expect(screen.getByText('Tisch 1')).toBeInTheDocument()
     expect(screen.queryByText(/Ort/)).not.toBeInTheDocument()
   })
 

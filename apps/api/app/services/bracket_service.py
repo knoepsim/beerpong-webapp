@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
     InvalidWinnerError,
+    MatchNotAtTableError,
     MatchNotReadyError,
     NotFoundError,
     ResultConflictError,
@@ -19,7 +20,9 @@ from app.models.result import Result, ResultType
 from app.schemas.match import BracketResponse, MatchResponse, MatchStatus
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import round_one_pairings
+from app.models.tournament_table import TournamentTable
 from app.services.revision import bump
+from app.services.table_planner import PlanMatch, assign_free_tables, plan
 from app.services.tournament_service import TournamentService
 from fastapi import Depends
 from typing import Annotated
@@ -152,12 +155,13 @@ class BracketService:
         - the winner must be one of the match's two teams
         - the next match must not be decided yet
         """
-        # Lock the match and its successor (always in this order) so concurrent reports for the
-        # same match or the same bracket path cannot pass the checks below at the same time
+        # Lock the tournament, then the match and its successor (always in this order): concurrent reports cannot
+        # pass the checks below at the same time, and the tables are planned by one report after the other
+        tournament_id = (await self._get_match(match_id)).tournament_id
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
         match = await self._get_match(match_id, for_update=True)
         if match.next_match_id is not None:
             await self._get_match(match.next_match_id, for_update=True)
-        tournament = await TournamentService(self.db).get_tournament(match.tournament_id)
         if not tournament.is_started:
             raise TournamentNotStartedError()
 
@@ -194,9 +198,96 @@ class BracketService:
             await self._advance_team(match.next_match_id, match.next_match_slot, winner_team_id)
 
         await self.db.flush()
+        await self.assign_tables(tournament.id)
         await bump(self.db, tournament.id, "bracket", "tournament")
         return entry
 
+    # -- tables ---------------------------------------------------------------------------------------------
+
+    async def _plan_input(self, tournament_id: UUID) -> tuple[list[Match], list[PlanMatch], list[UUID], dict]:
+        matches = list(
+            (await self.db.execute(select(Match).where(Match.tournament_id == tournament_id))).scalars().all()
+        )
+        results = await self._current_results([m.id for m in matches])
+        table_ids = list(
+            (
+                await self.db.execute(
+                    select(TournamentTable.id)
+                    .where(TournamentTable.tournament_id == tournament_id)
+                    .order_by(TournamentTable.position)
+                )
+            ).scalars()
+        )
+        feeders: dict[UUID, list[UUID]] = {}
+        for m in matches:
+            if m.next_match_id is not None:
+                feeders.setdefault(m.next_match_id, []).append(m.id)
+        planned = [
+            PlanMatch(
+                id=m.id,
+                round=m.round,
+                position=m.position,
+                feeders=tuple(feeders.get(m.id, ())),
+                ready=m.team_a_id is not None and m.team_b_id is not None,
+                ready_at=_timestamp(m.ready_at),
+                finished=m.id in results,
+                finished_at=_timestamp(results[m.id].created_at) if m.id in results else None,
+                table=m.table_id,
+                playing=m.on_table_at is not None,
+            )
+            for m in matches
+        ]
+        return matches, planned, table_ids, results
+
+    async def assign_tables(self, tournament_id: UUID) -> None:
+        """Bring the matches to the tables: keep what is being played, give free tables to the next ready matches.
+
+        Runs after the draw, after every result (also corrections) and when tables are added or deleted; the caller
+        holds the lock of the tournament, so one planning follows the other. See services/table_planner.py.
+        """
+        now = datetime.now(UTC)
+        matches, _, table_ids, results = await self._plan_input(tournament_id)
+        for m in matches:
+            ready = m.team_a_id is not None and m.team_b_id is not None
+            if not ready:
+                # it lost a team (a result was taken back): it waits again, without a table
+                m.ready_at = m.table_id = m.on_table_at = None
+            elif m.ready_at is None:
+                m.ready_at = now
+            # a match that is over or lost its table is not at a table (and so not live either)
+            if m.id in results or m.table_id not in table_ids:
+                m.on_table_at = None
+            if m.on_table_at is None:
+                m.started_at = None
+        await self.db.flush()
+
+        _, planned, _, _ = await self._plan_input(tournament_id)
+        by_id = {m.id: m for m in matches}
+        for match_id, table_id in assign_free_tables(planned, table_ids).items():
+            match = by_id[match_id]
+            if match.on_table_at is None:
+                match.table_id = table_id
+                match.on_table_at = now
+        await self.db.flush()
+
+
+    async def set_started(self, match_id: UUID, started: bool) -> None:
+        """Start a match at its table (live), or take the start back. A result can be reported without a start."""
+        tournament_id = (await self._get_match(match_id)).tournament_id
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
+        match = await self._get_match(match_id, for_update=True)
+        if not tournament.is_started:
+            raise TournamentNotStartedError()
+        if await self._has_active_result(match_id):
+            raise ResultConflictError("Das Spiel hat schon ein Ergebnis.")
+        if started and match.on_table_at is None:
+            raise MatchNotAtTableError()
+        if started and match.started_at is None:
+            match.started_at = datetime.now(UTC)
+        elif not started:
+            match.started_at = None
+        await self.db.flush()
+        await bump(self.db, tournament.id, "bracket")
 
     async def report_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
         """Report the first result for a match and advance the winner."""
@@ -228,7 +319,21 @@ class BracketService:
         results = await self._current_results([m.id for m in matches])
 
         total_rounds = max((m.round for m in matches), default=0)
-        responses = [self._to_response(m, results.get(m.id)) for m in matches]
+        names = dict(
+            (
+                await self.db.execute(
+                    select(TournamentTable.id, TournamentTable.name).where(TournamentTable.tournament_id == tournament_id)
+                )
+            ).all()
+        )
+        _, planned, table_ids, _ = await self._plan_input(tournament_id)
+        queue = {match_id: place for place, match_id in enumerate(plan(planned, table_ids).queue, start=1)}
+        responses = [
+            self._to_response(m, results.get(m.id)).model_copy(
+                update={"table_name": names.get(m.table_id), "queue_position": queue.get(m.id)}
+            )
+            for m in matches
+        ]
         final = next((r for r in responses if r.round == total_rounds), None)
 
         return BracketResponse(
@@ -242,10 +347,14 @@ class BracketService:
     def _to_response(match: Match, current: Result | None) -> MatchResponse:
         if current is not None:
             status = MatchStatus.FINISHED
-        elif match.team_a_id is not None and match.team_b_id is not None:
+        elif match.team_a_id is None or match.team_b_id is None:
+            status = MatchStatus.WAITING
+        elif match.started_at is not None:
+            status = MatchStatus.LIVE
+        elif match.on_table_at is not None:
             status = MatchStatus.READY
         else:
-            status = MatchStatus.WAITING
+            status = MatchStatus.QUEUED
         return MatchResponse.model_validate(match).model_copy(
             update={
                 "status": status,
@@ -258,3 +367,10 @@ class BracketService:
 
 def get_bracket_service(db: Annotated[AsyncSession, Depends(get_db)]) -> BracketService:
     return BracketService(db)
+
+
+def _timestamp(value: datetime | None) -> float | None:
+    """A comparable number for the planner (naive values from SQLite count as UTC)."""
+    if value is None:
+        return None
+    return (value if value.tzinfo else value.replace(tzinfo=UTC)).timestamp()

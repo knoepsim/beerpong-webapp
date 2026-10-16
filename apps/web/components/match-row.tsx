@@ -1,7 +1,9 @@
 import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
-import { describeSides, matchSummary, sideTone, tableLabel } from "@/lib/match-display";
+import { MatchStatusBadge } from "@/components/match-status-badge";
+import { MatchTable } from "@/components/match-table";
+import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchRowProps {
@@ -14,22 +16,17 @@ interface MatchRowProps {
   onClick?: (match: Match) => void;
 }
 
-/** The right-hand side of a row: only what belongs to the state of the match, nothing for a waiting one. */
+/** The right-hand side of a row: the status and the table to go to, or the cups of a finished match. */
 function Aside({ match }: Readonly<{ match: Match }>) {
-  const table = tableLabel(match);
   const cups = match.status === "finished" ? match.cups_left : null;
-  if (match.status === "ready" || table || cups != null) {
-    return (
-      <div className="flex w-[5.5rem] shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
-        {match.status === "ready" && (
-          <span className="rounded-full bg-primary px-2 py-0.5 font-medium text-primary-foreground">Bereit</span>
-        )}
-        {table && <span className="font-medium">{table}</span>}
-        {cups != null && <span className="text-balance text-muted-foreground">{cups} Becher übrig</span>}
-      </div>
-    );
-  }
-  return null;
+  if (match.status === "finished" && cups == null) return null;
+  return (
+    <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
+      <MatchStatusBadge match={match} />
+      <MatchTable match={match} className="max-w-full justify-end font-medium" />
+      {cups != null && <span className="text-balance text-muted-foreground">{cups} Becher übrig</span>}
+    </div>
+  );
 }
 
 /**

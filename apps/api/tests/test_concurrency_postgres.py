@@ -155,3 +155,34 @@ async def test_match_result_cannot_be_reported_twice_concurrently(client: AsyncC
     assert result[0] == 201 and result[1] == 409
     log = (await client.get(f"/matches/{match['id']}/results", headers=admin)).json()
     assert [r["type"] for r in log] == ["created"]
+
+
+@pytest.mark.asyncio
+async def test_two_results_at_the_same_time_do_not_give_one_table_to_two_matches(client: AsyncClient, monkeypatch):
+    admin, *players = [await login(client, i) for i in range(17)]
+    tid = (
+        await client.post(
+            "/tournaments",
+            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public", "table_count": 2},
+            headers=admin,
+        )
+    ).json()["id"]
+    for i in range(8):
+        team_id = await make_team(client, f"T{i}", players[2 * i], players[2 * i + 1])
+        await client.post(f"/tournaments/{tid}/join", json={"team_id": team_id}, headers=players[2 * i])
+    assert (await client.post(f"/tournaments/{tid}/start", headers=admin)).status_code == 200
+    matches = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"]
+    playing = [x for x in matches if x["round"] == 1 and x["table_name"]]
+    rendezvous(monkeypatch, BracketService, "_plan_input")
+
+    result = await statuses(
+        *(
+            client.post(f"/matches/{x['id']}/results", json={"winner_team_id": x["team_a_id"], "cups_left": 1}, headers=admin)
+            for x in playing
+        )
+    )
+
+    assert result == [201, 201]
+    matches = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"]
+    at_tables = [x["table_name"] for x in matches if x["status"] == "ready" and x["table_name"]]
+    assert sorted(at_tables) == ["Tisch 1", "Tisch 2"]

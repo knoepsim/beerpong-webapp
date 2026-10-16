@@ -70,7 +70,6 @@ class Tournament(Base):
     checkin_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_auto_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
-    table_count: Mapped[int] = mapped_column(Integer, default=1)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
     join_policy: Mapped[JoinPolicy] = mapped_column(

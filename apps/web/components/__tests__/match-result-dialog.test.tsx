@@ -4,11 +4,16 @@ import type { ReactNode } from 'react';
 import { MatchResultDialog } from '../match-result-dialog';
 import { api } from '@/lib/api';
 import { ResultType } from '@/types';
-import type { Result } from '@/types';
+import type { Match, Result } from '@/types';
+import { makeMatch } from '@/lib/test-fixtures/bracket';
 
 vi.mock('@/lib/api', () => ({
-  api: { results: { list: vi.fn(), create: vi.fn(), modify: vi.fn(), delete: vi.fn() } },
+  api: {
+    results: { list: vi.fn(), create: vi.fn(), modify: vi.fn(), delete: vi.fn() },
+    matches: { start: vi.fn(), undoStart: vi.fn() },
+  },
 }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/ui/dialog', () => ({
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -19,6 +24,9 @@ vi.mock('@/components/ui/dialog', () => ({
 const results = vi.mocked(api.results);
 const teamA = { id: 'a', name: 'Alpha' };
 const teamB = { id: 'b', name: 'Bravo' };
+
+const match = (overrides: Partial<Match> = {}): Match =>
+  makeMatch({ id: 'm1', round: 1, position: 0, team_a_id: 'a', team_b_id: 'b', status: 'queued', ...overrides });
 
 const result = (overrides: Partial<Result> = {}): Result => ({
   id: 'r1',
@@ -37,7 +45,7 @@ function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = 
   const onSuccess = vi.fn();
   const view = render(
     <MatchResultDialog
-      matchId="m1"
+      match={match()}
       teamA={teamA}
       teamB={teamB}
       open
@@ -246,7 +254,7 @@ describe('MatchResultDialog', () => {
 
   it('locks editing when the follow-up match already has a result', async () => {
     results.list.mockImplementation(async (id: string) => (id === 'next' ? [result({ id: 'n' })] : [result()]));
-    setup({ nextMatchId: 'next' });
+    setup({ match: match({ next_match_id: 'next' }) });
     await ready();
 
     expect(screen.getByText('Bearbeiten gesperrt')).toBeInTheDocument();
@@ -261,7 +269,7 @@ describe('MatchResultDialog', () => {
     ['has no results', []],
   ])('does not lock when the follow-up match %s', async (_name, nextResults) => {
     results.list.mockImplementation(async (id: string) => (id === 'next' ? nextResults : [result()]));
-    setup({ nextMatchId: 'next' });
+    setup({ match: match({ next_match_id: 'next' }) });
     await ready();
     expect(screen.queryByText('Bearbeiten gesperrt')).not.toBeInTheDocument();
   });
@@ -287,5 +295,43 @@ describe('MatchResultDialog', () => {
     await ready();
     fireEvent.click(saveButton());
     expect(results.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchResultDialog: start', () => {
+  beforeEach(() => {
+    vi.mocked(api.results.list).mockResolvedValue([]);
+    vi.mocked(api.matches.start).mockReset().mockResolvedValue(undefined);
+    vi.mocked(api.matches.undoStart).mockReset().mockResolvedValue(undefined);
+  });
+
+  it('starts a match at its table and shows the table', async () => {
+    const { onSuccess, onOpenChange } = setup({ match: match({ status: 'ready', table_id: 't', table_name: 'Terrasse' }) });
+    await ready();
+
+    expect(screen.getByText('Terrasse')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Spiel starten' }));
+
+    await waitFor(() => expect(api.matches.start).toHaveBeenCalledWith('m1'));
+    expect(onSuccess).toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('cannot start a match without a table, but the result can still be reported', async () => {
+    setup({ match: match({ status: 'queued', queue_position: 2 }) });
+    await ready();
+
+    expect(screen.queryByRole('button', { name: 'Spiel starten' })).not.toBeInTheDocument();
+    expect(screen.getByText('Platz 2')).toBeInTheDocument();
+    expect(saveButton()).toBeInTheDocument();
+  });
+
+  it('shows since when a live match runs and can take the start back', async () => {
+    setup({ match: match({ status: 'live', table_id: 't', table_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
+    await ready();
+
+    expect(screen.getByText(/^seit \d{2}:\d{2} Uhr$/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Start zurücknehmen' }));
+    await waitFor(() => expect(api.matches.undoStart).toHaveBeenCalledWith('m1'));
   });
 });
