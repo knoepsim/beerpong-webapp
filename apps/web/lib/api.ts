@@ -179,7 +179,6 @@ export const api = {
 
   teams: {
     list: () => request<Team[]>("/teams"),
-    get: (id: string) => request<Team>(`/teams/${id}`),
     create: (name: string) =>
       request<Team>("/teams", {
         method: "POST",

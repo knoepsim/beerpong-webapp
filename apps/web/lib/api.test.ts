@@ -225,7 +225,6 @@ describe('api endpoints', () => {
     ['users.requestPhoneChange', () => api.users.requestPhoneChange('+49'), 'POST', '/users/me/phone/request', { new_phone_number: '+49' }],
     ['users.verifyPhoneChange', () => api.users.verifyPhoneChange('+49', '1'), 'POST', '/users/me/phone/verify', { new_phone_number: '+49', code: '1' }],
     ['teams.list', () => api.teams.list(), 'GET', '/teams', undefined],
-    ['teams.get', () => api.teams.get('t1'), 'GET', '/teams/t1', undefined],
     ['teams.create', () => api.teams.create('Team'), 'POST', '/teams', { name: 'Team' }],
     ['teams.update', () => api.teams.update('t1', 'New'), 'PATCH', '/teams/t1', { name: 'New' }],
     ['teams.delete', () => api.teams.delete('t1'), 'DELETE', '/teams/t1', undefined],

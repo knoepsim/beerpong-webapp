@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import DbSession
 
 optional_security_scheme = HTTPBearer(auto_error=False)
 
@@ -129,8 +129,8 @@ async def _user_for_token(token: str, db: AsyncSession):
 
 async def get_current_user(
     request: Request,
+    db: DbSession,
     credentials: HTTPAuthorizationCredentials | None = Depends(optional_security_scheme),
-    db: AsyncSession = Depends(get_db),
 ):
     """FastAPI dependency: the logged-in user from the Authorization header or the session cookie."""
     token = _bearer_or_cookie(request, credentials)
@@ -151,7 +151,7 @@ async def user_from_request(request: Request, db: AsyncSession):
         return None
 
 
-async def get_optional_user(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_optional_user(request: Request, db: DbSession):
     """Like get_current_user, but for pages anybody may open: no (or an invalid) token means a stranger, not an error."""
     return await user_from_request(request, db)
 

@@ -1,5 +1,7 @@
 from collections.abc import AsyncGenerator
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -23,3 +25,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+# The session of a request, committed before the response is sent. With FastAPI's default scope ("request") the code
+# after `yield` runs only after the response went out, so a client asking again right away (create a team, then load
+# the list) could still read the old state.
+DbSession = Annotated[AsyncSession, Depends(get_db, scope="function")]

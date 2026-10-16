@@ -1,12 +1,10 @@
 from datetime import UTC, datetime
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, TournamentAlreadyStartedError
 from app.models.team import Team
 from app.models.tournament import TournamentTeam
@@ -85,5 +83,5 @@ class LifecycleService:
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])
 
 
-def get_lifecycle_service(db: Annotated[AsyncSession, Depends(get_db)]) -> LifecycleService:
+def get_lifecycle_service(db: DbSession) -> LifecycleService:
     return LifecycleService(db)

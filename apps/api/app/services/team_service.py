@@ -15,9 +15,7 @@ from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
 from app.repositories.team_repository import team_repository
 from app.schemas.team import TeamDeleteBlocker, TeamMemberResponse, TeamResponse
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.services.revision import bump_for_team
 
 
@@ -192,5 +190,5 @@ class TeamService:
 
 
 
-def get_team_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TeamService:
+def get_team_service(db: DbSession) -> TeamService:
     return TeamService(db)

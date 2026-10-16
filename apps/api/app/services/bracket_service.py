@@ -24,9 +24,7 @@ from app.models.tournament_table import TournamentTable
 from app.services.revision import bump
 from app.services.table_planner import PlanMatch, assign_free_tables, certain_next_tables, plan
 from app.services.tournament_service import TournamentService
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 
 
 class BracketService:
@@ -371,7 +369,7 @@ class BracketService:
 
 
 
-def get_bracket_service(db: Annotated[AsyncSession, Depends(get_db)]) -> BracketService:
+def get_bracket_service(db: DbSession) -> BracketService:
     return BracketService(db)
 
 

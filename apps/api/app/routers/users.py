@@ -1,8 +1,7 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.user import UserPublic, UserResponse, UserUpdate, PhoneNumberChangeRequest, PhoneNumberChangeVerify
@@ -30,7 +29,7 @@ async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
 async def update_me(
     body: UserUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await UserService(db).update_user(current_user, body)
 
@@ -44,7 +43,7 @@ async def update_me(
 async def request_phone_change(
     body: PhoneNumberChangeRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await UserService(db).request_phone_number_change(body.new_phone_number)
 
@@ -58,7 +57,7 @@ async def request_phone_change(
 async def verify_phone_change(
     body: PhoneNumberChangeVerify,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await UserService(db).verify_and_update_phone_number(current_user, body.new_phone_number, body.code)
 
@@ -73,7 +72,7 @@ async def verify_phone_change(
 async def search_users(
     query: str,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     if len(query) < 2:
         return []

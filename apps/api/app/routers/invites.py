@@ -1,9 +1,7 @@
-from typing import Annotated
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.schemas.tournament import TournamentPreview
 from app.services.invite_service import InviteService
 
@@ -17,5 +15,5 @@ router = APIRouter(prefix="/invites", tags=["Invites"])
     description="Name, Zeit und Ort des Turniers hinter einem Einladungslink, ohne Anmeldung abrufbar. "
     "Unbekannte und gelöschte Links antworten gleich (404).",
 )
-async def open_invite(token: str, db: Annotated[AsyncSession, Depends(get_db)]):
+async def open_invite(token: str, db: DbSession):
     return await InviteService(db).preview(token)

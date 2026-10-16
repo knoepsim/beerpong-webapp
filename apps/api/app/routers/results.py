@@ -6,11 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user, get_optional_user
 from app.models.match import Match
-from app.models.result import Result, ResultType
+from app.models.result import Result
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
 from app.schemas.result import ResultCreate, ResultResponse
@@ -42,7 +42,7 @@ async def create_result(
     match_id: UUID,
     body: ResultCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     match = await _get_match(db, match_id)
     await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
@@ -60,7 +60,7 @@ async def modify_result(
     match_id: UUID,
     body: ResultCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     match = await _get_match(db, match_id)
     await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
@@ -78,7 +78,7 @@ async def modify_result(
 async def delete_result(
     match_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     match = await _get_match(db, match_id)
     await RoleService(db).require_role(match.tournament_id, current_user.id, TournamentRoleType.REFEREE
@@ -97,7 +97,7 @@ async def delete_result(
 async def list_results(
     match_id: UUID,
     viewer: Annotated[User | None, Depends(get_optional_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     match = await _get_match(db, match_id)
     service = TournamentService(db)

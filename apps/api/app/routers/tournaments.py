@@ -3,9 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.exceptions import NotFoundError
 from app.core.security import get_current_user, get_optional_user
 from app.models.tournament import JoinPolicy, Tournament
@@ -43,7 +42,7 @@ router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 async def create_tournament(
     body: TournamentCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await TournamentService(db).create_tournament(body, current_user.id)
 
@@ -58,7 +57,7 @@ async def update_tournament(
     tournament_id: UUID,
     body: TournamentUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await TournamentService(db).update_tournament(tournament_id, body)
@@ -74,7 +73,7 @@ async def update_tournament(
 async def list_invites(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).get_tournament(tournament_id)
@@ -92,7 +91,7 @@ async def create_invite(
     tournament_id: UUID,
     body: InviteCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).get_tournament(tournament_id)
@@ -112,7 +111,7 @@ async def delete_invite(
     tournament_id: UUID,
     invite_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await InviteService(db).delete(tournament_id, invite_id)
@@ -128,7 +127,7 @@ async def delete_invite(
 async def delete_tournament(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.ADMIN)
     await TournamentService(db).delete_tournament(tournament_id)
@@ -142,7 +141,7 @@ async def delete_tournament(
 )
 async def get_my_tournaments(
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await TournamentService(db).get_my_tournaments(current_user.id)
 
@@ -156,7 +155,7 @@ async def get_my_tournaments(
 async def get_tournament_by_slug(
     slug: str,
     viewer: Annotated[User | None, Depends(get_optional_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     service = TournamentService(db)
     tournament = await service.get_tournament_by_slug(slug)
@@ -174,7 +173,7 @@ async def get_tournament_by_slug(
     description="Name, Zeit und Ort eines Turniers, dem jeder mit Link beitreten darf, ohne Anmeldung abrufbar. "
     "Bei Turnieren, die nur mit Einladungslink offen sind, antwortet die Adresse wie eine unbekannte (404).",
 )
-async def get_tournament_preview(slug: str, db: Annotated[AsyncSession, Depends(get_db)]):
+async def get_tournament_preview(slug: str, db: DbSession):
     tournament = await TournamentService(db).get_tournament_by_slug(slug)
     if tournament.join_policy != JoinPolicy.OPEN:
         raise NotFoundError("Tournament")
@@ -200,7 +199,7 @@ async def join_tournament(
     tournament_id: UUID,
     body: TournamentJoinRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await TournamentService(db).join_tournament(tournament_id, body.team_id, body.invite_token)
 
@@ -214,7 +213,7 @@ async def join_tournament(
 async def leave_tournament(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await TournamentService(db).leave_tournament(tournament_id, current_user.id)
 
@@ -227,7 +226,7 @@ async def leave_tournament(
 )
 async def get_bracket(
     tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await BracketService(db).get_bracket(tournament.id)
 
@@ -243,7 +242,7 @@ from app.schemas.team import TournamentTeamResponse, TeamMemberResponse
 async def get_teams(
     tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
     viewer: Annotated[User | None, Depends(get_optional_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     # strangers (and everybody who is neither a player nor a helper here) see the team names, not the players
     involved = await TournamentService(db).is_involved(tournament.id, viewer.id if viewer else None)
@@ -276,7 +275,7 @@ async def remove_team_from_tournament(
     tournament_id: UUID,
     team_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).remove_team(tournament_id, team_id)
@@ -300,7 +299,7 @@ async def checkin_team(
     team_id: UUID,
     body: CheckinRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).checkin_team(tournament_id, team_id, body.is_checked_in)
@@ -317,7 +316,7 @@ async def set_registration(
     tournament_id: UUID,
     body: OpenRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await LifecycleService(db).set_registration_open(tournament_id, body.open)
@@ -335,7 +334,7 @@ async def set_checkin(
     tournament_id: UUID,
     body: OpenRequest,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await LifecycleService(db).set_checkin_open(tournament_id, body.open)
@@ -353,7 +352,7 @@ async def set_checkin(
 async def start_tournament(
     tournament_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await LifecycleService(db).start_tournament(tournament_id)

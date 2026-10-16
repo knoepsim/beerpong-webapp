@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.security import get_current_user
 from app.models.user import User
 from app.schemas.team import TeamCreate, TeamInviteResponse, TeamInviteDetailsResponse, TeamResponse, TeamUpdate
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/teams", tags=["Teams"])
 async def create_team(
     body: TeamCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     team = await TeamService(db).create_team(body.name, current_user.id)
     return await TeamService(db).to_response(team)
@@ -37,7 +37,7 @@ async def create_team(
 )
 async def list_my_teams(
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     teams = await TeamService(db).get_user_teams(current_user.id)
     return [await TeamService(db).to_response(team) for team in teams]
@@ -52,7 +52,7 @@ async def list_my_teams(
 async def get_team(
     team_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     team = await TeamService(db).get_team(team_id)
     await _ensure_is_member(db, team_id, current_user.id)
@@ -75,7 +75,7 @@ async def update_team(
     team_id: UUID,
     body: TeamUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     team = await TeamService(db).get_team(team_id)
     await _ensure_is_member(db, team_id, current_user.id)
@@ -93,7 +93,7 @@ async def update_team(
 async def delete_team(
     team_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     team = await TeamService(db).get_team(team_id)
     await _ensure_is_member(db, team_id, current_user.id)
@@ -111,7 +111,7 @@ async def delete_team(
 async def create_invite(
     team_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await TeamService(db).create_invite(team_id, current_user.id)
 
@@ -124,7 +124,7 @@ async def create_invite(
 )
 async def get_invite_details(
     token: str,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     details = await TeamService(db).get_invite_details(token)
     return TeamInviteDetailsResponse(**details)
@@ -139,7 +139,7 @@ async def get_invite_details(
 async def accept_invite(
     token: str,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     team = await TeamService(db).accept_invite(token, current_user.id)
     return await TeamService(db).to_response(team)

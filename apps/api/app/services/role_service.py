@@ -6,9 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InsufficientRoleError, NotFoundError
 from app.models.tournament_role import ROLE_HIERARCHY, TournamentRoleType, TournamentUserRole
 from app.models.user import User
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.services.revision import bump
 
 
@@ -131,5 +129,5 @@ class RoleService:
 
 
 
-def get_role_service(db: Annotated[AsyncSession, Depends(get_db)]) -> RoleService:
+def get_role_service(db: DbSession) -> RoleService:
     return RoleService(db)

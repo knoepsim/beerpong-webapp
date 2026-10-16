@@ -30,8 +30,8 @@ from app.services.table_service import TableService
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
-from app.core.database import get_db
-from app.core.security import get_current_user, get_optional_user
+from app.core.database import DbSession
+from app.core.security import get_optional_user
 from app.models.user import User
 
 
@@ -346,7 +346,7 @@ class TournamentService:
         await bump(self.db, tournament_id, "teams")
 
 
-def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TournamentService:
+def get_tournament_service(db: DbSession) -> TournamentService:
     return TournamentService(db)
 
 

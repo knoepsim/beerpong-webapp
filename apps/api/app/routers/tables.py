@@ -2,9 +2,8 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.security import get_current_user
 from app.models.tournament import Tournament
 from app.models.tournament_role import TournamentRoleType
@@ -25,7 +24,7 @@ router = APIRouter(prefix="/tournaments/{tournament_id}/tables", tags=["Tables"]
 )
 async def list_tables(
     tournament: Annotated[Tournament, Depends(get_accessible_tournament)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     return await TableService(db).list_tables(tournament.id)
 
@@ -41,7 +40,7 @@ async def add_table(
     tournament_id: UUID,
     body: TableCreate,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TournamentService(db).get_tournament(tournament_id)
@@ -59,7 +58,7 @@ async def rename_table(
     table_id: UUID,
     body: TableRename,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await TableService(db).rename(tournament_id, table_id, body.name)
@@ -75,7 +74,7 @@ async def delete_table(
     tournament_id: UUID,
     table_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await TableService(db).delete(tournament_id, table_id)
