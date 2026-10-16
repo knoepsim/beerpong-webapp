@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 
-security_scheme = HTTPBearer()
+optional_security_scheme = HTTPBearer(auto_error=False)
 
 
 def create_access_token(user_id: UUID) -> str:
@@ -73,14 +73,50 @@ def generate_sms_code() -> str:
     return "".join(str(secrets.randbelow(10)) for _ in range(settings.sms_code_length))
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
-    db: AsyncSession = Depends(get_db),
-):
-    """FastAPI dependency: extract and verify JWT, return User object."""
+ACCESS_COOKIE = "beerpong_access_token"
+REFRESH_COOKIE = "beerpong_refresh_token"
+# A browser sends this header only from our own pages (a form on another site cannot set it, a script on another
+# site needs a CORS preflight we refuse): together with SameSite=Lax it keeps other sites from acting for a user.
+CSRF_HEADER = "X-Requested-With"
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    """Start a browser session: both tokens as HttpOnly cookies, out of reach of scripts on the page.
+
+    The access cookie outlives the (short) access token it holds: an expired token is renewed with the refresh cookie,
+    but the page proxy still sees that a session exists."""
+    lifetime = settings.refresh_token_expire_days * 24 * 3600
+    common = {"httponly": True, "secure": settings.cookies_secure, "samesite": "lax", "max_age": lifetime}
+    response.set_cookie(ACCESS_COOKIE, access_token, path="/", **common)
+    response.set_cookie(REFRESH_COOKIE, refresh_token, path=settings.refresh_cookie_path, **common)
+
+
+def clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(ACCESS_COOKIE, path="/")
+    response.delete_cookie(REFRESH_COOKIE, path=settings.refresh_cookie_path)
+
+
+def require_csrf_header(request: Request) -> None:
+    """Writing requests that rely on a cookie must come from our own pages."""
+    if request.method not in _SAFE_METHODS and CSRF_HEADER not in request.headers:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing request header")
+
+
+def _bearer_or_cookie(request: Request, credentials: HTTPAuthorizationCredentials | None) -> str | None:
+    """The access token of a request: an Authorization header (scripts, tests) wins over the session cookie."""
+    if credentials is not None:
+        return credentials.credentials
+    token = request.cookies.get(ACCESS_COOKIE)
+    if token is not None:
+        require_csrf_header(request)
+    return token
+
+
+async def _user_for_token(token: str, db: AsyncSession):
     from app.models.user import User
 
-    user_id = verify_access_token(credentials.credentials)
+    user_id = verify_access_token(token)
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
@@ -91,28 +127,33 @@ async def get_current_user(
     return user
 
 
-optional_security_scheme = HTTPBearer(auto_error=False)
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """FastAPI dependency: the logged-in user from the Authorization header or the session cookie."""
+    token = _bearer_or_cookie(request, credentials)
+    if token is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    return await _user_for_token(token, db)
 
 
-async def user_from_authorization(authorization: str | None, db: AsyncSession):
-    """The user behind an `Authorization: Bearer ...` header, None for no or an invalid token (a stranger)."""
-    scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not token:
+async def user_from_request(request: Request, db: AsyncSession):
+    """The user behind a request, None for no or an invalid token (a stranger)."""
+    credentials = await optional_security_scheme(request)
+    token = credentials.credentials if credentials else request.cookies.get(ACCESS_COOKIE)
+    if token is None:
         return None
     try:
-        return await get_current_user(HTTPAuthorizationCredentials(scheme=scheme, credentials=token), db)
+        return await _user_for_token(token, db)
     except HTTPException:
         return None
 
 
-async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security_scheme),
-    db: AsyncSession = Depends(get_db),
-):
+async def get_optional_user(request: Request, db: AsyncSession = Depends(get_db)):
     """Like get_current_user, but for pages anybody may open: no (or an invalid) token means a stranger, not an error."""
-    if credentials is None:
-        return None
-    return await user_from_authorization(f"{credentials.scheme} {credentials.credentials}", db)
+    return await user_from_request(request, db)
 
 
 async def get_current_system_admin(

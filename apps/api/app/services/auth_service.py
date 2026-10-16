@@ -178,6 +178,11 @@ class AuthService:
         return TokenResponse(access_token=access_token, refresh_token=new_raw_refresh)
 
 
+    async def revoke_refresh_token(self, raw_refresh_token: str) -> None:
+        """End one session: its refresh token cannot be used any more (unknown tokens are ignored)."""
+        token_hash = hashlib.sha256(raw_refresh_token.encode()).hexdigest()
+        await self.db.execute(update(RefreshToken).where(RefreshToken.token_hash == token_hash).values(revoked=True))
+
     async def revoke_all_user_tokens(self, user_id: UUID) -> None:
         """Revoke all refresh tokens for a user (e.g. on phone number change)."""
         await self.db.execute(

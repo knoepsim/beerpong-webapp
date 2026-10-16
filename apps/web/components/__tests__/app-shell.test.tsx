@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { AppShell } from '../app-shell';
-import { clearTokens, setTokens } from '@/lib/auth';
 
 const usePathname = vi.fn();
 const useCurrentUser = vi.fn();
@@ -85,16 +84,16 @@ describe('AppShell', () => {
     expect(screen.queryByText('Anmelden')).not.toBeInTheDocument()
   })
 
-  it('logs out: clears tokens and goes to the login', () => {
+  it('logs out: ends the session on the server and goes to the login', async () => {
     const location = { href: '/teams' };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
     vi.stubGlobal('location', location);
-    setTokens('a', 'r');
+    vi.stubGlobal('fetch', fetchMock);
 
     render(<AppShell>x</AppShell>);
     fireEvent.click(screen.getByText('Abmelden'));
 
-    expect(location.href).toBe('/login');
-    expect(localStorage.getItem('beerpong_access_token')).toBeNull();
-    clearTokens();
+    await waitFor(() => expect(location.href).toBe('/login'));
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/logout$/);
   });
 });

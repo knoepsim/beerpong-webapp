@@ -10,8 +10,17 @@ class Settings(BaseSettings):
 
     # JWT
     secret_key: str = "CHANGE-ME-IN-PRODUCTION"
-    access_token_expire_minutes: int = 43200
+    # The access token is short-lived and renewed in the background; what keeps somebody logged in is the refresh
+    # token: every use of it issues a new one for another refresh_token_expire_days, so an active user stays logged in
+    # and a phone that was in a pocket for an hour just renews silently.
+    access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30
+
+    # Session cookies (HttpOnly, SameSite=Lax). Secure by default in production only: a phone that opens the dev
+    # server over plain http in the local network would not get a Secure cookie. Set COOKIE_SECURE to override.
+    cookie_secure: bool | None = None
+    # Path the browser sees for the refresh endpoint (the web app proxies the API under /api)
+    refresh_cookie_path: str = "/api/auth"
 
     # SMS Verification
     sms_code_expire_minutes: int = 5
@@ -56,6 +65,11 @@ class Settings(BaseSettings):
         if problems:
             raise ValueError("Insecure production configuration: " + "; ".join(problems))
         return self
+
+
+    @property
+    def cookies_secure(self) -> bool:
+        return self.environment == "production" if self.cookie_secure is None else self.cookie_secure
 
 
 settings = Settings()

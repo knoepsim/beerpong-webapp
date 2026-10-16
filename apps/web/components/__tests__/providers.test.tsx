@@ -4,11 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { QueryProvider } from '../query-provider';
 import { ThemeProvider } from '../theme-provider';
 import { UserProvider, useCurrentUser } from '../user-provider';
-import { clearTokens, setTokens } from '@/lib/auth';
-import { api } from '@/lib/api';
+import { api, NetworkError } from '@/lib/api';
 import type { User } from '@/types';
 
-vi.mock('@/lib/api', () => ({ api: { users: { me: vi.fn() } } }));
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
+  api: { users: { me: vi.fn() } },
+}));
 
 const me = vi.mocked(api.users.me);
 const aUser = { id: 'u1', name: 'Ada', is_system_admin: false } as User;
@@ -26,24 +28,22 @@ function Probe() {
 describe('UserProvider', () => {
   beforeEach(() => {
     me.mockReset();
-    clearTokens();
   });
 
-  it('stays anonymous without an access token', async () => {
+  it('is anonymous for a visitor without a session, who is asked as a guest (no redirect to the login)', async () => {
+    me.mockRejectedValue(new Error('Not authenticated'));
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
-    expect(me).not.toHaveBeenCalled();
+    expect(me).toHaveBeenCalledWith({ guest: true });
   });
 
   it('loads the current user when logged in', async () => {
-    setTokens('a', 'r');
     me.mockResolvedValue(aUser);
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
   });
 
   it('falls back to anonymous when loading fails and can reload', async () => {
-    setTokens('a', 'r');
     me.mockRejectedValueOnce(new Error('boom'));
     render(<UserProvider><Probe /></UserProvider>);
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
@@ -52,6 +52,21 @@ describe('UserProvider', () => {
     screen.getByText('reload').click();
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
   });
+
+  it('keeps the user it knows when the network fails, and asks again when it is back', async () => {
+    me.mockResolvedValueOnce(aUser)
+    render(<UserProvider><Probe /></UserProvider>)
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'))
+
+    me.mockRejectedValueOnce(new NetworkError())
+    screen.getByText('reload').click()
+    await waitFor(() => expect(me).toHaveBeenCalledTimes(2))
+    expect(screen.getByTestId('state')).toHaveTextContent('Ada')
+
+    me.mockResolvedValue({ ...aUser, name: 'Ada Neu' })
+    window.dispatchEvent(new Event('online'))
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada Neu'))
+  })
 
   it('exposes a loading default context without provider', () => {
     render(<Probe />);
