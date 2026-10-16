@@ -39,8 +39,8 @@ const ICONS: Record<StatusIcon, LucideIcon> = {
 };
 
 /** The tone as the variant of the alert; the sentence says the same in words (never color alone). */
-const VARIANTS: Record<StatusTone, "destructive" | "warning" | "info" | "default" | "success"> = {
-  urgent: "destructive",
+const VARIANTS: Record<StatusTone, "error" | "warning" | "info" | "default" | "success"> = {
+  urgent: "error",
   attention: "warning",
   active: "info",
   relaxed: "default",
@@ -51,9 +51,9 @@ function StatusCard({ status, children }: Readonly<{ status: MyStatus; children?
   const Icon = ICONS[status.icon];
   return (
     // a lasting state, announced politely (not role="alert", which interrupts)
-    <Alert variant={VARIANTS[status.tone]} role="status">
-      <Icon aria-hidden="true" />
-      <AlertTitle>{status.title}</AlertTitle>
+    <Alert variant={VARIANTS[status.tone]} role="status" className="gap-x-3 rounded-xl px-4 py-3">
+      <Icon className="size-5" aria-hidden="true" />
+      <AlertTitle className="font-semibold leading-snug text-balance">{status.title}</AlertTitle>
       {status.detail && <AlertDescription>{status.detail}</AlertDescription>}
       {children && <div className="col-span-full mt-3 space-y-2">{children}</div>}
     </Alert>
