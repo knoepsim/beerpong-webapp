@@ -8,9 +8,9 @@ import type { Bracket, Match } from '@/types'
 const NOW = new Date('2099-07-01T12:00:00Z')
 const finished = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 3 })
 
-function inBracket(bracket: Bracket, teamId: string) {
+function inBracket(bracket: Bracket, teamId: string, now = NOW) {
   const slots = allMatchSlots(buildBracketLayout(bracket))
-  return statusInBracket(slots, bracket.total_rounds, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, bracket.champion_team_id)
+  return statusInBracket(slots, bracket.total_rounds, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, bracket.champion_team_id, now)
 }
 
 describe('statusBeforeStart', () => {
@@ -64,16 +64,28 @@ describe('statusInBracket', () => {
     expect([later.tone, later.detail]).toEqual(['relaxed', 'Platz 3 in der Warteschlange.'])
   })
 
-  it('tells a team waiting for its opponent who it can be and how far that match is', () => {
-    const s = inBracket(fiveTeamBracket({ m1: { status: 'live' } }), 't1')!
+  it('tells a team waiting for its opponent who it can be and since when that match runs', () => {
+    const live = (minutesAgo: number) =>
+      fiveTeamBracket({ m1: { status: 'live', started_at: new Date(NOW.getTime() - minutesAgo * 60_000).toISOString() } })
+    const s = inBracket(live(8), 't1')!
     expect([s.tone, s.icon, s.title]).toEqual(['relaxed', 'pause', 'Pause: Du wartest auf deinen Gegner.'])
-    expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 (Spiel 1 – läuft an Tisch 1).')
+    expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 – spielen an Tisch 1, seit 8 Minuten.')
+    expect(inBracket(live(0), 't1')!.detail).toBe('Dein Gegner: Team 4 oder Team 5 – spielen an Tisch 1, gerade gestartet.')
   })
 
   it('shows no place in the queue while waiting for the opponent, the queue is the other match', () => {
     const s = inBracket(fiveTeamBracket({ m1: { status: 'queued', table_id: null, table_name: null, queue_position: 2 } }), 't1')!
-    expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 (Spiel 1 – wartet auf einen Tisch).')
-    expect(s.slot?.match.queue_position).toBeNull()
+    expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 – warten noch auf einen Tisch.')
+  })
+
+  it('names the table of the next match when the API says it is certain, where the opponent plays now', () => {
+    const bracket = fiveTeamBracket({
+      m1: { status: 'live', started_at: new Date(NOW.getTime() - 5 * 60_000).toISOString() },
+      m2: { upcoming_table_id: 'x1', upcoming_table_name: 'Tisch 1' },
+    })
+    const s = inBracket(bracket, 't1')!
+    expect(s.detail).toBe('Euer Spiel ist danach an Tisch 1. Dort spielen gerade Team 4 und Team 5, seit 5 Minuten.')
+    expect(s.slot?.match.upcoming_table_name).toBe('Tisch 1')
   })
 
   it('gives the place of a team that is out, and the winner its trophy', () => {

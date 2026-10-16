@@ -18,6 +18,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MatchRow } from "@/components/match-row";
+import { useNow } from "@/hooks/use-now";
 import { JoinTournament } from "@/components/join-tournament";
 import { allMatchSlots, buildBracketLayout } from "@/lib/bracket-layout";
 import { formatWhen } from "@/lib/format-when";
@@ -94,6 +95,7 @@ export function ParticipantStatus({
   onLeave,
 }: Readonly<ParticipantStatusProps>) {
   const slots = useMemo(() => (bracket ? allMatchSlots(buildBracketLayout(bracket)) : []), [bracket]);
+  const now = useNow();
 
   if (!team) {
     if (!tournament.registration_open || canManage) return null;
@@ -119,7 +121,7 @@ export function ParticipantStatus({
   }
 
   const status = tournament.started_at
-    ? bracket && statusInBracket(slots, bracket.total_rounds, team, teamsMap, bracket.champion_team_id)
+    ? bracket && statusInBracket(slots, bracket.total_rounds, team, teamsMap, bracket.champion_team_id, now)
     : statusBeforeStart(tournament, team);
   if (!status) return null;
 

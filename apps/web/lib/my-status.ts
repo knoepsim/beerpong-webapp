@@ -66,22 +66,44 @@ export function statusBeforeStart(tournament: Tournament, team: TournamentTeam, 
   return { tone: "done", icon: "check", title: `${team.name} ist angemeldet.`, detail: start };
 }
 
-/** Where the opponent of a match still comes from: the feeder match, with its teams and how far it is. */
-function opponentSource(slot: MatchSlot, slots: MatchSlot[], teamId: string, teamsMap: Record<string, Team>): string {
+/** ", seit 8 Minuten" for a running match (real data, no forecast: everybody knows how long a match takes). */
+function runningFor(startedAt: string | null, now: Date): string {
+  if (!startedAt) return "";
+  const minutes = Math.floor((now.getTime() - Date.parse(startedAt)) / 60_000);
+  if (minutes < 1) return ", gerade gestartet";
+  return minutes === 1 ? ", seit 1 Minute" : `, seit ${minutes} Minuten`;
+}
+
+/**
+ * Who the opponent can be and how far that match is, so a waiting team can judge how long its break lasts and
+ * where to watch. The table of the own match only when the API says it is certain; no place in the queue of the
+ * other match (it would read as the own one).
+ */
+function opponentSource(
+  slot: MatchSlot,
+  slots: MatchSlot[],
+  teamId: string,
+  teamsMap: Record<string, Team>,
+  now: Date,
+): string {
   const missing = slot.match.team_a_id === teamId ? "b" : "a";
-  const number = slot.sources[missing];
-  const feeder = slots.find((s) => s.number === number);
-  if (!feeder) return "Dein Gegner steht noch nicht fest.";
-  const { match } = feeder;
-  if (!match.team_a_id || !match.team_b_id) return `Dein Gegner ist der Sieger aus Spiel ${feeder.number}.`;
-  const pair = `${name(teamsMap, match.team_a_id)} oder ${name(teamsMap, match.team_b_id)}`;
+  const feeder = slots.find((s) => s.number === slot.sources[missing])?.match;
+  if (!feeder?.team_a_id || !feeder.team_b_id) return "Dein Gegner steht noch nicht fest.";
+  const [a, b] = [name(teamsMap, feeder.team_a_id), name(teamsMap, feeder.team_b_id)];
+  const upcoming = slot.match.upcoming_table_name;
+  const atTable = feeder.status === "live" || feeder.status === "ready" ? feeder.table_name : null;
+  if (upcoming && upcoming === atTable) {
+    // the usual case at the end: the winner stays, so the next match is where the opponent plays now
+    const there = feeder.status === "live" ? `spielen gerade ${a} und ${b}${runningFor(feeder.started_at, now)}` : `spielen gleich ${a} und ${b}`;
+    return `Euer Spiel ist danach an ${upcoming}. Dort ${there}.`;
+  }
   const progress: Partial<Record<Match["status"], string>> = {
-    live: match.table_name ? ` – läuft an ${match.table_name}` : " – läuft",
-    ready: match.table_name ? ` – gleich an ${match.table_name}` : "",
-    // no place in the queue here: it belongs to the other match and would read as my own
-    queued: " – wartet auf einen Tisch",
+    live: `spielen an ${feeder.table_name}${runningFor(feeder.started_at, now)}`,
+    ready: `gleich an ${feeder.table_name}`,
+    queued: "warten noch auf einen Tisch",
   };
-  return `Dein Gegner: ${pair} (Spiel ${feeder.number}${progress[match.status] ?? ""}).`;
+  const opponent = `Dein Gegner: ${a} oder ${b} – ${progress[feeder.status] ?? "noch offen"}.`;
+  return upcoming ? `Euer Spiel ist danach an ${upcoming}. ${opponent}` : opponent;
 }
 
 /** While it runs and after: the next match of the team, or how it ended. */
@@ -91,6 +113,7 @@ export function statusInBracket(
   team: TournamentTeam,
   teamsMap: Record<string, Team>,
   championTeamId: string | null,
+  now: Date = new Date(),
 ): MyStatus | null {
   const mine = slots.filter((s) => s.match.team_a_id === team.id || s.match.team_b_id === team.id);
   if (championTeamId === team.id) {
@@ -133,7 +156,7 @@ export function statusInBracket(
         tone: "relaxed",
         icon: "pause",
         title: "Pause: Du wartest auf deinen Gegner.",
-        detail: opponentSource(next, slots, team.id, teamsMap),
+        detail: opponentSource(next, slots, team.id, teamsMap, now),
         slot: next,
       };
   }

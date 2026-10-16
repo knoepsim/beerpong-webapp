@@ -40,6 +40,8 @@ describe('tableOf', () => {
     expect(tableOf(slot({ table_name: 'Terrasse' }).match)).toBe('Terrasse')
     expect(tableOf(slot({ status: 'live', table_name: 'Terrasse' }).match)).toBe('Terrasse')
     expect(tableOf(slot({ status: 'queued', table_name: null }).match)).toBeNull()
+    expect(tableOf(slot({ status: 'waiting', table_name: null, upcoming_table_name: 'Tisch 2' }).match)).toBe('Tisch 2')
+    expect(tableOf(slot({ status: 'waiting', table_name: null }).match)).toBeNull()
     expect(tableOf(slot({ status: 'finished', winner_team_id: 'a', table_name: 'Tisch 2' }).match)).toBeNull()
   })
 })

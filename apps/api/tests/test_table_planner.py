@@ -1,5 +1,5 @@
 """The table planner on its own: who plays next and where."""
-from app.services.table_planner import PlanMatch, assign_free_tables, plan
+from app.services.table_planner import PlanMatch, assign_free_tables, certain_next_tables, plan
 
 TABLES = ["T1", "T2"]
 
@@ -95,3 +95,37 @@ def test_no_tables_no_plan():
     matches = [m("a", ready=True, ready_at=0)]
     assert assign_free_tables(matches, []) == {}
     assert plan(matches, []).queue == ["a"]
+
+
+# -- certain tables of matches that still wait for a team -------------------------------------------------------
+
+
+def semis_and_final(**second_semi):
+    return [
+        m("s1", finished=True, finished_at=5, table="T1"),
+        m("s2", pos=1, **({"ready": True, "ready_at": 0, "playing": True, "table": "T2"} | second_semi)),
+        m("final", rnd=2, feeders=("s1", "s2")),
+    ]
+
+
+def test_with_a_table_for_every_open_match_the_waiting_team_knows_its_table():
+    # the winner of the second semi-final stays at its table, the other finalist comes there
+    assert certain_next_tables(semis_and_final(), ["T1", "T2", "T3"], now=10) == {"final": "T2"}
+    assert certain_next_tables(semis_and_final(), ["T1", "T2"], now=10) == {"final": "T2"}
+
+
+def test_nothing_is_certain_with_fewer_tables_than_open_matches():
+    matches = semis_and_final() + [m("other", pos=2, ready=True, ready_at=0, playing=True, table="T1")]
+    assert certain_next_tables(matches, ["T1", "T2"], now=10) == {}
+
+
+def test_nothing_is_certain_while_matches_queue():
+    matches = semis_and_final() + [m("queued", pos=2, ready=True, ready_at=1)]
+    assert certain_next_tables(matches, ["T2"], now=10) == {}
+
+
+def test_nothing_is_certain_while_both_feeders_play_or_the_missing_one_has_no_table():
+    both_open = [m("s1", ready=True, ready_at=0, playing=True, table="T1")] + semis_and_final()[1:]
+    assert certain_next_tables(both_open, ["T1", "T2", "T3"], now=10) == {}
+    not_at_a_table = semis_and_final(playing=False, table=None, ready=False, ready_at=None)
+    assert certain_next_tables(not_at_a_table, ["T1", "T2", "T3"], now=10) == {}

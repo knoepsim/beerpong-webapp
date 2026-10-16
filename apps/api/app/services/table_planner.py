@@ -124,3 +124,43 @@ def plan(
     order = {m.id: i for i, m in enumerate(held)}
     queue = sorted((m.id for m in rest), key=lambda mid: order.get(mid, len(order)))
     return TablePlan(playing=playing, queue=queue)
+
+
+def certain_next_tables(
+    matches: Sequence[PlanMatch],
+    tables: Sequence[TableId],
+    now: float,
+    window: int | None = DEFAULT_WINDOW,
+    key: SortKey = first_come_first_served,
+) -> dict[MatchId, TableId]:
+    """Tables of matches still waiting for a team that are already certain (only then, never a guess).
+
+    That is the case towards the end: there are at least as many tables as open matches and nothing queues, so
+    nobody competes for a table. A match that only waits for one more feeder, which is at its table, gets what the
+    planner would decide if that feeder ended now (usually its table: the winner stays). With a queue the next free
+    table goes to the queue first, so nothing is said then.
+    """
+    open_matches = [m for m in matches if not m.finished]
+    if len(tables) < len(open_matches) or plan(matches, tables, window, key).queue:
+        return {}
+    by_id = {m.id: m for m in matches}
+    certain: dict[MatchId, TableId] = {}
+    for match in open_matches:
+        if match.ready:
+            continue
+        missing = [by_id[f] for f in match.feeders if f in by_id and not by_id[f].finished]
+        if len(missing) != 1 or not missing[0].playing:
+            continue
+        feeder = missing[0]
+        what_if = [
+            replace(m, finished=True, finished_at=now, playing=False)
+            if m.id == feeder.id
+            else replace(m, ready=True, ready_at=now)
+            if m.id == match.id
+            else m
+            for m in matches
+        ]
+        table = assign_free_tables(what_if, tables, window, key).get(match.id)
+        if table is not None:
+            certain[match.id] = table
+    return certain

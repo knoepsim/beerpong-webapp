@@ -261,3 +261,28 @@ async def test_only_the_organization_starts_matches(eight_teams_two_tables: Ctx)
     resp = await ctx.client.post(f"/matches/{first['id']}/start", headers=outsider)
 
     assert resp.status_code == 403
+
+
+# -- certain table of a match still waiting for a team ---------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_towards_the_end_a_waiting_match_knows_its_table(async_client: AsyncClient):
+    ctx = await _tournament(async_client, 4, 3)  # two semi-finals and the final: a table for every match
+    semi_one, semi_two = await ctx.round(1)
+
+    await ctx.win(semi_one)
+
+    final = (await ctx.round(2))[0]
+    assert (final["status"], final["upcoming_table_name"], final["table_name"]) == ("waiting", "Tisch 2", None)
+    await ctx.win(semi_two)
+    final = (await ctx.round(2))[0]
+    assert (final["status"], final["table_name"], final["upcoming_table_name"]) == ("ready", "Tisch 2", None)
+
+
+@pytest.mark.asyncio
+async def test_while_matches_queue_a_waiting_match_has_no_certain_table(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    await ctx.win((await ctx.round(1))[0])
+
+    assert all(x["upcoming_table_name"] is None for x in await ctx.bracket())
