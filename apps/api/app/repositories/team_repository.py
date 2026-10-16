@@ -4,9 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.team import Team, TeamMember
-from app.models.tournament import TournamentTeam
-from app.models.match import Match
-from app.models.result import Result
+from app.models.tournament import Tournament, TournamentTeam
 from app.models.user import User
 from app.repositories.base import BaseRepository
 
@@ -70,42 +68,18 @@ class TeamRepository(BaseRepository[Team]):
         )
         return result.scalar_one()
 
-    async def get_team_flags(self, db: AsyncSession, team_id: UUID) -> tuple[bool, bool]:
+    async def get_delete_blockers(self, db: AsyncSession, team_id: UUID) -> list[Tournament]:
+        """Tournaments the team plays in or is registered for (not finished, not deleted), soonest first."""
         result = await db.execute(
-            select(TournamentTeam.tournament_id).where(TournamentTeam.team_id == team_id)
+            select(Tournament)
+            .join(TournamentTeam, TournamentTeam.tournament_id == Tournament.id)
+            .where(
+                TournamentTeam.team_id == team_id,
+                Tournament.is_deleted.is_(False),
+                Tournament.finished_at.is_(None),
+            )
+            .order_by(Tournament.start_time)
         )
-        tournament_ids = result.scalars().all()
-
-        if not tournament_ids:
-            return True, True
-
-        is_deletable = True
-        is_renamable = True
-
-        for tid in tournament_ids:
-            matches_res = await db.execute(select(Match.id).where(Match.tournament_id == tid).limit(1))
-            has_matches = matches_res.scalar_one_or_none() is not None
-            
-            if not has_matches:
-                is_deletable = False
-            else:
-                final_match_res = await db.execute(
-                    select(Match.id)
-                    .where(Match.tournament_id == tid, Match.next_match_id == None)
-                )
-                final_match_id = final_match_res.scalar_one_or_none()
-                
-                has_result = False
-                if final_match_id:
-                    result_res = await db.execute(
-                        select(Result.id).where(Result.match_id == final_match_id).limit(1)
-                    )
-                    has_result = result_res.scalar_one_or_none() is not None
-                    
-                if not has_result:
-                    is_deletable = False
-                    is_renamable = False
-
-        return is_deletable, is_renamable
+        return list(result.scalars().all())
 
 team_repository = TeamRepository()

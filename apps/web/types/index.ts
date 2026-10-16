@@ -25,14 +25,24 @@ export interface TeamMember {
   joined_at: string;
 }
 
+/** A tournament that keeps a team from being deleted. */
+export interface TeamDeleteBlocker {
+  tournament_name: string;
+  tournament_slug: string;
+  /** false: registered, the tournament has not started yet */
+  running: boolean;
+  /** the team can still leave it */
+  registration_open: boolean;
+}
+
 export interface Team {
   id: string;
   name: string;
   max_size: number;
   members: TeamMember[];
   is_complete: boolean;
-  is_deletable: boolean;
-  is_renamable: boolean;
+  /** Empty: the team can be deleted. Renaming is always possible; started tournaments keep the old name. */
+  delete_blockers: TeamDeleteBlocker[];
   created_at: string;
 }
 

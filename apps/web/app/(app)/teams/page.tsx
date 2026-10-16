@@ -15,16 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DeleteTeamDialog } from "@/components/delete-team-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -138,7 +129,7 @@ export default function TeamsPage() {
       await loadTeams();
       toast.success("Team gelöscht.");
     } catch (err: unknown) {
-      toast.error("Fehler beim Löschen.");
+      toast.error(err instanceof Error ? err.message : "Das Team konnte nicht gelöscht werden. Versuch es noch einmal.");
     } finally {
       setIsDeleting(false);
     }
@@ -217,7 +208,7 @@ export default function TeamsPage() {
           <DialogHeader>
             <DialogTitle>Team umbenennen</DialogTitle>
             <DialogDescription>
-              Gib einen neuen Namen für dein Team ein.
+              Gilt für eure nächsten Turniere. Turniere, die schon gestartet sind, behalten den bisherigen Namen.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -240,30 +231,12 @@ export default function TeamsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={!!deleteTeam} onOpenChange={(o) => !o && setDeleteTeam(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Team wirklich löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Diese Aktion kann nicht rückgängig gemacht werden. Das Team wird unwiderruflich gelöscht.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Lösche..." : "Löschen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTeamDialog
+        team={deleteTeam}
+        isDeleting={isDeleting}
+        onClose={() => setDeleteTeam(null)}
+        onDelete={() => void handleDelete()}
+      />
 
     </div>
   );

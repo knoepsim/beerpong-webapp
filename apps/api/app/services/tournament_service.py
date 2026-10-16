@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select
 
 from app.core.exceptions import (
     NotFoundError,
@@ -21,6 +21,7 @@ from app.models.team import Team, TeamMember
 from app.models.tournament import JoinPolicy, Tournament, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
+from app.schemas.team import TeamResponse
 from app.schemas.tournament import TournamentCreate, TournamentUpdate
 from app.services.invite_service import InviteService
 from app.services.revision import bump
@@ -201,10 +202,11 @@ class TournamentService:
         participating_res, managing_res = await tournament_repository.get_my_tournaments(self.db, user_id)
 
         participating = []
-        for tournament, team in participating_res:
+        for tournament, team, frozen_name in participating_res:
+            # a tournament that started shows the team under the name it had then
             participating.append({
                 "tournament": tournament,
-                "team": team
+                "team": TeamResponse.model_validate(team).model_copy(update={"name": frozen_name or team.name}),
             })
 
         managing = []
@@ -259,10 +261,10 @@ class TournamentService:
         return entry
 
 
-    async def get_tournament_teams(self, tournament_id: UUID) -> list[tuple[Team, bool]]:
-        """Get all teams participating in a tournament along with their check-in status."""
+    async def get_tournament_teams(self, tournament_id: UUID) -> list[tuple[Team, bool, str]]:
+        """The teams of a tournament with their check-in and the name they play under (frozen at the start)."""
         result = await self.db.execute(
-            select(Team, TournamentTeam.is_checked_in)
+            select(Team, TournamentTeam.is_checked_in, func.coalesce(TournamentTeam.team_name, Team.name))
             .join(TournamentTeam, TournamentTeam.team_id == Team.id)
             .where(TournamentTeam.tournament_id == tournament_id)
         )

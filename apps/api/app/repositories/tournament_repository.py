@@ -17,7 +17,7 @@ class TournamentRepository(BaseRepository[Tournament]):
         from app.models.team import Team, TeamMember
         from app.models.tournament import TournamentTeam
         participating_q = (
-            select(Tournament, Team)
+            select(Tournament, Team, TournamentTeam.team_name)
             .join(TournamentTeam, Tournament.id == TournamentTeam.tournament_id)
             .join(Team, TournamentTeam.team_id == Team.id)
             .join(TeamMember, Team.id == TeamMember.team_id)

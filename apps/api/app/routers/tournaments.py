@@ -248,20 +248,17 @@ async def get_teams(
     # strangers (and everybody who is neither a player nor a helper here) see the team names, not the players
     involved = await TournamentService(db).is_involved(tournament.id, viewer.id if viewer else None)
     teams_data = await TournamentService(db).get_tournament_teams(tournament.id)
-    members_by_team = await TeamService(db).get_members_with_names_for_teams([team.id for team, _ in teams_data])
+    members_by_team = await TeamService(db).get_members_with_names_for_teams([team.id for team, _, _ in teams_data])
     result = []
-    for team, is_checked_in in teams_data:
+    for team, is_checked_in, name in teams_data:
         members = members_by_team[team.id]
-        is_deletable, is_renamable = await TeamService(db).get_team_flags(team.id)
         result.append(
             TournamentTeamResponse(
                 id=team.id,
-                name=team.name,
+                name=name,
                 max_size=team.max_size,
                 members=[TeamMemberResponse.model_validate(m) for m in members] if involved else [],
                 is_complete=len(members) >= team.max_size,
-                is_deletable=is_deletable,
-                is_renamable=is_renamable,
                 is_checked_in=is_checked_in,
                 created_at=team.created_at,
             )
