@@ -17,6 +17,8 @@ class SmsCodeVerify(BaseModel):
     """Request body for verifying an SMS code."""
     phone_number: str
     code: str
+    # A browser gets its session as HttpOnly cookies and no tokens in the response, scripts get the tokens as before
+    cookie_session: bool = False
 
     @field_validator('phone_number')
     @classmethod

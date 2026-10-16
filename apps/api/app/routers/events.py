@@ -9,13 +9,13 @@ from collections.abc import AsyncIterator
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.config import settings
 from app.core.database import async_session
 from app.core.events import Subscription, TooManySubscribers, bus
-from app.core.security import user_from_authorization
+from app.core.security import user_from_request
 from app.models.tournament import Tournament
 from app.schemas.tournament import TournamentState
 from app.services.tournament_service import TournamentService, get_accessible_tournament
@@ -63,7 +63,7 @@ async def event_stream(
     "Zugriff wie beim Lesen des Turniers (öffentlich für alle, privat nur für Beteiligte).",
     response_class=StreamingResponse,
 )
-async def tournament_events(tournament_id: UUID, authorization: Annotated[str | None, Header()] = None):
+async def tournament_events(tournament_id: UUID, request: Request):
     # No request-long database session here (a dependency with yield would hold one for as long as the stream
     # runs): the access check uses a short one of its own.
     try:
@@ -76,7 +76,7 @@ async def tournament_events(tournament_id: UUID, authorization: Annotated[str | 
         )
     try:
         async with async_session() as db:
-            viewer = await user_from_authorization(authorization, db)
+            viewer = await user_from_request(request, db)
             tournament = await TournamentService(db).get_tournament_for_user(tournament_id, viewer.id if viewer else None)
             revision = tournament.revision
     except BaseException:

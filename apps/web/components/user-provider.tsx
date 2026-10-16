@@ -2,8 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { User } from "@/types";
-import { api } from "@/lib/api";
-import { getAccessToken } from "@/lib/auth";
+import { api, NetworkError } from "@/lib/api";
 
 interface UserContextValue {
   user: User | null;
@@ -26,15 +25,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const load = async () => {
-    if (!getAccessToken()) {
-      setIsLoading(false);
-      return;
-    }
     try {
-      const u = await api.users.me();
-      setUser(u);
-    } catch {
-      setUser(null);
+      setUser(await api.users.me({ guest: true }));
+    } catch (error) {
+      // Nobody is logged in: say so. A network problem says nothing about that: keep what is known.
+      if (!(error instanceof NetworkError)) setUser(null);
     } finally {
       setIsLoading(false);
     }
@@ -42,6 +37,10 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void load();
+    // after a network problem, ask again as soon as the browser is back online
+    const reload = () => void load();
+    window.addEventListener("online", reload);
+    return () => window.removeEventListener("online", reload);
   }, []);
 
   return (

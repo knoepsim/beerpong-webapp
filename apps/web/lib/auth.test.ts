@@ -1,35 +1,30 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  REFRESH_TOKEN_KEY,
-  TOKEN_KEY,
-  clearTokens,
-  getAccessToken,
-  getRedirectParam,
-  getRefreshToken,
-  setTokens,
-  toSafeRedirectPath,
-} from './auth';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getRedirectParam, logout, toSafeRedirectPath } from './auth';
 
-describe('token storage', () => {
-  beforeEach(() => clearTokens());
+describe('logout', () => {
+  afterEach(() => vi.unstubAllGlobals());
 
-  it('stores tokens in localStorage and the access token as cookie', () => {
-    setTokens('access', 'refresh');
+  it('ends the session on the server and goes to the login', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
+    const location = { href: '/teams', pathname: '/teams', search: '' };
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('location', location);
 
-    expect(getAccessToken()).toBe('access');
-    expect(getRefreshToken()).toBe('refresh');
-    expect(localStorage.getItem(TOKEN_KEY)).toBe('access');
-    expect(localStorage.getItem(REFRESH_TOKEN_KEY)).toBe('refresh');
-    expect(document.cookie).toContain(`${TOKEN_KEY}=access`);
+    await logout();
+
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/logout$/);
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+    expect(location.href).toBe('/login');
   });
 
-  it('removes tokens and cookie on clear', () => {
-    setTokens('access', 'refresh');
-    clearTokens();
+  it('goes to the login even if the server cannot be reached', async () => {
+    const location = { href: '/teams', pathname: '/teams', search: '' };
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    vi.stubGlobal('location', location);
 
-    expect(getAccessToken()).toBeNull();
-    expect(getRefreshToken()).toBeNull();
-    expect(document.cookie).not.toContain(TOKEN_KEY);
+    await logout();
+
+    expect(location.href).toBe('/login');
   });
 });
 

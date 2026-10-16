@@ -1,11 +1,9 @@
 import { API_BASE_URL } from "./config";
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from "./auth";
 import type {
   Bracket,
   Team,
   TeamInvite,
   TeamInviteDetails,
-  TokenResponse,
   Tournament,
   TournamentCreateRequest,
   TournamentInvite,
@@ -36,63 +34,84 @@ export class ApiError extends Error {
 
 // ── Core fetch logic ──────────────────────────────────
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
+// The session is a pair of HttpOnly cookies. The access token in it lives only minutes and is renewed in the
+// background with the refresh cookie, so somebody who takes the phone out of the pocket after an hour is still logged
+// in; the session ends after REFRESH_TOKEN_EXPIRE_DAYS without use (every renewal starts the time again).
+const CSRF_HEADER = { "X-Requested-With": "fetch" };
+const SESSION_LOCK = "beerpong-session";
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+/** Runs `task` alone: in all tabs of the browser if possible (they share the cookies), else only in this one. */
+function exclusively<T>(task: () => Promise<T>): Promise<T> {
+  return typeof navigator !== "undefined" && navigator.locks
+    ? (navigator.locks.request(SESSION_LOCK, () => task()) as unknown as Promise<T>)
+    : task();
+}
 
-    if (!res.ok) {
-      clearTokens();
-      return null;
-    }
-
-    const data = await res.json();
-    setTokens(data.access_token, data.refresh_token);
-    return data.access_token;
-  } catch {
-    clearTokens();
-    return null;
+/** The server cannot be reached (no network, a hiccup): no reason to doubt the session, try again later. */
+export class NetworkError extends Error {
+  constructor() {
+    super("Keine Verbindung zum Server. Prüfe dein Netz und versuche es noch einmal.");
+    this.name = "NetworkError";
   }
 }
 
-async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  let token = getAccessToken();
-  const headers = new Headers(options.headers || {});
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+/**
+ * Renews the session with the refresh cookie. Only a refusal ends the session ("ended"); that the server cannot be
+ * reached or answers with an error is not the answer of the server to the session ("unreachable").
+ */
+async function renewSession(): Promise<"renewed" | "ended" | "unreachable"> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: CSRF_HEADER,
+      credentials: "include",
+    });
+    if (res.ok) return "renewed";
+    return res.status === 401 || res.status === 403 ? "ended" : "unreachable";
+  } catch {
+    return "unreachable";
   }
+}
 
-  let res = await fetch(url, { ...options, headers });
+interface FetchOptions extends RequestInit {
+  /** A 401 means "not logged in" and is no reason to go to the login (public pages, finding out who is logged in). */
+  guest?: boolean;
+}
+
+async function fetchWithAuth(url: string, { guest = false, ...options }: FetchOptions = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+  for (const [name, value] of Object.entries(CSRF_HEADER)) headers.set(name, value);
+  const send = () =>
+    fetch(url, { ...options, headers, credentials: "include" }).catch((error: unknown) => {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new NetworkError();
+    });
+
+  let res = await send();
 
   if (res.status === 401) {
-    if (token) {
-      const newToken = await refreshAccessToken();
-      if (newToken) {
-        headers.set("Authorization", `Bearer ${newToken}`);
-        res = await fetch(url, { ...options, headers });
-        if (res.status !== 401) return res;
-      }
-    }
-    
-    if (typeof window !== "undefined") {
-      const currentUrl = window.location.pathname + window.location.search;
-      window.location.href = `/login?redirect=${encodeURIComponent(currentUrl)}`;
-      // Prevent further execution while browser is redirecting
-      await new Promise(() => {});
-    }
+    // One renewal at a time: with rotating refresh tokens a second, parallel one would end the session. Whoever comes
+    // second first tries again, because the one before may have renewed the cookies already.
+    res = await exclusively(async () => {
+      const again = await send();
+      if (again.status !== 401) return again;
+      const outcome = await renewSession();
+      if (outcome === "unreachable") throw new NetworkError(); // stay where you are, the session may well be fine
+      return outcome === "renewed" ? send() : again;
+    });
+  }
+
+  if (res.status === 401 && !guest && typeof window !== "undefined") {
+    const currentUrl = window.location.pathname + window.location.search;
+    window.location.href = `/login?redirect=${encodeURIComponent(currentUrl)}`;
+    // Prevent further execution while browser is redirecting
+    await new Promise(() => {});
   }
 
   return res;
 }
 
-export async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+export async function request<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   if (!options.headers) {
@@ -127,15 +146,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ phone_number }),
       }),
+    /** Logs in: the server answers with the session as HttpOnly cookies, not with tokens. */
     verify: (phone_number: string, code: string) =>
-      request<TokenResponse>("/auth/verify", {
+      request<void>("/auth/verify", {
         method: "POST",
-        body: JSON.stringify({ phone_number, code }),
+        body: JSON.stringify({ phone_number, code, cookie_session: true }),
       }),
+    logout: () => request<void>("/auth/logout", { method: "POST" }),
   },
 
   users: {
-    me: () => request<User>("/users/me"),
+    /** `guest`: without a session this is an answer ("nobody"), not a reason to go to the login. */
+    me: (options: { guest?: boolean } = {}) => request<User>("/users/me", options),
     updateMe: (data: { name?: string; email?: string }) =>
       request<User>("/users/me", {
         method: "PATCH",
