@@ -29,6 +29,9 @@ class MatchResponse(BaseModel):
     table_name: str | None = None
     # a ready match without a table: its place in the queue for the next free table (1 = next)
     queue_position: int | None = None
+    # a match still waiting for a team whose table is already certain (towards the end, when nothing queues)
+    upcoming_table_id: UUID | None = None
+    upcoming_table_name: str | None = None
     started_at: datetime | None = None
     created_at: datetime
     status: MatchStatus = MatchStatus.WAITING

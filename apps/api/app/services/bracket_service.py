@@ -22,7 +22,7 @@ from app.schemas.result import ResultCreate
 from app.services.bracket_layout import round_one_pairings
 from app.models.tournament_table import TournamentTable
 from app.services.revision import bump
-from app.services.table_planner import PlanMatch, assign_free_tables, plan
+from app.services.table_planner import PlanMatch, assign_free_tables, certain_next_tables, plan
 from app.services.tournament_service import TournamentService
 from fastapi import Depends
 from typing import Annotated
@@ -328,9 +328,15 @@ class BracketService:
         )
         _, planned, table_ids, _ = await self._plan_input(tournament_id)
         queue = {match_id: place for place, match_id in enumerate(plan(planned, table_ids).queue, start=1)}
+        upcoming = certain_next_tables(planned, table_ids, datetime.now(UTC).timestamp())
         responses = [
             self._to_response(m, results.get(m.id)).model_copy(
-                update={"table_name": names.get(m.table_id), "queue_position": queue.get(m.id)}
+                update={
+                    "table_name": names.get(m.table_id),
+                    "queue_position": queue.get(m.id),
+                    "upcoming_table_id": upcoming.get(m.id),
+                    "upcoming_table_name": names.get(upcoming.get(m.id)),
+                }
             )
             for m in matches
         ]

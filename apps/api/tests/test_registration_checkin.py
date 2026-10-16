@@ -207,6 +207,20 @@ async def test_registration_and_check_in_are_switched_independently_at_any_time(
 
 
 @pytest.mark.asyncio
+async def test_a_team_can_leave_only_while_the_registration_is_open(ctx: Ctx):
+    tid = await ctx.create()
+    await ctx.join(tid, 0)
+    await ctx.join(tid, 1)
+
+    assert (await ctx.client.delete(f"/tournaments/{tid}/leave", headers=ctx.players[0])).status_code == 204
+    await ctx.set_registration(tid, False)
+    resp = await ctx.client.delete(f"/tournaments/{tid}/leave", headers=ctx.players[2])
+
+    assert resp.status_code == 409
+    assert ctx.team_ids[1] in await ctx.teams(tid)
+
+
+@pytest.mark.asyncio
 async def test_a_team_can_register_while_check_in_is_open(ctx: Ctx):
     tid = await ctx.create_with_open_checkin()
     assert (await ctx.join(tid, 0)).status_code == 201

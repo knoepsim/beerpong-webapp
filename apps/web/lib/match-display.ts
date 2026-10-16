@@ -103,9 +103,13 @@ export const STATUS_STYLE: Record<Exclude<Match["status"], "finished">, string> 
   live: "bg-red-600 text-white", // white on red-600 keeps 4.5:1 in both themes
 };
 
-/** The table to go to, only while it matters: at the table (ready) or playing there (live). */
+/**
+ * The table to go to, only while it matters: at the table (ready), playing there (live), or still waiting for a
+ * team when the API says the table is already certain. Never a guess.
+ */
 export function tableOf(match: Match): string | null {
-  return match.status === "ready" || match.status === "live" ? match.table_name : null;
+  if (match.status === "ready" || match.status === "live") return match.table_name;
+  return match.status === "waiting" ? match.upcoming_table_name : null;
 }
 
 /**

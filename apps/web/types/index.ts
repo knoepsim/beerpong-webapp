@@ -196,6 +196,9 @@ export interface Match {
   table_name: string | null;
   /** A ready match without a table: its place in the queue for the next free table (1 = next). */
   queue_position: number | null;
+  /** A match still waiting for a team whose table is already certain (towards the end, when nothing queues). */
+  upcoming_table_id: string | null;
+  upcoming_table_name: string | null;
   /** When it was started at its table (only while live). */
   started_at: string | null;
   created_at: string;

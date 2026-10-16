@@ -269,9 +269,12 @@ class TournamentService:
         return list(result.all())
 
     async def leave_tournament(self, tournament_id: UUID, user_id: UUID) -> None:
-        """Withdraw a team from a tournament before it starts."""
-        if (await self.get_tournament(tournament_id, for_update=True)).is_started:
+        """Withdraw a team from a tournament: only while the registration is open (like joining)."""
+        tournament = await self.get_tournament(tournament_id, for_update=True)
+        if tournament.is_started:
             raise TournamentAlreadyStartedError()
+        if not tournament.registration_open:
+            raise RegistrationClosedError()
 
         team_q = (
             select(Team)
