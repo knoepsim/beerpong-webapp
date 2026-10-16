@@ -58,19 +58,40 @@ export function isOpen(match: Match): boolean {
   return match.status === "queued" || match.status === "ready" || match.status === "live";
 }
 
-/** The status in a few words: "Wartet auf Team", "Wartet auf Tisch", "Bereit", "Live" or the cups of the winner. */
+/**
+ * The status as short as it stays clear next to its icon: "Wartet" (for a team, the rows name the matches it comes
+ * from), "Platz 2" (in the queue for a table), "Bereit", "Live", or the cups the winner had left.
+ */
 export function statusLabel(match: Match): string {
   switch (match.status) {
     case "waiting":
-      return "Wartet auf Team";
+      return "Wartet";
     case "queued":
-      return "Wartet auf Tisch";
+      return match.queue_position != null ? `Platz ${match.queue_position}` : "Wartet";
     case "ready":
       return "Bereit";
     case "live":
       return "Live";
     default:
       return match.cups_left != null ? `${match.cups_left} Becher` : "Beendet";
+  }
+}
+
+/** The status in words, for screen readers and as tooltip of the badge; null for a finished match. */
+export function statusText(match: Match): string | null {
+  switch (match.status) {
+    case "waiting":
+      return "Wartet auf Team";
+    case "queued":
+      return match.queue_position != null
+        ? `Wartet auf Tisch, Platz ${match.queue_position} in der Warteschlange`
+        : "Wartet auf Tisch";
+    case "ready":
+      return "Bereit";
+    case "live":
+      return "Läuft";
+    default:
+      return null;
   }
 }
 
@@ -82,30 +103,9 @@ export const STATUS_STYLE: Record<Exclude<Match["status"], "finished">, string> 
   live: "bg-red-600 text-white", // white on red-600 keeps 4.5:1 in both themes
 };
 
-const capitalize = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
-
-/**
- * The second line of a match, only what the status does not say: whom it waits for (by color, the team is not
- * known yet), its place in the queue, or the table to go to. Nothing for a finished match.
- */
-export function statusDetail(slot: MatchSlot): string | null {
-  const { match, sources } = slot;
-  switch (match.status) {
-    case "waiting": {
-      const missing = (["a", "b"] as const).filter((side) => (side === "a" ? match.team_a_id : match.team_b_id) === null);
-      const where = (side: Side) => (sources[side] === null ? "offen" : `noch in Spiel ${sources[side]}`);
-      // both: the rows below already name the matches they come from
-      if (missing.length === 2) return "Beide Teams offen";
-      return `${capitalize(SIDE_STYLE[missing[0]].label)} ${where(missing[0])}`;
-    }
-    case "queued":
-      return match.queue_position != null ? `Warteschlange #${match.queue_position}` : null;
-    case "ready":
-    case "live":
-      return match.table_name;
-    default:
-      return null;
-  }
+/** The table to go to, only while it matters: at the table (ready) or playing there (live). */
+export function tableOf(match: Match): string | null {
+  return match.status === "ready" || match.status === "live" ? match.table_name : null;
 }
 
 /**
@@ -129,8 +129,8 @@ export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teams
   return [
     `Spiel ${number}`,
     sides.map((s) => `${s.name ?? s.placeholder} (${SIDE_STYLE[s.side].label})`).join(" gegen "),
-    finished ? null : statusLabel(match),
-    statusDetail(slot),
+    statusText(match),
+    tableOf(match),
     finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
     finished && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
   ]

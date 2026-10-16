@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Match, Result } from "@/types";
 import { ResultType } from "@/types";
-import { History, Play, Hash, Undo2 } from "lucide-react";
+import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { BeerpongTable } from "@/components/BeerpongTable";
 import { Button } from "@/components/ui/button";
@@ -186,7 +186,7 @@ export function MatchResultDialog({
               <MatchStatusBadge match={match} className="text-xs" />
               {match.table_name && (match.status === "ready" || match.status === "live") && (
                 <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
-                  <Hash className="w-3 h-3" aria-hidden="true" />
+                  <MapPin className="w-3 h-3" aria-hidden="true" />
                   {match.table_name}
                 </Badge>
               )}
@@ -244,9 +244,12 @@ export function MatchResultDialog({
               )}
               {match.status === "live" && (
                 <div className="mb-3 flex items-center justify-between gap-2 text-sm">
-                  <span className="text-muted-foreground">
-                    {match.started_at ? `Läuft seit ${timeOf(match.started_at)} Uhr` : "Läuft"}
-                  </span>
+                  {match.started_at && (
+                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                      <Timer className="w-4 h-4" aria-hidden="true" />
+                      seit {timeOf(match.started_at)} Uhr
+                    </span>
+                  )}
                   <Button
                     type="button"
                     variant="ghost"

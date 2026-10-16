@@ -28,18 +28,18 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows status and second line for every state', () => {
+  it('shows the status with icon and short text, and the table only where to go', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Wartet auf Tisch')).toBeInTheDocument();
-    expect(screen.getByText('Warteschlange #2')).toBeInTheDocument();
+    expect(screen.getByTitle('Wartet auf Tisch, Platz 2 in der Warteschlange')).toHaveTextContent('Platz 2');
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null, table_id: null, table_name: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
-    expect(screen.getByText('Wartet auf Team')).toBeInTheDocument();
-    expect(screen.getByText('Blau noch in Spiel 3')).toBeInTheDocument();
-    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('Wartet auf Team')).toHaveTextContent('Wartet');
+    expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument(); // the row says where the team comes from
+    expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
 
     rerender(<MatchCard slot={slot({ status: 'live' })} teamsMap={teamsMap} />);
     expect(screen.getByText('Live')).toBeInTheDocument();

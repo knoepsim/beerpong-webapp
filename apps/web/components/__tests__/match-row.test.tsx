@@ -15,19 +15,17 @@ describe('MatchRow', () => {
 
   it('shows the place in the queue of a match without a table', () => {
     render(<MatchRow slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
-    expect(screen.getByText('Wartet auf Tisch')).toBeInTheDocument()
-    expect(screen.getByText('Warteschlange #1')).toBeInTheDocument()
+    expect(screen.getByTitle('Wartet auf Tisch, Platz 1 in der Warteschlange')).toHaveTextContent('Platz 1')
   })
 
-  it('says for a match that waits for its teams which ones are still playing, and no table', () => {
+  it('shows a waiting match as waiting, the rows name where the teams come from, no table', () => {
     const { container } = render(
       <MatchRow slot={slot({ status: 'waiting', team_a_id: null, team_b_id: null }, { a: 3, b: 4 })} teamsMap={teamsMap} />,
     )
     expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument()
     expect(screen.getByText('Sieger Spiel 4')).toBeInTheDocument()
     expect(screen.queryByText('Bereit')).not.toBeInTheDocument()
-    expect(screen.getByText('Wartet auf Team')).toBeInTheDocument()
-    expect(screen.getByText('Beide Teams offen')).toBeInTheDocument()
+    expect(screen.getByTitle('Wartet auf Team')).toHaveTextContent('Wartet')
     expect(container.textContent).not.toMatch(/Tisch/)
   })
 

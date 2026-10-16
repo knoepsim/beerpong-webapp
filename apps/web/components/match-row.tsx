@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
-import { describeSides, matchSummary, sideTone, statusDetail } from "@/lib/match-display";
+import { MatchTable } from "@/components/match-table";
+import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchRowProps {
@@ -15,16 +16,14 @@ interface MatchRowProps {
   onClick?: (match: Match) => void;
 }
 
-/** The right-hand side of a row: the status and what it waits for, or the cups of a finished match. */
-function Aside({ slot }: Readonly<{ slot: MatchSlot }>) {
-  const { match } = slot;
-  const detail = statusDetail(slot);
+/** The right-hand side of a row: the status and the table to go to, or the cups of a finished match. */
+function Aside({ match }: Readonly<{ match: Match }>) {
   const cups = match.status === "finished" ? match.cups_left : null;
   if (match.status === "finished" && cups == null) return null;
   return (
-    <div className="flex w-32 shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
+    <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
       <MatchStatusBadge match={match} />
-      {detail && <span className="text-balance font-medium">{detail}</span>}
+      <MatchTable match={match} className="max-w-full justify-end font-medium" />
       {cups != null && <span className="text-balance text-muted-foreground">{cups} Becher übrig</span>}
     </div>
   );
@@ -68,7 +67,7 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
           </div>
         ))}
       </div>
-      <Aside slot={slot} />
+      <Aside match={match} />
     </>
   );
   const summary = matchSummary(slot, sides, teamsMap);

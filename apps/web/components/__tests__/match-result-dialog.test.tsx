@@ -322,7 +322,7 @@ describe('MatchResultDialog: start', () => {
     await ready();
 
     expect(screen.queryByRole('button', { name: 'Spiel starten' })).not.toBeInTheDocument();
-    expect(screen.getByText('Wartet auf Tisch')).toBeInTheDocument();
+    expect(screen.getByText('Platz 2')).toBeInTheDocument();
     expect(saveButton()).toBeInTheDocument();
   });
 
@@ -330,7 +330,7 @@ describe('MatchResultDialog: start', () => {
     setup({ match: match({ status: 'live', table_id: 't', table_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
     await ready();
 
-    expect(screen.getByText(/^Läuft seit \d{2}:\d{2} Uhr$/)).toBeInTheDocument();
+    expect(screen.getByText(/^seit \d{2}:\d{2} Uhr$/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Start zurücknehmen' }));
     await waitFor(() => expect(api.matches.undoStart).toHaveBeenCalledWith('m1'));
   });

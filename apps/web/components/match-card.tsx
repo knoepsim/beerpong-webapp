@@ -2,7 +2,8 @@ import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
-import { describeSides, matchSummary, sideTone, statusDetail, statusLabel } from "@/lib/match-display";
+import { MatchTable } from "@/components/match-table";
+import { describeSides, matchSummary, sideTone, statusLabel } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchCardProps {
@@ -19,7 +20,6 @@ interface MatchCardProps {
 export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchCardProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
-  const detail = statusDetail(slot);
   const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
   const className = cn(
@@ -43,7 +43,7 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
             </span>
           )}
         </div>
-        {detail && <div className="truncate">{detail}</div>}
+        <MatchTable match={match} className="flex" />
       </div>
       {sides.map((side) => (
         <div

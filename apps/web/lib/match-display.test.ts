@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describeSides, isOpen, matchSummary, statusDetail, statusLabel } from './match-display'
+import { describeSides, isOpen, matchSummary, statusLabel, statusText, tableOf } from './match-display'
 import type { Match } from '@/types'
 import { abTeams as teamsMap, makeSlot as slot } from './test-fixtures/bracket'
 
@@ -35,40 +35,26 @@ describe('describeSides', () => {
   })
 })
 
-describe('statusDetail', () => {
-  const waiting = (a: string | null, b: string | null, sources = { a: 3, b: 4 }) =>
-    slot({ status: 'waiting', team_a_id: a, team_b_id: b, table_id: null, table_name: null }, sources)
-
-  it('says which team is still in which match, by color', () => {
-    expect(statusDetail(waiting('a', null))).toBe('Blau noch in Spiel 4')
-    expect(statusDetail(waiting(null, 'b'))).toBe('Rot noch in Spiel 3')
-    expect(statusDetail(waiting(null, null))).toBe('Beide Teams offen')
-  })
-
-  it('shows the place in the queue of a match without a table', () => {
-    expect(statusDetail(slot({ status: 'queued', table_id: null, table_name: null, queue_position: 3 }))).toBe(
-      'Warteschlange #3',
-    )
-  })
-
-  it('shows the table of a match at its table or live', () => {
-    expect(statusDetail(slot({ table_name: 'Terrasse' }))).toBe('Terrasse')
-    expect(statusDetail(slot({ status: 'live', table_name: 'Terrasse' }))).toBe('Terrasse')
-  })
-
-  it('shows nothing for a finished match, even if it had a table', () => {
-    expect(statusDetail(slot({ status: 'finished', winner_team_id: 'a', table_name: 'Tisch 2' }))).toBeNull()
+describe('tableOf', () => {
+  it('shows the table only while the match is at it', () => {
+    expect(tableOf(slot({ table_name: 'Terrasse' }).match)).toBe('Terrasse')
+    expect(tableOf(slot({ status: 'live', table_name: 'Terrasse' }).match)).toBe('Terrasse')
+    expect(tableOf(slot({ status: 'queued', table_name: null }).match)).toBeNull()
+    expect(tableOf(slot({ status: 'finished', winner_team_id: 'a', table_name: 'Tisch 2' }).match)).toBeNull()
   })
 })
 
 describe('statusLabel', () => {
-  it('names every state', () => {
-    expect(statusLabel(slot({ status: 'waiting' }).match)).toBe('Wartet auf Team')
-    expect(statusLabel(slot({ status: 'queued' }).match)).toBe('Wartet auf Tisch')
+  it('is short next to the icon, the full text is in statusText', () => {
+    expect(statusLabel(slot({ status: 'waiting' }).match)).toBe('Wartet')
+    expect(statusLabel(slot({ status: 'queued', queue_position: 2 }).match)).toBe('Platz 2')
     expect(statusLabel(slot().match)).toBe('Bereit')
     expect(statusLabel(slot({ status: 'live' }).match)).toBe('Live')
     expect(statusLabel(slot({ status: 'finished', cups_left: 3 }).match)).toBe('3 Becher')
     expect(statusLabel(slot({ status: 'finished', cups_left: null }).match)).toBe('Beendet')
+    expect(statusText(slot({ status: 'waiting' }).match)).toBe('Wartet auf Team')
+    expect(statusText(slot({ status: 'queued', queue_position: 2 }).match)).toBe('Wartet auf Tisch, Platz 2 in der Warteschlange')
+    expect(statusText(slot({ status: 'finished' }).match)).toBeNull()
   })
 })
 
