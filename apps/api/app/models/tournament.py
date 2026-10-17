@@ -155,6 +155,8 @@ class TournamentTeam(Base):
     )
     team_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.id"), nullable=False)
     is_checked_in: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # the team's name when the tournament started: the tournament keeps it, a later renaming does not change history
+    team_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     # the invitation link this team joined with (if any); kept only to count what a link brought
     invite_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("tournament_invites.id", ondelete="SET NULL"), nullable=True

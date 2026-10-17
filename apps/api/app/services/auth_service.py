@@ -19,9 +19,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.sms_verification import SmsVerification
 from app.models.user import User
 from app.schemas.auth import TokenResponse
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 
 
 class AuthService:
@@ -193,5 +191,5 @@ class AuthService:
 
 
 
-def get_auth_service(db: Annotated[AsyncSession, Depends(get_db)]) -> AuthService:
+def get_auth_service(db: DbSession) -> AuthService:
     return AuthService(db)

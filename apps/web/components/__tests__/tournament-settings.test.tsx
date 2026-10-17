@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { render } from '@/lib/test-fixtures/render';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
 import { api, ApiError } from '@/lib/api';
@@ -55,7 +56,9 @@ vi.mock('@/components/ui/tabs', () => {
       useContext(Ctx).value === value ? <div>{children}</div> : null,
   };
 });
-vi.mock('@/components/ui/alert-dialog', () => {
+// the global confirmation dialog loads it early: react is imported here, not from the top of the file
+vi.mock('@/components/ui/alert-dialog', async () => {
+  const { createContext, useContext } = await import('react');
   const Ctx = createContext<(open: boolean) => void>(() => {});
   return {
     AlertDialog: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (o: boolean) => void; children: ReactNode }) =>
@@ -135,7 +138,9 @@ function setup(
   );
 }
 
-const saveButton = () => screen.getByRole('button', { name: /Änderungen speichern|Gespeichert|Speichern\.\.\./ });
+/** A card of the settings by its title, and the save button right in it. */
+const card = (title: string) => screen.getByText(title, { selector: '[data-slot=card-title]' }).closest('[data-slot=card]') as HTMLElement;
+const saveOf = (title: string) => within(card(title)).getByRole('button', { name: /speichern|Gespeichert/ });
 const nameInput = () => screen.getByDisplayValue('Summer Cup');
 
 beforeEach(() => {
@@ -147,24 +152,25 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('visibility per role', () => {
-  it('shows everything to admins', () => {
+  it('shows everything to admins, grouped', () => {
     setup(TournamentRoleType.ADMIN);
-    expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
-    expect(screen.getByText('Gefahrenzone')).toBeInTheDocument();
+    for (const title of ['Allgemein', 'Zeitplan', 'Tische', 'Link & Zugang', 'Rollen & Berechtigungen', 'Gefahrenzone']) {
+      expect(screen.getByText(title, { selector: '[data-slot=card-title]' })).toBeInTheDocument();
+    }
     expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(3);
     expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument(); // everybody may join
   });
 
   it('lets managers edit details but only revoke referees', () => {
     setup(TournamentRoleType.MANAGER);
-    expect(screen.getByText('Turnier-Details bearbeiten')).toBeInTheDocument();
+    expect(card('Allgemein')).toBeInTheDocument();
     expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(1);
   });
 
   it.each([TournamentRoleType.REFEREE, null])('shows only the role list to %s', (role) => {
     setup(role);
-    expect(screen.queryByText('Turnier-Details bearbeiten')).not.toBeInTheDocument();
+    expect(screen.queryByText('Allgemein')).not.toBeInTheDocument();
     expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
     expect(screen.getByText('Rollen & Berechtigungen')).toBeInTheDocument();
     expect(screen.getByText('Alice Admin')).toBeInTheDocument();
@@ -172,68 +178,91 @@ describe('visibility per role', () => {
   });
 });
 
-describe('editing the tournament details', () => {
-  it('starts clean and enables saving after a change', () => {
+describe('after the start', () => {
+  const started = { started_at: '2026-07-01T18:05:00', phase: 'running' as const, registration_open: false };
+
+  it('hides what only matters before the start: schedule, who may join, invitation links', () => {
+    setup(TournamentRoleType.ADMIN, { ...started, join_policy: JoinPolicy.INVITE_ONLY });
+    expect(screen.queryByText('Zeitplan', { selector: '[data-slot=card-title]' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Beitreten')).not.toBeInTheDocument();
+    expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Adresse')).toBeInTheDocument();
+    expect(screen.getByText('Ergebnisse sehen')).toBeInTheDocument();
+  });
+
+  it('does not send who may join any more', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN, started);
+    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
+    fireEvent.click(saveOf('Link & Zugang'));
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
+    expect(mocked.update.mock.calls[0][1]).toEqual({ slug: 'summer-cup', visibility: 'private' });
+  });
+});
+
+describe('editing the tournament: each card saves its own fields', () => {
+  it('starts clean and enables saving after a change in that card only', () => {
     setup(TournamentRoleType.ADMIN);
     const name = nameInput();
-    expect(saveButton()).toHaveTextContent('Gespeichert');
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Allgemein')).toHaveTextContent('Gespeichert');
+    expect(saveOf('Allgemein')).toBeDisabled();
 
     fireEvent.change(name, { target: { value: 'Winter Cup' } });
-    expect(saveButton()).toHaveTextContent('Änderungen speichern');
-    expect(saveButton()).toBeEnabled();
+    expect(saveOf('Allgemein')).toHaveTextContent('Allgemein speichern');
+    expect(saveOf('Allgemein')).toBeEnabled();
+    expect(saveOf('Zeitplan')).toBeDisabled();
 
     fireEvent.change(name, { target: { value: '  ' } });
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Allgemein')).toBeDisabled();
   });
 
   it.each([
-    ['location', () => screen.getByDisplayValue('Garden'), 'Beach'],
-    ['start time', () => screen.getByDisplayValue('2026-07-01T18:00'), '2026-07-02T18:00'],
-    ['registration end', () => screen.getByDisplayValue('2026-06-30T18:00'), '2026-06-29T18:00'],
-  ])('marks %s changes as dirty', (_name, field, value) => {
+    ['location', 'Allgemein', () => screen.getByDisplayValue('Garden'), 'Beach'],
+    ['start time', 'Zeitplan', () => screen.getByDisplayValue('2026-07-01T18:00'), '2026-07-02T18:00'],
+    ['registration end', 'Zeitplan', () => screen.getByDisplayValue('2026-06-30T18:00'), '2026-06-29T18:00'],
+  ])('marks %s changes as dirty', (_name, title, field, value) => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(field(), { target: { value } });
-    expect(saveButton()).toBeEnabled();
+    expect(saveOf(title)).toBeEnabled();
   });
 
   it('marks check-in, description and visibility changes as dirty', () => {
     setup(TournamentRoleType.ADMIN);
     const checkinSwitch = screen.getByRole('switch', { name: 'Check-in vor Ort' });
     fireEvent.click(checkinSwitch);
-    expect(saveButton()).toBeEnabled();
-    fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-06-30T19:00' } });
-    expect(saveButton()).toBeEnabled();
+    expect(saveOf('Zeitplan')).toBeEnabled();
     fireEvent.click(checkinSwitch);
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Zeitplan')).toBeDisabled();
 
     fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'New rules' } });
-    expect(saveButton()).toBeEnabled();
+    expect(saveOf('Allgemein')).toBeEnabled();
     fireEvent.change(screen.getByPlaceholderText(/Turnier-Regeln/), { target: { value: 'Rules' } });
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Allgemein')).toBeDisabled();
 
     fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
-    expect(saveButton()).toBeEnabled();
+    expect(saveOf('Link & Zugang')).toBeEnabled();
   });
 
-  it('saves the converted values and reloads', async () => {
+  it('saves the general fields and reloads', async () => {
     mocked.update.mockResolvedValue(tournament);
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
-    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
-    fireEvent.click(screen.getByText('Nur mit Einladungslink', { selector: 'span' }));
-    fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Allgemein'));
 
     await waitFor(() => expect(onReload).toHaveBeenCalled());
+    expect(mocked.update).toHaveBeenCalledWith('t1', { name: 'Winter Cup', location: undefined, description: 'Rules' });
+    expect(toast.success).toHaveBeenCalledWith('Gespeichert');
+  });
+
+  it('saves the schedule with the converted values', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '' } });
+    fireEvent.click(saveOf('Zeitplan'));
+
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
     expect(mocked.update).toHaveBeenCalledWith('t1', {
-      name: 'Winter Cup',
-      slug: 'summer-cup',
-      location: undefined,
-      description: 'Rules',
-      visibility: 'private',
-      join_policy: 'invite_only',
       start_time: new Date('2026-07-01T18:00').toISOString(),
       registration_end_time: null,
       registration_auto_close: false,
@@ -241,14 +270,23 @@ describe('editing the tournament details', () => {
       checkin_start_time: null,
       checkin_auto_open: false,
     });
-    expect(toast.success).toHaveBeenCalledWith('Turnier-Details erfolgreich gespeichert!');
+  });
+
+  it('saves access: address, visibility and who may join', async () => {
+    mocked.update.mockResolvedValue(tournament);
+    setup(TournamentRoleType.ADMIN);
+    fireEvent.click(screen.getByText('Privat', { selector: 'span' }));
+    fireEvent.click(screen.getByText('Nur mit Einladungslink', { selector: 'span' }));
+    fireEvent.click(saveOf('Link & Zugang'));
+    await waitFor(() => expect(mocked.update).toHaveBeenCalled());
+    expect(mocked.update.mock.calls[0][1]).toEqual({ slug: 'summer-cup', visibility: 'private', join_policy: 'invite_only' });
   });
 
   it('omits an emptied description', async () => {
     mocked.update.mockResolvedValue(tournament);
     setup(TournamentRoleType.ADMIN, { description: null });
     fireEvent.change(nameInput(), { target: { value: 'X' } });
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Allgemein'));
     await waitFor(() => expect(mocked.update).toHaveBeenCalled());
     expect(mocked.update.mock.calls[0][1]).toMatchObject({ description: undefined });
   });
@@ -256,22 +294,22 @@ describe('editing the tournament details', () => {
   it('requires a start time', () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(screen.getByDisplayValue('2026-07-01T18:00'), { target: { value: '' } });
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Zeitplan')).toBeDisabled();
   });
 
   it('explains an impossible schedule and blocks saving', () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(screen.getByDisplayValue('2026-06-30T18:00'), { target: { value: '2026-07-02T18:00' } });
     expect(screen.getByText('Der Anmeldeschluss muss vor dem Turnierstart liegen.')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
+    expect(saveOf('Zeitplan')).toBeDisabled();
   });
 
-  it('saves check-in settings and drops the check-in time when it is switched off', async () => {
+  it('saves check-in settings', async () => {
     mocked.update.mockResolvedValue(tournament);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(screen.getByRole('switch', { name: 'Check-in vor Ort' }));
     fireEvent.change(screen.getByLabelText('Check-in ab'), { target: { value: '2026-07-01T17:00' } });
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Zeitplan'));
     await waitFor(() => expect(mocked.update).toHaveBeenCalled());
     expect(mocked.update.mock.calls[0][1]).toMatchObject({
       checkin_enabled: true,
@@ -287,7 +325,7 @@ describe('editing the tournament details', () => {
     expect(closeSwitch).toBeChecked();
 
     fireEvent.click(closeSwitch);
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Zeitplan'));
     await waitFor(() => expect(mocked.update).toHaveBeenCalled());
     expect(mocked.update.mock.calls[0][1]).toMatchObject({
       registration_end_time: new Date('2026-06-30T18:00').toISOString(),
@@ -303,11 +341,6 @@ describe('editing the tournament details', () => {
     expect(closeSwitch).not.toBeChecked();
   });
 
-  it('keeps the check-in setting locked once the tournament has started', () => {
-    setup(TournamentRoleType.ADMIN, { started_at: '2026-07-01T18:05:00', phase: 'running' });
-    expect(screen.getByRole('switch', { name: 'Check-in vor Ort' })).toHaveAttribute('data-disabled');
-  });
-
   it('changes the address and follows it to the new page', async () => {
     mocked.update.mockResolvedValue({ ...tournament, slug: 'winter-cup' });
     setup(TournamentRoleType.ADMIN);
@@ -315,7 +348,7 @@ describe('editing the tournament details', () => {
 
     fireEvent.change(screen.getByLabelText('Adresse'), { target: { value: 'Winter-Cup' } });
     expect(screen.getByText(/Der alte Link und QR-Codes .* funktionieren dann nicht mehr/)).toBeInTheDocument();
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Link & Zugang'));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/t/winter-cup'));
     expect(mocked.update.mock.calls[0][1]).toMatchObject({ slug: 'winter-cup' });
@@ -325,7 +358,7 @@ describe('editing the tournament details', () => {
     mocked.update.mockRejectedValue(new ApiError(409, { detail: 'Diese Adresse ist schon vergeben.', error_code: 'SLUG_TAKEN' }));
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(screen.getByLabelText('Adresse'), { target: { value: 'vergeben' } });
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Link & Zugang'));
 
     expect(await screen.findByText('Diese Adresse ist schon vergeben.')).toBeInTheDocument();
     expect(toast.error).not.toHaveBeenCalled();
@@ -337,11 +370,11 @@ describe('editing the tournament details', () => {
     mocked.update.mockReturnValue(new Promise((_, r) => (reject = r)));
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
-    fireEvent.click(saveButton());
+    fireEvent.click(saveOf('Allgemein'));
 
-    expect(await screen.findByText('Speichern...')).toBeDisabled();
-    reject(new Error('x'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Speichern der Turnier-Details'));
+    expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
+    reject(new Error('Das hat nicht geklappt.'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Das hat nicht geklappt.'));
   });
 
   it('previews the description as markdown', () => {
@@ -355,7 +388,7 @@ describe('editing the tournament details', () => {
   it('previews an empty description with a placeholder', () => {
     setup(TournamentRoleType.ADMIN, { description: null });
     fireEvent.click(screen.getByText('Vorschau'));
-    expect(screen.getByText('Keine Beschreibung...')).toBeInTheDocument();
+    expect(screen.getByText('Keine Beschreibung…')).toBeInTheDocument();
   });
 });
 
@@ -401,7 +434,7 @@ describe('invitation links', () => {
 
 describe('role management', () => {
   const alice = { id: 'u9', name: 'Zed Zimmer' } as User;
-  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen...');
+  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen…');
   const searchButton = () => document.querySelector('.lucide-search')!.closest('button')!;
 
   it('requires two characters before searching', () => {
@@ -489,17 +522,18 @@ describe('role management', () => {
   const revokeButtons = () =>
     screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'));
 
-  it('revokes a role after confirmation', async () => {
+  it('revokes a role after a confirmation that names the consequence', async () => {
     mocked.revoke.mockResolvedValue(undefined);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(revokeButtons()[1]);
-    expect(screen.getByText('Rolle wirklich entziehen?')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    expect(screen.getByText('Rolle entziehen?')).toBeInTheDocument();
+    expect(screen.getByText('Ref Reese kann das Turnier danach nicht mehr als Schiedsrichter leiten.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
 
     await waitFor(() => expect(mocked.revoke).toHaveBeenCalledWith('t1', 'r2'));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle erfolgreich entzogen.'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle entzogen.'));
     expect(onReload).toHaveBeenCalled();
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
   it('can cancel the confirmation', () => {
@@ -512,13 +546,14 @@ describe('role management', () => {
 
   it.each([
     [new Error('Nicht erlaubt'), 'Nicht erlaubt'],
-    ['boom', 'Fehler'],
-  ])('reports revoke failures (%s)', async (error, message) => {
+    ['boom', 'Das hat nicht geklappt. Versuch es noch einmal.'],
+  ])('shows a failed revoke in the dialog (%s)', async (error, message) => {
     mocked.revoke.mockRejectedValue(error);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(revokeButtons()[0]);
-    fireEvent.click(screen.getByText('Bestätigen'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument(); // stays open to try again or cancel
   });
 });
 
@@ -526,26 +561,29 @@ describe('deleting the tournament', () => {
   const open = () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(screen.getByText('Turnier endgültig löschen'));
+    // deleting a tournament needs LÖSCHEN typed (case does not matter)
+    expect(screen.getByRole('button', { name: 'Turnier löschen' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Zum Bestätigen/), { target: { value: 'löschen' } });
   };
 
-  it('deletes after confirmation and leaves the page', async () => {
+  it('deletes after a confirmation that names the consequences and leaves the page', async () => {
     mocked.remove.mockResolvedValue(undefined);
     open();
-    expect(screen.getByText(/unwiderruflich löschen/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    expect(screen.getByText('Summer Cup löschen?')).toBeInTheDocument();
+    expect(screen.getByText(/lässt sich nicht rückgängig machen/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier löschen' }));
 
     await waitFor(() => expect(mocked.remove).toHaveBeenCalledWith('t1'));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/tournaments'));
     expect(toast.success).toHaveBeenCalledWith('Turnier gelöscht.');
   });
 
-  it('re-enables the button when deleting fails', async () => {
-    mocked.remove.mockRejectedValue(new Error('x'));
+  it('keeps the dialog open with the reason when deleting fails', async () => {
+    mocked.remove.mockRejectedValue(new Error('Das Turnier läuft noch.'));
     open();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier löschen' }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Löschen des Turniers'));
-    expect(screen.getByText('Turnier endgültig löschen').closest('button')).toBeEnabled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier läuft noch.');
     expect(push).not.toHaveBeenCalled();
   });
 });

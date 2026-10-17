@@ -36,12 +36,12 @@ export function TeamCard({ team, onRename, onDelete, onShare, onCopy }: Readonly
             <MoreVertical aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem disabled={!team.is_renamable} onClick={() => onRename(team)}>
+            <DropdownMenuItem onClick={() => onRename(team)}>
               <Pencil className="mr-2 size-4" />
               Umbenennen
             </DropdownMenuItem>
+            {/* never greyed out: the dialog says what stands in the way */}
             <DropdownMenuItem
-              disabled={!team.is_deletable}
               className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
               onClick={() => onDelete(team)}
             >

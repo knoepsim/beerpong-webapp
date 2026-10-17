@@ -97,6 +97,9 @@ interface BeerpongTableProps {
 
 export function BeerpongTable({ leftCups, rightCups, className, compact = false }: BeerpongTableProps) {
   const aspectClass = compact ? "aspect-[22/10]" : "aspect-[33/10]";
+  // tilted by 60° the table looks half as high but keeps its full height in the layout: give the empty space above
+  // and below back (a quarter of the height each; margins in % refer to the width, so it fits every screen)
+  const giveBack = compact ? "-11%" : "-7.5%";
   const widthFactor = compact ? 1.5 : 1.0;
   const leftCupPositions = [
     // Base column (4 cups)
@@ -150,13 +153,17 @@ export function BeerpongTable({ leftCups, rightCups, className, compact = false 
   ].sort((a, b) => a.y - b.y);
 
   return (
+    // no overflow handling here: cups and shadow stand out over the table, nothing is cut off or scrolls.
+    // Decoration only: it lets taps through to what it overlaps (it reaches into the space above) and is hidden from
+    // screen readers, the texts around it say the same.
     <div
-      className={cn("w-full max-w-5xl mx-auto p-2  overflow-x-auto no-scrollbar", className)}
-      style={{ perspective: "1000px" }}
+      className={cn("pointer-events-none w-full max-w-5xl mx-auto p-2", className)}
+      style={{ perspective: "1000px", marginBlock: giveBack }}
+      aria-hidden="true"
     >
       <div className="w-full mx-auto">
         <div
-          className={`relative w-full ${aspectClass} bg-zinc-900 border-[8px] border-zinc-800 rounded-xl shadow-2xl transition-all`}
+          className={`relative w-full ${aspectClass} bg-zinc-900 border-4 sm:border-8 border-zinc-800 rounded-xl shadow-2xl transition-all`}
           style={{
             transform: "rotateX(60deg)",
             transformStyle: "preserve-3d",

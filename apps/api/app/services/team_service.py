@@ -9,13 +9,13 @@ from app.core.exceptions import (
     InvalidInviteError,
     NotFoundError,
     TeamFullError,
+    TeamInTournamentError,
 )
 from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
 from app.repositories.team_repository import team_repository
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.schemas.team import TeamDeleteBlocker, TeamMemberResponse, TeamResponse
+from app.core.database import DbSession
 from app.services.revision import bump_for_team
 
 
@@ -64,12 +64,34 @@ class TeamService:
         return await team_repository.get_team_member_count(self.db, team_id)
 
 
-    async def get_team_flags(self, team_id: UUID) -> tuple[bool, bool]:
-        """Returns (is_deletable, is_renamable)."""
-        return await team_repository.get_team_flags(self.db, team_id)
+    async def get_delete_blockers(self, team_id: UUID) -> list[TeamDeleteBlocker]:
+        """Why a team cannot be deleted right now: the tournaments it plays in or is registered for."""
+        return [
+            TeamDeleteBlocker(
+                tournament_name=t.name,
+                tournament_slug=t.slug,
+                running=t.is_started,
+                registration_open=t.registration_open,
+            )
+            for t in await team_repository.get_delete_blockers(self.db, team_id)
+        ]
+
+    async def to_response(self, team: Team) -> TeamResponse:
+        """A team for its members: players and what keeps it from being deleted."""
+        members = await self.get_team_members_with_names(team.id)
+        return TeamResponse(
+            id=team.id,
+            name=team.name,
+            max_size=team.max_size,
+            members=[TeamMemberResponse.model_validate(m) for m in members],
+            is_complete=len(members) >= team.max_size,
+            delete_blockers=await self.get_delete_blockers(team.id),
+            created_at=team.created_at,
+        )
 
 
     async def update_team(self, team_id: UUID, name: str) -> Team:
+        """Rename a team. Always allowed: tournaments that started keep the name the team had then."""
         team = await self.get_team(team_id)
         updated = await team_repository.update(self.db, db_obj=team, obj_in={"name": name})
         await bump_for_team(self.db, team_id, "teams", "bracket")
@@ -77,7 +99,19 @@ class TeamService:
 
 
     async def soft_delete_team(self, team_id: UUID) -> None:
-        team = await self.get_team(team_id)
+        """Hide a team (its finished tournaments keep it); not while it plays in or is registered for one."""
+        team = await self.get_team(team_id, for_update=True)
+        blockers = await self.get_delete_blockers(team_id)
+        if blockers:
+            first = blockers[0]
+            if first.running:
+                raise TeamInTournamentError(
+                    f"Das Team spielt gerade in „{first.tournament_name}“. Löschen geht nach dem Turnier."
+                )
+            raise TeamInTournamentError(
+                f"Das Team ist für „{first.tournament_name}“ angemeldet. "
+                + ("Melde es dort ab, dann kannst du es löschen." if first.registration_open else "Löschen geht nach dem Turnier.")
+            )
         await team_repository.update(self.db, db_obj=team, obj_in={"is_deleted": True})
 
 
@@ -88,7 +122,7 @@ class TeamService:
             select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
         )
         if result.scalar_one_or_none() is None:
-            raise NotFoundError("Team membership")
+            raise NotFoundError("Teammitgliedschaft")
 
         invite = TeamInvite(
             team_id=team_id,
@@ -156,5 +190,5 @@ class TeamService:
 
 
 
-def get_team_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TeamService:
+def get_team_service(db: DbSession) -> TeamService:
     return TeamService(db)

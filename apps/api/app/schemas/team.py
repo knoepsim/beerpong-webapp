@@ -22,6 +22,14 @@ class TeamMemberResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TeamDeleteBlocker(BaseModel):
+    """A tournament that keeps a team from being deleted (it plays in it or is registered for it)."""
+    tournament_name: str
+    tournament_slug: str
+    running: bool  # False: registered, the tournament has not started yet
+    registration_open: bool  # the team can still leave it
+
+
 class TeamResponse(BaseModel):
     """Team details response."""
     id: UUID
@@ -29,8 +37,8 @@ class TeamResponse(BaseModel):
     max_size: int
     members: list[TeamMemberResponse] = []
     is_complete: bool = False
-    is_deletable: bool = False
-    is_renamable: bool = True
+    # empty: the team can be deleted (a team can always be renamed; started tournaments keep the old name)
+    delete_blockers: list[TeamDeleteBlocker] = []
     created_at: datetime
 
     model_config = {"from_attributes": True}

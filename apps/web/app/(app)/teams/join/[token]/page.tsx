@@ -13,6 +13,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Users } from "lucide-react";
+import { toast } from "sonner";
 import { useCurrentUser } from "@/components/user-provider";
 
 export default function JoinTeamPage({ params }: { params: Promise<{ token: string }> }) {
@@ -42,7 +43,9 @@ export default function JoinTeamPage({ params }: { params: Promise<{ token: stri
     setError(null);
     try {
       const team = await api.teams.acceptInvite(token);
-      router.push(`/teams/${team.id}`);
+      // the team shows up in "Meine Teams", where everything about it is
+      toast.success(`Du bist jetzt im Team ${team.name}.`);
+      router.push("/teams");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Der Link ist ungültig oder das Team ist bereits voll.";
       setError(message);

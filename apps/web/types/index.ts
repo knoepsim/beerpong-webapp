@@ -25,14 +25,24 @@ export interface TeamMember {
   joined_at: string;
 }
 
+/** A tournament that keeps a team from being deleted. */
+export interface TeamDeleteBlocker {
+  tournament_name: string;
+  tournament_slug: string;
+  /** false: registered, the tournament has not started yet */
+  running: boolean;
+  /** the team can still leave it */
+  registration_open: boolean;
+}
+
 export interface Team {
   id: string;
   name: string;
   max_size: number;
   members: TeamMember[];
   is_complete: boolean;
-  is_deletable: boolean;
-  is_renamable: boolean;
+  /** Empty: the team can be deleted. Renaming is always possible; started tournaments keep the old name. */
+  delete_blockers: TeamDeleteBlocker[];
   created_at: string;
 }
 
@@ -164,6 +174,11 @@ export interface TournamentCreateRequest {
 export interface ParticipatingTournament {
   tournament: Tournament;
   team: Team;
+  is_checked_in: boolean;
+  /** The team's next match that is not finished (once started). */
+  next_match: Match | null;
+  /** Out or won: the place (1 = winner). */
+  place: number | null;
 }
 
 export interface ManagedTournament {
@@ -199,6 +214,8 @@ export interface Match {
   /** A match still waiting for a team whose table is already certain (towards the end, when nothing queues). */
   upcoming_table_id: string | null;
   upcoming_table_name: string | null;
+  /** Since when it is at its table (ready or live). */
+  on_table_at: string | null;
   /** When it was started at its table (only while live). */
   started_at: string | null;
   created_at: string;

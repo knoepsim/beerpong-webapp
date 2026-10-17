@@ -3,7 +3,7 @@ import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { MatchTable } from "@/components/match-table";
-import { describeSides, matchSummary, sideTone, statusLabel } from "@/lib/match-display";
+import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
 
 interface MatchCardProps {
@@ -31,29 +31,24 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
   );
   const content = (
     <>
-      <div className="px-2 pt-1 pb-1 text-xs leading-4 text-muted-foreground">
-        <div className="flex items-center justify-between gap-2">
-          <span className="truncate tabular-nums" title={`Spiel ${number}`}>
-            {number}
-          </span>
-          <MatchStatusBadge match={match} />
-          {match.status === "finished" && (
-            <span className="shrink-0" title="Becher, die dem Sieger übrig blieben">
-              {statusLabel(match)}
-            </span>
-          )}
-        </div>
-        <MatchTable match={match} className="flex" />
+      {/* one line: number, table, status (the bracket has a fixed height per slot) */}
+      <div className="flex h-6 items-center gap-2 px-2 text-xs leading-4 text-muted-foreground">
+        <span className="shrink-0 tabular-nums" title={`Spiel ${number}`}>
+          {number}
+        </span>
+        <MatchTable match={match} className="min-w-0" />
+        <span className="flex-1" />
+        <MatchStatusBadge match={match} />
       </div>
       {sides.map((side) => (
         <div
           key={side.side}
           className={cn(
-            "flex items-center gap-1 min-h-8 px-1.5 py-1 border-t text-[13px] leading-tight",
+            "flex h-7 items-center gap-1 px-1.5 border-t text-[13px] leading-tight",
             sideTone(side, !!highlightTeamId && side.id === highlightTeamId),
           )}
         >
-          <TeamLabel side={side} />
+          <TeamLabel side={side} wrap={false} />
         </div>
       ))}
     </>
@@ -86,13 +81,13 @@ export function ByeCard({
   return (
     <article
       className={cn(
-        "w-full rounded-lg border border-dashed bg-card/60 px-2 py-1.5 text-[13px] leading-none",
+        "w-full rounded-lg border border-dashed bg-card/60 px-2 py-2 text-[13px] leading-none",
         mine && "ring-2 ring-primary/60 bg-primary/10",
       )}
       aria-label={`${name}, Freilos: ohne Spiel direkt in der nächsten Runde`}
     >
-      <p className="text-xs leading-4 text-muted-foreground">Freilos</p>
-      <p className="truncate font-medium pt-1">{name}</p>
+      {/* just the team: the dashed box without a match says enough; screen readers hear "Freilos" */}
+      <p className="truncate font-medium">{name}</p>
     </article>
   );
 }

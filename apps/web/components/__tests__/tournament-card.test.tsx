@@ -49,12 +49,16 @@ describe('TournamentCard', () => {
     expect(screen.getByText('Jan')).toBeInTheDocument()
   })
 
-  it('names the state while the tournament is being prepared', () => {
-    const { rerender } = card()
+  it('names the state while the tournament is being prepared, for admins, managers and referees', () => {
+    const { rerender } = card({ role: TournamentRoleType.MANAGER })
     expect(screen.getByText('Anmeldung offen')).toBeInTheDocument()
 
-    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }) }} />)
+    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), role: TournamentRoleType.REFEREE }} />)
     expect(screen.getByText('Check-in läuft')).toBeInTheDocument()
+
+    // a player gets their own status instead of the state of the tournament
+    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), team: { id: 'x', name: 'A' } as Team }} />)
+    expect(screen.queryByText('Check-in läuft')).not.toBeInTheDocument()
   })
 
   it('does not repeat the state of running and finished tournaments, the group heading says it', () => {
@@ -85,5 +89,21 @@ describe('TournamentCard', () => {
     rerender(<TournamentCard item={{ tournament: tournament({ phase: 'finished' }) }} />)
     expect(container.querySelector('.bg-primary.text-primary-foreground')).toBeNull()
     expect(screen.getByRole('heading').className).toContain('text-muted-foreground')
+  })
+
+  it('shows my status in a few words when there is something to know, nothing otherwise', () => {
+    const team = { id: 'x', name: 'Becherhelden' } as Team
+    const { rerender } = card(
+      { team, participation: { is_checked_in: false, next_match: null, place: null } },
+      { checkin_enabled: true, checkin_open: true },
+    )
+    expect(screen.getByText('Jetzt einchecken')).toBeInTheDocument()
+
+    rerender(
+      <TournamentCard
+        item={{ tournament: tournament(), team, participation: { is_checked_in: false, next_match: null, place: null } }}
+      />,
+    )
+    expect(screen.queryByText('Jetzt einchecken')).not.toBeInTheDocument()
   })
 })

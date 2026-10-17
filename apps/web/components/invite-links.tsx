@@ -4,20 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Copy, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { TournamentInvite } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 export const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`;
 
@@ -28,7 +19,7 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
   const [invites, setInvites] = useState<TournamentInvite[] | null>(null);
   const [label, setLabel] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-  const [toDelete, setToDelete] = useState<TournamentInvite | null>(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -69,15 +60,17 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
     }
   };
 
-  const handleDelete = async () => {
-    if (!toDelete) return;
-    try {
-      await api.tournaments.deleteInvite(tournamentId, toDelete.id);
-      setToDelete(null);
-      await load();
-    } catch {
-      toast.error("Der Link konnte nicht gelöscht werden.");
-    }
+  const handleDelete = (invite: TournamentInvite) => {
+    void confirm({
+      title: "Link löschen?",
+      description: "Wer den Link noch hat, kann damit nicht mehr beitreten. Teams, die schon beigetreten sind, bleiben im Turnier.",
+      confirmLabel: "Link löschen",
+      destructive: true,
+      action: async () => {
+        await api.tournaments.deleteInvite(tournamentId, invite.id);
+        await load();
+      },
+    });
   };
 
   const canShare = typeof navigator !== "undefined" && "share" in navigator;
@@ -121,7 +114,7 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
               variant="ghost"
               size="icon"
               className="size-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => setToDelete(invite)}
+              onClick={() => handleDelete(invite)}
               aria-label={`Link ${invite.label ?? invite.token} löschen`}
             >
               <Trash2 aria-hidden="true" />
@@ -147,29 +140,6 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
         </div>
       </form>
 
-      <AlertDialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Link löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Wer den Link noch hat, kann damit nicht mehr beitreten. Teams, die schon beigetreten sind, bleiben im
-              Turnier.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

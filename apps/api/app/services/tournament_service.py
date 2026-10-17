@@ -1,8 +1,9 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from sqlalchemy import delete, func, select
 
 from app.core.exceptions import (
     NotFoundError,
@@ -21,6 +22,7 @@ from app.models.team import Team, TeamMember
 from app.models.tournament import JoinPolicy, Tournament, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
+from app.schemas.team import TeamResponse
 from app.schemas.tournament import TournamentCreate, TournamentUpdate
 from app.services.invite_service import InviteService
 from app.services.revision import bump
@@ -29,9 +31,29 @@ from app.services.table_service import TableService
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
-from app.core.database import get_db
-from app.core.security import get_current_user, get_optional_user
+from app.core.database import DbSession
+from app.core.security import get_optional_user
 from app.models.user import User
+
+
+# settings that only matter before the start (the schedule and who may join)
+BEFORE_START_ONLY = (
+    "start_time",
+    "registration_end_time",
+    "registration_auto_close",
+    "checkin_enabled",
+    "checkin_start_time",
+    "checkin_auto_open",
+    "join_policy",
+)
+
+
+
+def _same(a, b) -> bool:
+    """Equal values; times without a zone (SQLite) count as UTC."""
+    if isinstance(a, datetime) and isinstance(b, datetime):
+        return (a if a.tzinfo else a.replace(tzinfo=UTC)) == (b if b.tzinfo else b.replace(tzinfo=UTC))
+    return a == b
 
 
 class TournamentService:
@@ -83,7 +105,7 @@ class TournamentService:
         )
         tournament = result.scalar_one_or_none()
         if tournament is None:
-            raise NotFoundError("Tournament")
+            raise NotFoundError("Turnier")
         return tournament
 
     async def get_tournament(self, tournament_id: UUID, *, for_update: bool = False) -> Tournament:
@@ -94,7 +116,7 @@ class TournamentService:
         """
         tournament = await tournament_repository.get_by_id(self.db, tournament_id, for_update=for_update)
         if tournament is None:
-            raise NotFoundError("Tournament")
+            raise NotFoundError("Turnier")
         if tournament.is_deleted:
             raise TournamentDeletedError()
         return tournament
@@ -126,7 +148,7 @@ class TournamentService:
             return tournament
         if await self.is_involved(tournament_id, user_id):
             return tournament
-        raise HTTPException(status_code=403, detail="You do not have access to this private tournament.")
+        raise HTTPException(status_code=403, detail="Dieses Turnier ist privat. Du hast keinen Zugriff.")
 
 
     @staticmethod
@@ -149,8 +171,10 @@ class TournamentService:
         if not update_data:
             return tournament
 
-        new_checkin_enabled = update_data.get("checkin_enabled", tournament.checkin_enabled)
-        if tournament.is_started and new_checkin_enabled != tournament.checkin_enabled:
+        # the schedule and who may join only matter before the start: afterwards they stay as they were
+        if tournament.is_started and any(
+            key in update_data and not _same(update_data[key], getattr(tournament, key)) for key in BEFORE_START_ONLY
+        ):
             raise TournamentAlreadyStartedError()
 
         if "slug" in update_data:
@@ -201,10 +225,13 @@ class TournamentService:
         participating_res, managing_res = await tournament_repository.get_my_tournaments(self.db, user_id)
 
         participating = []
-        for tournament, team in participating_res:
+        for tournament, team, frozen_name, is_checked_in in participating_res:
+            # a tournament that started shows the team under the name it had then
             participating.append({
                 "tournament": tournament,
-                "team": team
+                "team": TeamResponse.model_validate(team).model_copy(update={"name": frozen_name or team.name}),
+                "is_checked_in": is_checked_in,
+                **(await self._my_progress(tournament, team.id) if tournament.is_started else {}),
             })
 
         managing = []
@@ -218,6 +245,21 @@ class TournamentService:
             "participating": participating,
             "managing": managing
         }
+
+    async def _my_progress(self, tournament: Tournament, team_id: UUID) -> dict:
+        """The next match of a team in a started tournament, or its place once it is out or has won."""
+        from app.services.bracket_service import BracketService  # imported here: the bracket uses this service
+
+        bracket = await BracketService(self.db).get_bracket(tournament.id)
+        mine = sorted(
+            (m for m in bracket.matches if team_id in (m.team_a_id, m.team_b_id)), key=lambda m: (m.round, m.position)
+        )
+        if bracket.champion_team_id == team_id:
+            return {"place": 1}
+        lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
+        if lost is not None:
+            return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
+        return {"next_match": next((m for m in mine if m.winner_team_id is None), None)}
 
     async def join_tournament(
         self, tournament_id: UUID, team_id: UUID, invite_token: str | None = None
@@ -259,10 +301,10 @@ class TournamentService:
         return entry
 
 
-    async def get_tournament_teams(self, tournament_id: UUID) -> list[tuple[Team, bool]]:
-        """Get all teams participating in a tournament along with their check-in status."""
+    async def get_tournament_teams(self, tournament_id: UUID) -> list[tuple[Team, bool, str]]:
+        """The teams of a tournament with their check-in and the name they play under (frozen at the start)."""
         result = await self.db.execute(
-            select(Team, TournamentTeam.is_checked_in)
+            select(Team, TournamentTeam.is_checked_in, func.coalesce(TournamentTeam.team_name, Team.name))
             .join(TournamentTeam, TournamentTeam.team_id == Team.id)
             .where(TournamentTeam.tournament_id == tournament_id)
         )
@@ -289,7 +331,7 @@ class TournamentService:
         team = result.scalar_one_or_none()
 
         if not team:
-            raise HTTPException(status_code=400, detail="User is not part of this tournament.")
+            raise HTTPException(status_code=400, detail="Du spielst in diesem Turnier nicht mit.")
 
         await self.db.execute(
             delete(TournamentTeam)
@@ -312,7 +354,7 @@ class TournamentService:
             )
         )
         if result.rowcount == 0:
-            raise HTTPException(status_code=400, detail="Team is not part of this tournament.")
+            raise HTTPException(status_code=400, detail="Dieses Team spielt in diesem Turnier nicht mit.")
         await bump(self.db, tournament_id, "teams")
 
 
@@ -338,13 +380,13 @@ class TournamentService:
         
         if not tournament_team:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Team is not in this tournament.")
+            raise HTTPException(status_code=404, detail="Dieses Team spielt in diesem Turnier nicht mit.")
             
         tournament_team.is_checked_in = is_checked_in
         await bump(self.db, tournament_id, "teams")
 
 
-def get_tournament_service(db: Annotated[AsyncSession, Depends(get_db)]) -> TournamentService:
+def get_tournament_service(db: DbSession) -> TournamentService:
     return TournamentService(db)
 
 

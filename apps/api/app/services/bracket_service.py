@@ -24,9 +24,7 @@ from app.models.tournament_table import TournamentTable
 from app.services.revision import bump
 from app.services.table_planner import PlanMatch, assign_free_tables, certain_next_tables, plan
 from app.services.tournament_service import TournamentService
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 
 
 class BracketService:
@@ -117,7 +115,7 @@ class BracketService:
         result = await self.db.execute(stmt)
         match = result.scalar_one_or_none()
         if match is None:
-            raise NotFoundError("Match")
+            raise NotFoundError("Spiel")
         return match
 
 
@@ -167,9 +165,9 @@ class BracketService:
 
         is_active = await self._has_active_result(match_id)
         if result_type == ResultType.CREATED and is_active:
-            raise ResultConflictError("This match already has a result. Modify it instead.")
+            raise ResultConflictError("Für dieses Spiel gibt es schon ein Ergebnis. Ändere es stattdessen.")
         if result_type != ResultType.CREATED and not is_active:
-            raise ResultConflictError("This match has no result to modify or delete.")
+            raise ResultConflictError("Für dieses Spiel gibt es noch kein Ergebnis.")
 
         if result_type != ResultType.DELETED:
             if match.team_a_id is None or match.team_b_id is None:
@@ -179,7 +177,7 @@ class BracketService:
 
         if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
             raise ResultConflictError(
-                "The next match already has a result. Delete the next match's result first."
+                "Das nächste Spiel hat schon ein Ergebnis. Lösche zuerst dieses Ergebnis, dann kannst du hier etwas ändern."
             )
 
         entry = Result(
@@ -371,7 +369,7 @@ class BracketService:
 
 
 
-def get_bracket_service(db: Annotated[AsyncSession, Depends(get_db)]) -> BracketService:
+def get_bracket_service(db: DbSession) -> BracketService:
     return BracketService(db)
 
 

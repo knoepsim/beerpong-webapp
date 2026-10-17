@@ -106,6 +106,20 @@ export function activeRounds(layout: BracketLayout): Set<number> {
   return new Set(active.map((r) => r.round));
 }
 
+/**
+ * The round the tree opens at: where my team plays next, else the first round with something to play, else the
+ * final (a finished tournament). Round one is mostly played and only scrolled past otherwise.
+ */
+export function focusRound(layout: BracketLayout, teamId?: string | null): number {
+  const slots = allMatchSlots(layout);
+  const mine = teamId
+    ? slots.find((s) => s.match.status !== "finished" && (s.match.team_a_id === teamId || s.match.team_b_id === teamId))
+    : undefined;
+  if (mine) return mine.match.round;
+  const active = [...activeRounds(layout)];
+  return active.length > 0 ? Math.min(...active) : layout.totalRounds;
+}
+
 export function isMatchSlot(slot: BracketSlot): slot is MatchSlot {
   return slot.kind === "match";
 }

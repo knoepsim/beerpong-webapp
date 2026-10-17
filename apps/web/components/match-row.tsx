@@ -14,17 +14,17 @@ interface MatchRowProps {
   highlightTeamId?: string | null;
   /** Organizers open the result dialog by clicking a match. */
   onClick?: (match: Match) => void;
+  /** Without the right-hand side, where status and table are shown around the row already (the tables tab). */
+  aside?: boolean;
 }
 
-/** The right-hand side of a row: the status and the table to go to, or the cups of a finished match. */
+/** The right-hand side of a row: the status and the table to go to; a finished match has its score in the rows. */
 function Aside({ match }: Readonly<{ match: Match }>) {
-  const cups = match.status === "finished" ? match.cups_left : null;
-  if (match.status === "finished" && cups == null) return null;
+  if (match.status === "finished") return null;
   return (
     <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
       <MatchStatusBadge match={match} />
       <MatchTable match={match} className="max-w-full justify-end font-medium" />
-      {cups != null && <span className="text-balance text-muted-foreground">{cups} Becher übrig</span>}
     </div>
   );
 }
@@ -33,10 +33,10 @@ function Aside({ match }: Readonly<{ match: Match }>) {
  * A match as a list row, like a scoreboard: number | both teams | what matters now.
  * Used for the list of all matches and for "my matches", so both read the same.
  *
- * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out; "Bereit" and
- * the table only exist for matches that can be played; the cups only for finished ones.
+ * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out, the cups they had
+ * left stand next to them; status and table only exist for matches that are not finished.
  */
-export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchRowProps>) {
+export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick, aside = true }: Readonly<MatchRowProps>) {
   const { match, number } = slot;
   const sides = describeSides(slot, teamsMap, championTeamId);
 
@@ -59,15 +59,13 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
             className={cn(
               "flex min-h-9 items-center gap-1 px-2 py-1 text-[13px] leading-tight",
               sideTone(side, !!highlightTeamId && side.id === highlightTeamId, false),
-              side.isWinner && "font-semibold",
-              side.isLoser && "line-through decoration-muted-foreground/60",
             )}
           >
-            <TeamLabel side={side} marker={false} />
+            <TeamLabel side={side} />
           </div>
         ))}
       </div>
-      <Aside match={match} />
+      {aside && <Aside match={match} />}
     </>
   );
   const summary = matchSummary(slot, sides, teamsMap);

@@ -9,9 +9,7 @@ from app.core.phone import normalize_german_mobile
 from app.models.user import User
 from app.schemas.user import UserUpdate
 from app.services.auth_service import AuthService
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 
 
 class UserService:
@@ -23,7 +21,7 @@ class UserService:
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user is None:
-            raise NotFoundError("User")
+            raise NotFoundError("Nutzer")
         return user
 
 
@@ -87,5 +85,5 @@ class UserService:
 
 
 
-def get_user_service(db: Annotated[AsyncSession, Depends(get_db)]) -> UserService:
+def get_user_service(db: DbSession) -> UserService:
     return UserService(db)

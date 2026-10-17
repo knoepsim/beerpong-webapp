@@ -4,16 +4,18 @@ import { use, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useCurrentUser } from "@/components/user-provider";
-import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam, TournamentPreview } from "@/types";
+import type { Tournament, Bracket, Team, TournamentUserRole, Match, TournamentTeam, TournamentPreview, TournamentTable } from "@/types";
 import { JoinPolicy, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { BracketView } from "@/components/bracket-view";
-import { MatchList } from "@/components/match-list";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Schedule } from "@/components/schedule";
 import { ParticipantStatus } from "@/components/participant-status";
-import { MatchResultDialog } from "@/components/match-result-dialog";
+import { useConfirm } from "@/components/confirm-dialog";
+import { TablesBoard } from "@/components/tables-board";
+import { PodiumCard } from "@/components/podium-card";
+import dynamic from "next/dynamic";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
 import { CheckinSummary } from "@/components/checkin-summary";
@@ -22,6 +24,7 @@ import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
 import { useTournamentLive, type LiveScope } from "@/hooks/use-tournament-live";
 import { highestRole } from "@/lib/roles";
+import { tabFromParam, tabQuery, type TournamentTab } from "@/lib/tournament-tabs";
 import { PreparationControls } from "@/components/preparation-controls";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -29,21 +32,23 @@ import { MapPin, Calendar, Users, Trophy, Play, Share2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+// only referees, managers and admins open it: the dialog with its cup animation is loaded then, not for everybody
+const MatchResultDialog = dynamic(() => import("@/components/match-result-dialog").then((m) => m.MatchResultDialog), {
+  ssr: false,
+});
+
+export default function TournamentDetailPage({
+  params,
+  searchParams,
+}: Readonly<{
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}>) {
   const { slug } = use(params);
+  const { tab: tabParam } = use(searchParams);
   const router = useRouter();
   const { user } = useCurrentUser();
 
@@ -56,33 +61,41 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   // a stranger who may join sees this instead of the tournament
   const [preview, setPreview] = useState<TournamentPreview | null>(null);
   const [tournamentTeams, setTournamentTeams] = useState<TournamentTeam[]>([]); // Teams in this tournament
+  const [tables, setTables] = useState<TournamentTable[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<number | null>(null);
 
   
-  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
-  const [confirmState, setConfirmState] = useState<{title: string, description?: string, action: () => Promise<void>} | null>(null);
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const confirm = useConfirm();
 
   const [isStartingTournament, setIsStartingTournament] = useState(false);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState<TournamentTab>(() => tabFromParam(tabParam));
+  // the tab is part of the address: reload, back and shared links keep it (replace: tabs are no history steps)
+  const changeTab = (next: string) => {
+    const value = next as TournamentTab;
+    setTab(value);
+    window.history.replaceState(null, "", `${window.location.pathname}${tabQuery(value)}`);
+  };
 
   
 
   const loadData = async () => {
     try {
       const tData = await api.tournaments.getBySlug(slug);
-      const [rolesData, tTeamsData] = await Promise.all([
+      const [rolesData, tTeamsData, tablesData] = await Promise.all([
         api.roles.list(tData.id),
         api.tournaments.getTeams(tData.id),
+        api.tournaments.listTables(tData.id),
       ]);
       setTournament(tData);
       setPreview(null);
       setRoles(rolesData);
       setTournamentTeams(tTeamsData);
+      setTables(tablesData);
 
       try {
         const bData = await api.tournaments.getBracket(tData.id);
@@ -121,9 +134,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     const load: Record<LiveScope, () => Promise<void>> = {
       tournament: async () => setTournament(await api.tournaments.getBySlug(slug)),
       teams: async () => setTournamentTeams(await api.tournaments.getTeams(id)),
+      // the tables belong to the bracket: who plays where
       bracket: async () => {
-        const data = await api.tournaments.getBracket(id);
+        const [data, tablesData] = await Promise.all([api.tournaments.getBracket(id), api.tournaments.listTables(id)]);
         setBracket(data.matches.length > 0 ? data : null);
+        setTables(tablesData);
       },
       roles: async () => setRoles(await api.roles.list(id)),
     };
@@ -153,33 +168,30 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
 
   const handleLeave = () => {
     if (!myTournamentTeam) return;
-    setConfirmState({
+    void confirm({
       title: "Turnier verlassen?",
       description: `${myTournamentTeam.name} wird vom Turnier abgemeldet. Solange die Anmeldung offen ist, kannst du wieder beitreten.`,
+      confirmLabel: "Turnier verlassen",
+      destructive: true,
       action: async () => {
-        try {
-          await api.tournaments.leave(tournamentId);
-          await loadData();
-          toast.success("Du hast das Turnier verlassen.");
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
-        }
-      }
+        await api.tournaments.leave(tournamentId);
+        await loadData();
+        toast.success("Du hast das Turnier verlassen.");
+      },
     });
   };
 
   const handleRemoveTeam = (teamId: string, teamName: string) => {
-    setConfirmState({
-      title: `Möchtest du das Team "${teamName}" wirklich aus dem Turnier entfernen?`,
+    void confirm({
+      title: `${teamName} aus dem Turnier entfernen?`,
+      description: "Das Team ist dann nicht mehr angemeldet. Seine Spieler können es wieder anmelden, solange die Anmeldung offen ist.",
+      confirmLabel: "Team entfernen",
+      destructive: true,
       action: async () => {
-        try {
-          await api.tournaments.removeTeam(tournamentId, teamId);
-          await loadData();
-          toast.success("Team entfernt");
-        } catch (err: unknown) {
-          toast.error("Fehler beim Entfernen des Teams");
-        }
-      }
+        await api.tournaments.removeTeam(tournamentId, teamId);
+        await loadData();
+        toast.success(`${teamName} entfernt`);
+      },
     });
   };
 
@@ -196,12 +208,25 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   };
 
   const handleSetOpen = async (kind: "registration" | "checkin", open: boolean) => {
-    try {
+    const apply = async () => {
       if (kind === "registration") await api.tournaments.setRegistrationOpen(tournamentId, open);
       else await api.tournaments.setCheckinOpen(tournamentId, open);
       await loadData();
+    };
+    // opening the check-in has a consequence at the start: ask once; everything else is switched right away
+    if (kind === "checkin" && open) {
+      void confirm({
+        title: "Check-in öffnen?",
+        description: "Teams können sich ab jetzt vor Ort einchecken. Wer beim Turnierstart nicht eingecheckt ist, wird entfernt.",
+        confirmLabel: "Check-in öffnen",
+        action: apply,
+      });
+      return;
+    }
+    try {
+      await apply();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuche es noch einmal.");
+      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
     }
   };
 
@@ -212,9 +237,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
       toast.error(plan.description);
       return;
     }
-    setConfirmState({
+    void confirm({
       title: "Turnier jetzt starten?",
-      description: tournament.registration_open ? `${plan.description} Die Anmeldung wird geschlossen.` : plan.description,
+      description: [
+        plan.description,
+        tournament.registration_open ? "Die Anmeldung wird geschlossen." : null,
+        "Der Spielplan wird ausgelost; danach können keine Teams mehr dazukommen.",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      confirmLabel: "Turnier starten",
       action: async () => {
         setIsStartingTournament(true);
         try {
@@ -225,8 +257,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
               ? `Turnier gestartet. ${result.removed_team_ids.length} Team(s) ohne Check-in entfernt.`
               : "Turnier gestartet",
           );
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Fehler beim Turnierstart");
         } finally {
           setIsStartingTournament(false);
         }
@@ -321,6 +351,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     );
   }
 
+  // the tables only matter while it runs; a tab that is not there (tables before the start or after the end,
+  // settings without the role) shows the overview
+  const hasTables = !!bracket && !tournament.finished_at;
+  const shownTab: TournamentTab =
+    (tab === "tables" && !hasTables) || (tab === "admin" && !canManage) ? "overview" : tab;
   const matchTeamA = selectedMatch?.team_a_id ? teamsMap[selectedMatch.team_a_id] : undefined;
   const matchTeamB = selectedMatch?.team_b_id ? teamsMap[selectedMatch.team_b_id] : undefined;
 
@@ -330,27 +365,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
               {tournament.join_policy === JoinPolicy.OPEN && (
                 <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8" title="Turnier teilen">
                   <Share2 className="h-4 w-4 text-muted-foreground" />
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
               <Badge variant={tournament.phase === "running" ? "default" : "secondary"}>
                 {phaseLabel(tournament.phase)}
               </Badge>
               {tournament.start_time && (
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> 
-                  {new Date(tournament.start_time).toLocaleString("de-DE", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  })} Uhr
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  {formatWhen(tournament.start_time)}
                 </span>
               )}
               {tournament.location && (
@@ -378,19 +407,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         slug={slug}
         onJoined={loadData}
         onLeave={handleLeave}
+        compact={shownTab !== "overview"}
       />
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
+      <Tabs value={shownTab} onValueChange={changeTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
+          {hasTables && <TabsTrigger value="tables" className="flex-1">Tische</TabsTrigger>}
           <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
         </TabsList>
         {canManage && (
           <Button
             variant="outline"
             className={cn("mt-2 h-11 w-full", tab === "admin" && "border-primary bg-primary/10 text-primary")}
-            onClick={() => setTab("admin")}
+            onClick={() => changeTab("admin")}
             aria-pressed={tab === "admin"}
           >
             <ShieldAlert aria-hidden="true" />
@@ -399,6 +430,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         )}
 
         <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* the end of the tournament: the winner first */}
+          {tournament.finished_at && bracket && <PodiumCard bracket={bracket} teamsMap={teamsMap} />}
           {canManage && (
             <Card className="border-primary/50 shadow-sm bg-primary/5">
               <CardHeader className="pb-3">
@@ -459,49 +492,34 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         </TabsContent>
 
         <TabsContent value="bracket" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Turnierbaum</CardTitle>
-              {canReferee && <CardDescription>Klicke auf ein Match, um das Ergebnis einzutragen.</CardDescription>}
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center p-8">
-                  <div className="space-y-4 w-full max-w-3xl">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                    <Skeleton className="h-32 w-full" />
-                  </div>
-                </div>
-              ) : !bracket ? (
-                <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
-                  <Trophy className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
-                  <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  <BracketView
-                    bracket={bracket}
-                    teamsMap={teamsMap}
-                    onMatchClick={canReferee ? handleMatchClick : undefined}
-                    highlightTeamId={myTournamentTeam?.id}
-                  />
-                  
-                  <div className="border-t pt-6">
-                    <h3 className="font-semibold mb-4">Alle Spiele</h3>
-                    <MatchList
-                      bracket={bracket}
-                      teamsMap={teamsMap}
-                      highlightTeamId={myTournamentTeam?.id}
-                      onMatchClick={canReferee ? handleMatchClick : undefined}
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {bracket ? (
+            <Schedule
+              bracket={bracket}
+              teamsMap={teamsMap}
+              highlightTeamId={myTournamentTeam?.id}
+              onMatchClick={canReferee ? handleMatchClick : undefined}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
+              <Trophy className="h-12 w-12 mb-4 opacity-50" aria-hidden="true" />
+              <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
+              <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
+            </div>
+          )}
         </TabsContent>
+
+        {hasTables && bracket && (
+          <TabsContent value="tables" className="mt-6">
+            <TablesBoard
+              bracket={bracket}
+              tables={tables}
+              teamsMap={teamsMap}
+              highlightTeamId={myTournamentTeam?.id}
+              onResult={canReferee ? handleMatchClick : undefined}
+              onChanged={() => refresh(["bracket"])}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="teams" className="mt-6 space-y-4">
           {tournament.checkin_enabled && !tournament.started_at && tournamentTeams.length > 0 && (
@@ -554,29 +572,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         />
       )}
 
-      <AlertDialog open={!!confirmState} onOpenChange={(open) => !open && setConfirmState(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
-            {confirmState?.description && <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction disabled={isConfirmLoading} onClick={async (e) => {
-              e.preventDefault();
-              setIsConfirmLoading(true);
-              try {
-                await confirmState?.action();
-                setConfirmState(null);
-              } finally {
-                setIsConfirmLoading(false);
-              }
-            }}>
-              {isConfirmLoading ? "Lädt..." : "Bestätigen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

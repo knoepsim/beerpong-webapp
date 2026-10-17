@@ -12,16 +12,18 @@ interface MatchListProps {
   highlightTeamId?: string | null;
   /** Organizers open the result dialog by clicking a match. */
   onMatchClick?: (match: Match) => void;
+  /** Only these matches (e.g. the open ones); rounds without one are left out. */
+  include?: (match: Match) => boolean;
 }
 
 /** Every match of the tournament, round by round, in the same compact row as "my matches". */
-export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick }: Readonly<MatchListProps>) {
+export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, include }: Readonly<MatchListProps>) {
   const layout = useMemo(() => buildBracketLayout(bracket), [bracket]);
 
   return (
     <div className="space-y-5">
       {layout.rounds.map((round) => {
-        const slots = round.slots.filter(isMatchSlot);
+        const slots = round.slots.filter(isMatchSlot).filter((s) => !include || include(s.match));
         if (slots.length === 0) return null;
         return (
           <section key={round.round} aria-label={roundLabel(round.round, layout.totalRounds)}>

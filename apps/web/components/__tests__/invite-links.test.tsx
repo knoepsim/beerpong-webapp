@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { render } from '@/lib/test-fixtures/render'
 import { InviteLinks } from '../invite-links'
 import { api } from '@/lib/api'
 import type { TournamentInvite } from '@/types'
@@ -82,7 +83,7 @@ describe('InviteLinks', () => {
     expect(screen.getByText(/Teams, die schon beigetreten sind, bleiben im/)).toBeInTheDocument()
     expect(mocked.remove).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Link löschen' }))
     await waitFor(() => expect(mocked.remove).toHaveBeenCalledWith('t1', 'i1'))
   })
 

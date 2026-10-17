@@ -6,9 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import InsufficientRoleError, NotFoundError
 from app.models.tournament_role import ROLE_HIERARCHY, TournamentRoleType, TournamentUserRole
 from app.models.user import User
-from fastapi import Depends
-from typing import Annotated
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.services.revision import bump
 
 
@@ -69,7 +67,7 @@ class RoleService:
             raise InsufficientRoleError("Referees cannot assign roles")
 
         if await self.db.get(User, target_user_id) is None:
-            raise NotFoundError("User")
+            raise NotFoundError("Nutzer")
 
         # Check if role already exists
         existing = await self.db.execute(
@@ -105,10 +103,10 @@ class RoleService:
         )
         role_entry = result.scalar_one_or_none()
         if role_entry is None:
-            raise NotFoundError("Role assignment")
+            raise NotFoundError("Rolle")
 
         if role_entry.tournament_id != tournament_id:
-            raise NotFoundError("Role assignment")
+            raise NotFoundError("Rolle")
 
         revoker_highest = await self.get_highest_role(tournament_id, revoker_id)
         if revoker_highest is None:
@@ -131,5 +129,5 @@ class RoleService:
 
 
 
-def get_role_service(db: Annotated[AsyncSession, Depends(get_db)]) -> RoleService:
+def get_role_service(db: DbSession) -> RoleService:
     return RoleService(db)

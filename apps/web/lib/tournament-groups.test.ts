@@ -93,3 +93,20 @@ describe('mergeMyTournaments', () => {
     ])
   })
 })
+
+describe('mergeMyTournaments: roles', () => {
+  it('keeps the strongest role when a user holds several in one tournament', () => {
+    const data = {
+      participating: [],
+      managing: [
+        { tournament: tournament('a'), role: TournamentRoleType.REFEREE },
+        { tournament: tournament('a'), role: TournamentRoleType.ADMIN },
+        { tournament: tournament('b'), role: TournamentRoleType.REFEREE },
+      ],
+    } as MyTournamentsResponse
+    expect(mergeMyTournaments(data).map((i) => [i.tournament.id, i.role])).toEqual([
+      ['a', TournamentRoleType.ADMIN],
+      ['b', TournamentRoleType.REFEREE],
+    ])
+  })
+})

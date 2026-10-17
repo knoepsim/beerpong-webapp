@@ -10,9 +10,9 @@ const team = (members: string[]): Team =>
     max_size: 2,
     members: members.map((name, i) => ({ user_id: `${i}`, name })),
     is_complete: members.length === 2,
-    is_deletable: true,
-    is_renamable: true,
-  }) as Team
+    delete_blockers: [],
+    created_at: '',
+  }) as unknown as Team
 
 const handlers = () => ({ onRename: vi.fn(), onDelete: vi.fn(), onShare: vi.fn(), onCopy: vi.fn() })
 

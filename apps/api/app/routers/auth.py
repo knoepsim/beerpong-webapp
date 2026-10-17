@@ -1,10 +1,8 @@
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.exceptions import AppException, InvalidCredentialsError
 from app.core.security import (
     REFRESH_COOKIE,
@@ -24,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
     summary="SMS-Code anfordern",
     description="Sendet einen 6-stelligen Verifizierungscode an die angegebene Telefonnummer.",
 )
-async def request_code(body: SmsCodeRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+async def request_code(body: SmsCodeRequest, db: DbSession):
     await AuthService(db).request_sms_code(body.phone_number)
 
 
@@ -37,7 +35,7 @@ async def request_code(body: SmsCodeRequest, db: Annotated[AsyncSession, Depends
     "Mit `cookie_session` (Browser) setzt der Server stattdessen HttpOnly-Cookies und antwortet ohne Tokens. "
     "Erstellt automatisch einen neuen User, falls die Telefonnummer noch nicht registriert ist.",
 )
-async def verify_code(body: SmsCodeVerify, db: Annotated[AsyncSession, Depends(get_db)]):
+async def verify_code(body: SmsCodeVerify, db: DbSession):
     tokens = await AuthService(db).verify_code_and_authenticate(body.phone_number, body.code)
     if not body.cookie_session:
         return tokens
@@ -55,7 +53,7 @@ async def verify_code(body: SmsCodeVerify, db: Annotated[AsyncSession, Depends(g
     "Refresh-Cookie verwendet und die Sitzung per Cookie erneuert (jede Erneuerung verlängert die Sitzung).",
 )
 async def refresh_token(
-    request: Request, db: Annotated[AsyncSession, Depends(get_db)], body: RefreshTokenRequest | None = None
+    request: Request, db: DbSession, body: RefreshTokenRequest | None = None
 ):
     service = AuthService(db)
     if body is not None:
@@ -83,7 +81,7 @@ async def refresh_token(
     summary="Abmelden",
     description="Beendet die Sitzung: der Refresh-Token wird widerrufen und die Cookies werden gelöscht.",
 )
-async def logout(request: Request, db: Annotated[AsyncSession, Depends(get_db)], body: RefreshTokenRequest | None = None):
+async def logout(request: Request, db: DbSession, body: RefreshTokenRequest | None = None):
     raw = body.refresh_token if body is not None else request.cookies.get(REFRESH_COOKIE)
     if body is None:
         require_csrf_header(request)

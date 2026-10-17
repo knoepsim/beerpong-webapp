@@ -34,3 +34,12 @@ describe('BeerpongTable', () => {
     expect(svgs).toHaveLength(20)
   })
 })
+
+describe('BeerpongTable: decoration only', () => {
+  it('lets taps through to what it overlaps and is hidden from screen readers', () => {
+    const { container } = render(<BeerpongTable leftCups={10} rightCups={10} compact />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root.className).toContain('pointer-events-none')
+    expect(root).toHaveAttribute('aria-hidden', 'true')
+  })
+})

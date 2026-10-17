@@ -4,19 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { TournamentTable } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 function TableCard({
   table,
@@ -98,7 +89,7 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
   const [tables, setTables] = useState<TournamentTable[] | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [toDelete, setToDelete] = useState<TournamentTable | null>(null);
+  const confirm = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -136,15 +127,17 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
     }
   };
 
-  const handleDelete = async () => {
-    if (!toDelete) return;
-    try {
-      await api.tournaments.deleteTable(tournamentId, toDelete.id);
-      setTables((current) => current?.filter((t) => t.id !== toDelete.id) ?? null);
-      setToDelete(null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Der Tisch konnte nicht gelöscht werden.");
-    }
+  const handleDelete = (table: TournamentTable) => {
+    void confirm({
+      title: `${table.name} löschen?`,
+      description: "Der Tisch wird aus dem Turnier entfernt. Ein Spiel, das dort gerade ist, wartet wieder auf einen freien Tisch.",
+      confirmLabel: "Tisch löschen",
+      destructive: true,
+      action: async () => {
+        await api.tournaments.deleteTable(tournamentId, table.id);
+        setTables((current) => current?.filter((t) => t.id !== table.id) ?? null);
+      },
+    });
   };
 
   if (tables === null) return null;
@@ -165,7 +158,7 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
               }}
               onSave={(name) => void handleSave(table, name)}
               onCancel={() => setEditingId(null)}
-              onDelete={() => setToDelete(table)}
+              onDelete={() => handleDelete(table)}
             />
           </li>
         ))}
@@ -182,26 +175,6 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
       </ul>
       {tables.length === 1 && <p className="text-sm text-muted-foreground">Ein Turnier braucht mindestens einen Tisch.</p>}
 
-      <AlertDialog open={!!toDelete} onOpenChange={(open) => !open && setToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{toDelete?.name} löschen?</AlertDialogTitle>
-            <AlertDialogDescription>Der Tisch wird aus dem Turnier entfernt.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Tisch löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

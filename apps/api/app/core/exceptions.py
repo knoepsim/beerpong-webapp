@@ -21,31 +21,31 @@ class InvalidCredentialsError(AppException):
 
 class TokenExpiredError(AppException):
     def __init__(self):
-        super().__init__(401, "TOKEN_EXPIRED", "Token has expired")
+        super().__init__(401, "TOKEN_EXPIRED", "Deine Anmeldung ist abgelaufen. Melde dich neu an.")
 
 
 class TokenRevokedError(AppException):
     def __init__(self):
-        super().__init__(401, "TOKEN_REVOKED", "Token has been revoked")
+        super().__init__(401, "TOKEN_REVOKED", "Deine Anmeldung ist nicht mehr gültig. Melde dich neu an.")
 
 
 # --- Not Found ---
 
 class NotFoundError(AppException):
     def __init__(self, resource: str = "Resource"):
-        super().__init__(404, "NOT_FOUND", f"{resource} not found")
+        super().__init__(404, "NOT_FOUND", f"{resource} nicht gefunden.")
 
 
 # --- Teams ---
 
 class TeamFullError(AppException):
     def __init__(self):
-        super().__init__(409, "TEAM_FULL", "Team has already reached its maximum size")
+        super().__init__(409, "TEAM_FULL", "Das Team ist schon voll.")
 
 
 class AlreadyTeamMemberError(AppException):
     def __init__(self):
-        super().__init__(409, "ALREADY_MEMBER", "User is already a member of this team")
+        super().__init__(409, "ALREADY_MEMBER", "Du bist schon in diesem Team.")
 
 
 # --- Invites ---
@@ -64,12 +64,12 @@ class TooManyRequestsError(AppException):
 
 class TournamentDeletedError(AppException):
     def __init__(self):
-        super().__init__(410, "TOURNAMENT_DELETED", "Tournament has been deleted")
+        super().__init__(410, "TOURNAMENT_DELETED", "Dieses Turnier wurde gelöscht.")
 
 
 class TeamNotCompleteError(AppException):
     def __init__(self):
-        super().__init__(400, "TEAM_NOT_COMPLETE", "Team must be complete before joining a tournament")
+        super().__init__(400, "TEAM_NOT_COMPLETE", "Dein Team braucht erst alle Spieler, bevor es einem Turnier beitreten kann.")
 
 
 class PlayerAlreadyInTournamentError(AppException):
@@ -90,12 +90,12 @@ class InsufficientRoleError(AppException):
 
 class TournamentAlreadyStartedError(AppException):
     def __init__(self):
-        super().__init__(409, "TOURNAMENT_ALREADY_STARTED", "This action is not possible after the tournament has started")
+        super().__init__(409, "TOURNAMENT_ALREADY_STARTED", "Das geht nach dem Turnierstart nicht mehr.")
 
 
 class TournamentNotStartedError(AppException):
     def __init__(self):
-        super().__init__(409, "TOURNAMENT_NOT_STARTED", "The tournament has not been started yet")
+        super().__init__(409, "TOURNAMENT_NOT_STARTED", "Das Turnier hat noch nicht begonnen.")
 
 
 class RegistrationClosedError(AppException):
@@ -147,17 +147,22 @@ class InvalidScheduleError(AppException):
 
 class MatchNotReadyError(AppException):
     def __init__(self):
-        super().__init__(409, "MATCH_NOT_READY", "Both teams of this match must be determined first")
+        super().__init__(409, "MATCH_NOT_READY", "Für dieses Spiel stehen noch nicht beide Teams fest.")
 
 
 class InvalidWinnerError(AppException):
     def __init__(self):
-        super().__init__(400, "INVALID_WINNER", "The winner must be one of the two teams playing this match")
+        super().__init__(400, "INVALID_WINNER", "Der Sieger muss eines der beiden Teams dieses Spiels sein.")
 
 
 class ResultConflictError(AppException):
     def __init__(self, detail: str):
         super().__init__(409, "RESULT_CONFLICT", detail)
+
+
+class TeamInTournamentError(AppException):
+    def __init__(self, detail: str):
+        super().__init__(409, "TEAM_IN_TOURNAMENT", detail)
 
 
 class MatchNotAtTableError(AppException):

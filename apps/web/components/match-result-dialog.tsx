@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Match, Result } from "@/types";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
+import { formatWhen } from "@/lib/format-when";
 import { BeerpongTable } from "@/components/BeerpongTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,11 @@ interface MatchResultDialogProps {
   onSuccess: () => void;
 }
 
-const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+/** Without an entry the winner had all cups left: what the placeholder shows is what is saved. */
+const DEFAULT_CUPS = 10;
+
+const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const timeOf = (iso: string) => TIME.format(new Date(iso));
 
 /**
  * The organization's view of a match: start it at its table (or take the start back) and report its result.
@@ -51,6 +56,10 @@ export function MatchResultDialog({
   const matchId = match.id;
   const nextMatchId = match.next_match_id;
   const [isStarting, setIsStarting] = useState(false);
+  // tapping the winner puts the cursor into its cups field (on a phone the number pad opens right away);
+  // opening an existing result does not
+  const [winnerTapped, setWinnerTapped] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [cupsLeft, setCupsLeft] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,6 +75,8 @@ export function MatchResultDialog({
     if (open) {
       setWinnerId(null);
       setCupsLeft("");
+      setWinnerTapped(false);
+      setConfirmDelete(false);
       setError(null);
       setExistingResult(null);
       setNextMatchHasResult(false);
@@ -109,7 +120,7 @@ export function MatchResultDialog({
     setIsSubmitting(true);
     setError(null);
     try {
-      const cups = cupsLeft.trim() ? parseInt(cupsLeft, 10) : undefined;
+      const cups = cupsLeft.trim() ? Number.parseInt(cupsLeft, 10) : DEFAULT_CUPS;
       if (existingResult) {
         await api.results.modify(matchId, winnerId, cups);
       } else {
@@ -160,18 +171,33 @@ export function MatchResultDialog({
   let leftCups = 10;
   let rightCups = 10;
   if (winnerId === teamA.id) {
-    leftCups = cupsLeft ? parseInt(cupsLeft, 10) : 10;
+    leftCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
     rightCups = 0;
   } else if (winnerId === teamB.id) {
     leftCups = 0;
-    rightCups = cupsLeft ? parseInt(cupsLeft, 10) : 10;
+    rightCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
   }
 
   const hasChanges = !existingResult ||
     existingResult.winner_team_id !== winnerId ||
-    (existingResult.cups_left?.toString() || "") !== cupsLeft.trim();
+    String(existingResult.cups_left ?? DEFAULT_CUPS) !== (cupsLeft.trim() || String(DEFAULT_CUPS));
 
-  const isValid = winnerId !== null && cupsLeft.trim() !== "";
+  const savedWinner = existingResult?.winner_team_id === teamA.id ? teamA.name : teamB.name;
+  const deleteConsequence = nextMatchId
+    ? `${savedWinner} wird aus dem nächsten Spiel wieder entfernt, das Spiel ist wieder offen.`
+    : "Das Finale ist wieder offen, das Turnier gilt nicht mehr als beendet.";
+
+  let submitLabel = existingResult ? "Ergebnis ändern" : "Ergebnis speichern";
+  if (isSubmitting) submitLabel = "Wird gespeichert…";
+
+  // the cups are optional: empty means all cups left (the placeholder)
+  const isValid = winnerId !== null;
+
+  const chooseWinner = (teamId: string) => {
+    if (nextMatchHasResult) return;
+    setWinnerId(teamId);
+    setWinnerTapped(true);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,12 +229,8 @@ export function MatchResultDialog({
               </div>
             </div>
 
-            {/* Score display */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-2xl font-bold tabular-nums text-red-500">10</span>
-              <span className="text-lg text-muted-foreground font-light">:</span>
-              <span className="text-2xl font-bold tabular-nums text-blue-500">10</span>
-            </div>
+            {/* no score here: the table below shows the cups */}
+            <span className="shrink-0 text-xs text-muted-foreground">gegen</span>
 
             {/* Team B */}
             <div className="flex-1 min-w-0 text-left">
@@ -239,7 +261,7 @@ export function MatchResultDialog({
                   className="w-full h-11 mb-3 gap-2 border-emerald-600/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-500/50"
                 >
                   <Play className="w-4 h-4 fill-current" aria-hidden="true" />
-                  {isStarting ? "Wird gestartet..." : "Spiel starten"}
+                  {isStarting ? "Wird gestartet…" : "Spiel starten"}
                 </Button>
               )}
               {match.status === "live" && (
@@ -283,7 +305,7 @@ export function MatchResultDialog({
                       {allResults.map((r) => (
                         <div key={r.id} className="text-xs border-b last:border-0 pb-2 last:pb-0">
                           <div className="flex justify-between text-muted-foreground">
-                            <span>{new Date(r.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>
+                            <span>{formatWhen(r.created_at)}</span>
                             <span>{r.reported_by_username || "Unbekannt"}</span>
                           </div>
                           <div className="mt-1 font-medium">
@@ -332,7 +354,7 @@ export function MatchResultDialog({
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamA.id ? "border-red-500 bg-red-500/5 ring-1 ring-red-500" : "border-border bg-card hover:bg-accent/50"
                       } ${nextMatchHasResult ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onClick={() => !nextMatchHasResult && setWinnerId(teamA.id)}
+                    onClick={() => chooseWinner(teamA.id)}
                     disabled={nextMatchHasResult}
                   >
                     <div className="flex flex-col items-center gap-2 w-full">
@@ -341,9 +363,11 @@ export function MatchResultDialog({
                     </div>
                     {winnerId === teamA.id && (
                       <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                        <Label htmlFor="cups_left_a" className="text-xs text-red-600 dark:text-red-400 font-medium">Übrige Becher *</Label>
+                        <Label htmlFor="cups_left_a" className="text-xs text-red-600 dark:text-red-400 font-medium">Übrige Becher</Label>
                         <Input
                           id="cups_left_a"
+                          autoFocus={winnerTapped}
+                          onFocus={(e) => e.target.select()}
                           type="number"
                           min={1}
                           max={10}
@@ -351,7 +375,7 @@ export function MatchResultDialog({
                           value={cupsLeft}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (val === "" || (parseInt(val) >= 1 && parseInt(val) <= 10)) setCupsLeft(val);
+                            if (val === "" || (Number.parseInt(val) >= 1 && Number.parseInt(val) <= 10)) setCupsLeft(val);
                           }}
                           className="mt-1.5 border-red-500/30 focus-visible:ring-red-500 text-center text-lg h-10 bg-background"
                           disabled={nextMatchHasResult}
@@ -365,7 +389,7 @@ export function MatchResultDialog({
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamB.id ? "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500" : "border-border bg-card hover:bg-accent/50"
                       } ${nextMatchHasResult ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onClick={() => !nextMatchHasResult && setWinnerId(teamB.id)}
+                    onClick={() => chooseWinner(teamB.id)}
                     disabled={nextMatchHasResult}
                   >
                     <div className="flex flex-col items-center gap-2 w-full">
@@ -374,9 +398,11 @@ export function MatchResultDialog({
                     </div>
                     {winnerId === teamB.id && (
                       <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                        <Label htmlFor="cups_left_b" className="text-xs text-blue-600 dark:text-blue-400 font-medium">Übrige Becher *</Label>
+                        <Label htmlFor="cups_left_b" className="text-xs text-blue-600 dark:text-blue-400 font-medium">Übrige Becher</Label>
                         <Input
                           id="cups_left_b"
+                          autoFocus={winnerTapped}
+                          onFocus={(e) => e.target.select()}
                           type="number"
                           min={1}
                           max={10}
@@ -384,7 +410,7 @@ export function MatchResultDialog({
                           value={cupsLeft}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (val === "" || (parseInt(val) >= 1 && parseInt(val) <= 10)) setCupsLeft(val);
+                            if (val === "" || (Number.parseInt(val) >= 1 && Number.parseInt(val) <= 10)) setCupsLeft(val);
                           }}
                           className="mt-1.5 border-blue-500/30 focus-visible:ring-blue-500 text-center text-lg h-10 bg-background"
                           disabled={nextMatchHasResult}
@@ -404,21 +430,40 @@ export function MatchResultDialog({
                     Abbrechen
                   </Button>
                   <Button onClick={handleSubmit} disabled={!isValid || !hasChanges || isSubmitting || nextMatchHasResult} className="flex-1">
-                    {isSubmitting ? "Wird gespeichert..." : existingResult ? "Überschreiben" : "Speichern"}
+                    {submitLabel}
                   </Button>
                 </div>
-                {existingResult && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isDeleting || nextMatchHasResult}
-                    className="w-full"
-                  >
-                    {isDeleting ? "Wird gelöscht..." : "Ergebnis löschen"}
-                  </Button>
-                )}
               </div>
+
+              {/* deleting is far from the primary action and asks first, naming what happens */}
+              {existingResult && !nextMatchHasResult && (
+                <div className="mt-6 border-t pt-3">
+                  {confirmDelete ? (
+                    <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      <p className="font-medium">Ergebnis löschen?</p>
+                      <p className="text-muted-foreground">{deleteConsequence}</p>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirmDelete(false)} disabled={isDeleting}>
+                          Abbrechen
+                        </Button>
+                        <Button type="button" variant="destructive" className="flex-1" onClick={handleDelete} disabled={isDeleting}>
+                          {isDeleting ? "Wird gelöscht…" : "Ergebnis löschen"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full text-destructive hover:text-destructive"
+                    >
+                      Ergebnis löschen
+                    </Button>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

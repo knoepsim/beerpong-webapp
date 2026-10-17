@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { MyTournamentsResponse } from "@/types";
-import { JoinPolicy, TournamentVisibility } from "@/types";
+import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,7 @@ export default function TournamentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const organizes = !!data?.managing.some((m) => m.role === TournamentRoleType.ADMIN || m.role === TournamentRoleType.MANAGER);
 
   const [isCreating, setIsCreating] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -195,7 +196,16 @@ export default function TournamentsPage() {
             setApiError(null);
           }
         }}>
-          <DialogTrigger render={<Button size="lg" className="w-full sm:w-auto shadow-md" />}>
+          {/* the one highlighted action only for whoever organizes tournaments already; for players it is secondary */}
+          <DialogTrigger
+            render={
+              <Button
+                size="lg"
+                variant={organizes ? "default" : "outline"}
+                className={organizes ? "w-full sm:w-auto shadow-md" : "w-full sm:w-auto"}
+              />
+            }
+          >
             <Plus className="mr-2 h-5 w-5" />
             Neues Turnier
           </DialogTrigger>
@@ -254,7 +264,7 @@ export default function TournamentsPage() {
                     <FormItem>
                       <FormLabel>Beschreibung (Markdown unterstützt)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise..." className="min-h-24" {...field} />
+                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise…" className="min-h-24" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

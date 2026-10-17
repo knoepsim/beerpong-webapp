@@ -1,9 +1,12 @@
-import type { MyTournamentsResponse, Team, Tournament, TournamentRoleType } from "@/types";
+import { strongestRole } from "@/lib/roles";
+import type { MyTournamentsResponse, ParticipatingTournament, Team, Tournament, TournamentRoleType } from "@/types";
 
 /** A tournament of the logged-in user with the way they are involved: with a team, with a role, or both. */
 export interface MyTournament {
   tournament: Tournament;
   team?: Team;
+  /** How my team is doing (check-in, next match, place); only when I play. */
+  participation?: Pick<ParticipatingTournament, "is_checked_in" | "next_match" | "place">;
   role?: TournamentRoleType;
 }
 
@@ -16,11 +19,14 @@ export interface TournamentGroups {
 /** One entry per tournament, even if the user plays in it and manages it. */
 export function mergeMyTournaments(data: MyTournamentsResponse): MyTournament[] {
   const byId = new Map<string, MyTournament>();
-  for (const { tournament, team } of data.participating) {
-    byId.set(tournament.id, { tournament, team });
+  for (const { tournament, team, ...participation } of data.participating) {
+    byId.set(tournament.id, { tournament, team, participation });
   }
+  // a user can hold several roles in a tournament (admin and referee): the strongest one counts
   for (const { tournament, role } of data.managing) {
-    byId.set(tournament.id, { ...byId.get(tournament.id), tournament, role });
+    const known = byId.get(tournament.id);
+    const held = known?.role ? [known.role, role] : [role];
+    byId.set(tournament.id, { ...known, tournament, role: strongestRole(held) ?? role });
   }
   return [...byId.values()];
 }

@@ -59,7 +59,12 @@ function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = 
 
 const ready = () => screen.findByText('Wer hat gewonnen?');
 const cupsInput = () => screen.getByPlaceholderText('10') as HTMLInputElement;
-const saveButton = () => screen.getByRole('button', { name: /Speichern|Überschreiben|Wird gespeichert/ });
+const saveButton = () => screen.getByRole('button', { name: /Ergebnis speichern|Ergebnis ändern|Wird gespeichert/ });
+/** Deleting asks first: the link opens the confirmation with the consequence, its button deletes. */
+const confirmDelete = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Ergebnis löschen' }));
+  fireEvent.click(screen.getAllByRole('button', { name: 'Ergebnis löschen' }).at(-1)!);
+};
 
 describe('MatchResultDialog', () => {
   beforeEach(() => {
@@ -89,9 +94,10 @@ describe('MatchResultDialog', () => {
     const { onSuccess, onOpenChange } = setup();
     await ready();
 
-    expect(saveButton()).toBeDisabled();
+    expect(saveButton()).toBeDisabled(); // no winner yet
     fireEvent.click(screen.getAllByText('Alpha')[1].closest('button')!);
-    expect(saveButton()).toBeDisabled(); // cups missing
+    expect(cupsInput()).toHaveFocus(); // straight into the cups of the winner
+    expect(saveButton()).toBeEnabled(); // the cups are optional
 
     fireEvent.change(cupsInput(), { target: { value: '4' } });
     expect(saveButton()).toBeEnabled();
@@ -100,6 +106,22 @@ describe('MatchResultDialog', () => {
     await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'a', 4));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('saves the placeholder: without an entry the winner had all 10 cups left', async () => {
+    results.create.mockResolvedValue(result());
+    setup();
+    await ready();
+    fireEvent.click(screen.getAllByText('Bravo')[1].closest('button')!);
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'b', 10));
+  });
+
+  it('does not jump into the cups when an existing result is opened', async () => {
+    results.list.mockResolvedValue([result()]);
+    setup();
+    await ready();
+    expect(cupsInput()).not.toHaveFocus();
   });
 
   it('creates a result for team B and ignores out-of-range cups', async () => {
@@ -144,7 +166,7 @@ describe('MatchResultDialog', () => {
     fireEvent.change(cupsInput(), { target: { value: '3' } });
     fireEvent.click(saveButton());
 
-    expect(await screen.findByText('Wird gespeichert...')).toBeDisabled();
+    expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
     reject(new Error('Spiel gesperrt'));
     expect(await screen.findByText('Spiel gesperrt')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -167,7 +189,7 @@ describe('MatchResultDialog', () => {
     await ready();
 
     expect(cupsInput().value).toBe('4');
-    expect(saveButton()).toHaveTextContent('Überschreiben');
+    expect(saveButton()).toHaveTextContent('Ergebnis ändern');
     expect(saveButton()).toBeDisabled();
 
     fireEvent.change(cupsInput(), { target: { value: '6' } });
@@ -191,7 +213,7 @@ describe('MatchResultDialog', () => {
     results.list.mockResolvedValue([result(), result({ id: 'r2', type: ResultType.DELETED })]);
     setup();
     await ready();
-    expect(screen.queryByText('Überschreiben')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ergebnis ändern')).not.toBeInTheDocument();
     expect(screen.queryByText('Ergebnis löschen')).not.toBeInTheDocument();
   });
 
@@ -201,10 +223,21 @@ describe('MatchResultDialog', () => {
     const { onSuccess, onOpenChange } = setup();
     await ready();
 
-    fireEvent.click(screen.getByText('Ergebnis löschen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis löschen' }));
+    expect(results.delete).not.toHaveBeenCalled(); // asks first and names the consequence
+    expect(screen.getByText('Das Finale ist wieder offen, das Turnier gilt nicht mehr als beendet.')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ergebnis löschen' }).at(-1)!);
     await waitFor(() => expect(results.delete).toHaveBeenCalledWith('m1'));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('names who leaves the next match when a result is deleted', async () => {
+    results.list.mockImplementation(async (id: string) => (id === 'm1' ? [result()] : []));
+    setup({ match: match({ next_match_id: 'next' }) });
+    await ready();
+    fireEvent.click(screen.getByRole('button', { name: 'Ergebnis löschen' }));
+    expect(screen.getByText('Alpha wird aus dem nächsten Spiel wieder entfernt, das Spiel ist wieder offen.')).toBeInTheDocument();
   });
 
   it('shows delete errors', async () => {
@@ -212,11 +245,11 @@ describe('MatchResultDialog', () => {
     results.delete.mockRejectedValueOnce(new Error('Löschen verboten'));
     setup();
     await ready();
-    fireEvent.click(screen.getByText('Ergebnis löschen'));
+    confirmDelete();
     expect(await screen.findByText('Löschen verboten')).toBeInTheDocument();
 
     results.delete.mockRejectedValueOnce('x');
-    fireEvent.click(screen.getByText('Ergebnis löschen'));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Ergebnis löschen' }).at(-1)!);
     expect(await screen.findByText('Fehler beim Löschen des Ergebnisses')).toBeInTheDocument();
   });
 
@@ -225,8 +258,8 @@ describe('MatchResultDialog', () => {
     results.delete.mockReturnValue(new Promise(() => {}));
     setup();
     await ready();
-    fireEvent.click(screen.getByText('Ergebnis löschen'));
-    expect(await screen.findByText('Wird gelöscht...')).toBeDisabled();
+    confirmDelete();
+    expect(await screen.findByText('Wird gelöscht…')).toBeDisabled();
   });
 
   it('toggles and renders the history of all entries', async () => {
@@ -260,7 +293,7 @@ describe('MatchResultDialog', () => {
     expect(screen.getByText('Bearbeiten gesperrt')).toBeInTheDocument();
     expect(screen.getAllByText('Alpha')[1].closest('button')).toBeDisabled();
     expect(saveButton()).toBeDisabled();
-    expect(screen.getByText('Ergebnis löschen')).toBeDisabled();
+    expect(screen.queryByText('Ergebnis löschen')).not.toBeInTheDocument(); // nothing to delete while locked
     fireEvent.click(screen.getAllByText('Bravo')[1].closest('button')!);
   });
 

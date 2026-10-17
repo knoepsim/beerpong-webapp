@@ -1,13 +1,12 @@
 from datetime import UTC, datetime
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, TournamentAlreadyStartedError
+from app.models.team import Team
 from app.models.tournament import TournamentTeam
 from app.schemas.tournament import TournamentStartResponse
 from app.services.bracket_service import BracketService
@@ -67,6 +66,13 @@ class LifecycleService:
         for entry in removed:
             await self.db.delete(entry)
 
+        # the tournament keeps the names the teams have now: renaming a team later does not change it
+        names = dict(
+            (await self.db.execute(select(Team.id, Team.name).where(Team.id.in_([e.team_id for e in playing])))).all()
+        )
+        for entry in playing:
+            entry.team_name = names[entry.team_id]
+
         bracket = BracketService(self.db)
         await bracket.generate_bracket(tournament_id, [e.team_id for e in playing])
         tournament.started_at = datetime.now(UTC)
@@ -77,5 +83,5 @@ class LifecycleService:
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])
 
 
-def get_lifecycle_service(db: Annotated[AsyncSession, Depends(get_db)]) -> LifecycleService:
+def get_lifecycle_service(db: DbSession) -> LifecycleService:
     return LifecycleService(db)

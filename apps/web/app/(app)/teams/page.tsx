@@ -15,16 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { TeamDeleteBlockers } from "@/components/delete-team-dialog";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -45,8 +37,8 @@ export default function TeamsPage() {
   const [newName, setNewName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
-  const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [blockedTeam, setBlockedTeam] = useState<Team | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     void loadTeams();
@@ -129,19 +121,24 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTeam) return;
-    setIsDeleting(true);
-    try {
-      await api.teams.delete(deleteTeam.id);
-      setDeleteTeam(null);
-      await loadTeams();
-      toast.success("Team gelöscht.");
-    } catch (err: unknown) {
-      toast.error("Fehler beim Löschen.");
-    } finally {
-      setIsDeleting(false);
+  // tournaments in the way: say which; otherwise ask with the consequences
+  const handleDelete = (team: Team) => {
+    if (team.delete_blockers.length > 0) {
+      setBlockedTeam(team);
+      return;
     }
+    void confirm({
+      title: `${team.name} löschen?`,
+      description:
+        "Das Team verschwindet aus deinen Teams und kann nicht wiederhergestellt werden. Beendete Turniere zeigen es weiter mit seinen Ergebnissen.",
+      confirmLabel: "Team löschen",
+      destructive: true,
+      action: async () => {
+        await api.teams.delete(team.id);
+        await loadTeams();
+        toast.success("Team gelöscht.");
+      },
+    });
   };
 
   if (isLoading) {
@@ -203,7 +200,7 @@ export default function TeamsPage() {
                 setNewName(team.name);
                 setRenameTeam(team);
               }}
-              onDelete={setDeleteTeam}
+              onDelete={handleDelete}
               onShare={handleShareInvite}
               onCopy={handleCopyInvite}
             />
@@ -217,7 +214,7 @@ export default function TeamsPage() {
           <DialogHeader>
             <DialogTitle>Team umbenennen</DialogTitle>
             <DialogDescription>
-              Gib einen neuen Namen für dein Team ein.
+              Gilt für eure nächsten Turniere. Turniere, die schon gestartet sind, behalten den bisherigen Namen.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -234,36 +231,13 @@ export default function TeamsPage() {
               Abbrechen
             </Button>
             <Button onClick={handleRename} disabled={!newName.trim() || isRenaming}>
-              {isRenaming ? "Speichere..." : "Speichern"}
+              {isRenaming ? "Speichere…" : "Speichern"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={!!deleteTeam} onOpenChange={(o) => !o && setDeleteTeam(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Team wirklich löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Diese Aktion kann nicht rückgängig gemacht werden. Das Team wird unwiderruflich gelöscht.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Lösche..." : "Löschen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <TeamDeleteBlockers team={blockedTeam} onClose={() => setBlockedTeam(null)} />
 
     </div>
   );

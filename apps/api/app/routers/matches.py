@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.security import get_current_user
 from app.models.tournament_role import TournamentRoleType
 from app.models.user import User
@@ -31,7 +31,7 @@ async def _set_started(match_id: UUID, started: bool, user: User, db: AsyncSessi
 async def start_match(
     match_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await _set_started(match_id, True, current_user, db)
 
@@ -45,6 +45,6 @@ async def start_match(
 async def undo_start(
     match_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     await _set_started(match_id, False, current_user, db)

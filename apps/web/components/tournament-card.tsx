@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ChevronRight, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { STATUS_ICONS } from "@/components/status-icons";
+import { listStatus, type StatusTone } from "@/lib/my-status";
 import { phaseLabel } from "@/lib/tournament-phase";
 import type { MyTournament } from "@/lib/tournament-groups";
 import { cn } from "@/lib/utils";
@@ -12,9 +14,12 @@ const ROLE_LABELS: Record<TournamentRoleType, string> = {
   [TournamentRoleType.REFEREE]: "Schiedsrichter",
 };
 
-const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+const DAY = new Intl.DateTimeFormat("de-DE", { day: "numeric" });
+// "Okt." -> "Okt": the tile is too small for the dot
+const MONTH = new Intl.DateTimeFormat("de-DE", { month: "short" });
 
-const WEEKDAY_TIME = new Intl.DateTimeFormat("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+// the date tile names the day already: the text adds only the time
+const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 
 /** The date of the tournament as a small calendar tile: the first thing the eye looks for in an event list. */
 function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase }>) {
@@ -29,15 +34,25 @@ function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase
       )}
       aria-hidden="true"
     >
-      <span className="text-xl font-bold tabular-nums">{date.getDate()}</span>
-      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide">{MONTHS[date.getMonth()]}</span>
+      <span className="text-xl font-bold tabular-nums">{DAY.format(date)}</span>
+      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide">{MONTH.format(date).replace(".", "")}</span>
     </div>
   );
 }
 
+/** Like the status card: tinted and bordered by urgency, the icon carries the color, the text stays readable. */
+const TONE: Record<StatusTone, { pill: string; icon: string }> = {
+  urgent: { pill: "border-destructive/50 bg-destructive/10", icon: "text-destructive" },
+  attention: { pill: "border-warning/50 bg-warning/10", icon: "text-warning" },
+  active: { pill: "border-primary/50 bg-primary/10", icon: "text-primary" },
+  relaxed: { pill: "", icon: "text-muted-foreground" },
+  done: { pill: "border-success/50 bg-success/10", icon: "text-success" },
+};
+
 /**
- * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in):
- * "running" and "finished" are already said by the heading of the group the card is in.
+ * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in), and
+ * only for organizers: a player gets their own status instead ("Jetzt einchecken", "Eingecheckt"). "running" and
+ * "finished" are already said by the heading of the group the card is in.
  */
 const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !== "finished";
 
@@ -46,14 +61,16 @@ const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !==
  * involved (a badge with my team if I play, a badge per role if I organize; both if I do both). Nothing else; everything else is on the tournament page.
  */
 export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
-  const { tournament: t, team, role } = item;
+  const { tournament: t, team, role, participation } = item;
   const when = t.start_time ?? t.created_at;
+  const status = participation ? listStatus(t, participation) : null;
+  const StatusIcon = status ? STATUS_ICONS[status.icon] : null;
 
   return (
     <Link
       href={`/t/${t.slug}`}
       className={cn(
-        "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-none transition",
+        "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-hidden transition",
         "hover:border-primary/40 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50",
       )}
     >
@@ -65,7 +82,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
         </h4>
 
         <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-          <span>{WEEKDAY_TIME.format(new Date(when))} Uhr</span>
+          <span>{TIME.format(new Date(when))} Uhr</span>
           {t.location && (
             <>
               <span aria-hidden="true">·</span>
@@ -76,7 +93,13 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
         </p>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
+          {status && StatusIcon && (
+            <Badge variant="outline" className={cn("font-semibold", TONE[status.tone].pill)}>
+              <StatusIcon className={TONE[status.tone].icon} aria-hidden="true" />
+              {status.text}
+            </Badge>
+          )}
+          {role && isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
           {team && (
             <Badge variant="secondary" className="max-w-full">
               <Users aria-hidden="true" />

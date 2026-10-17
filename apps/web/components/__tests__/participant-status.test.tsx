@@ -52,3 +52,19 @@ describe('ParticipantStatus', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+describe('ParticipantStatus: one line on the other tabs', () => {
+  it('keeps the sentence, leaves out the match and the actions', () => {
+    render(
+      <ParticipantStatus
+        {...base}
+        tournament={tournament({ started_at: '2099-07-01T18:00:00Z', registration_open: false, phase: 'running' })}
+        team={team()}
+        bracket={fiveTeamBracket()}
+        compact
+      />,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('Geh jetzt zu Tisch 1: Spiel gegen Team 5.')
+    expect(screen.queryByRole('article', { name: /Spiel 1,/ })).not.toBeInTheDocument()
+  })
+})

@@ -114,7 +114,7 @@ export default function OnboardingPage() {
   };
 
   if (isLoading) {
-    return <div className="flex min-h-screen items-center justify-center p-4 text-muted-foreground animate-pulse">Lade...</div>;
+    return <div className="flex min-h-screen items-center justify-center p-4 text-muted-foreground animate-pulse">Lade…</div>;
   }
 
   return (

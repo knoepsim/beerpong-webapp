@@ -286,3 +286,22 @@ async def test_while_matches_queue_a_waiting_match_has_no_certain_table(eight_te
     await ctx.win((await ctx.round(1))[0])
 
     assert all(x["upcoming_table_name"] is None for x in await ctx.bracket())
+
+
+@pytest.mark.asyncio
+async def test_a_match_at_its_table_says_since_when(eight_teams_two_tables: Ctx):
+    first, _, third, _ = await eight_teams_two_tables.round(1)
+    assert first["on_table_at"] is not None
+    assert third["on_table_at"] is None  # in the queue
+
+
+@pytest.mark.asyncio
+async def test_renaming_a_table_is_shown_live(eight_teams_two_tables: Ctx):
+    ctx = eight_teams_two_tables
+    before = (await ctx.client.get(f"/tournaments/{ctx.tid}", headers=ctx.admin)).json()["revision"]
+    table = (await ctx.tables())[0]
+
+    await ctx.client.patch(f"/tournaments/{ctx.tid}/tables/{table['id']}", json={"name": "Terrasse"}, headers=ctx.admin)
+
+    assert (await ctx.client.get(f"/tournaments/{ctx.tid}", headers=ctx.admin)).json()["revision"] > before
+    assert (await ctx.round(1))[0]["table_name"] == "Terrasse"

@@ -4,9 +4,10 @@
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+/* inline: the fonts of next/font (variables on <html>) are used directly, no variable refers to itself */
+@theme inline {
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
 }
 
 :root {
@@ -148,7 +149,40 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* native controls follow the theme of the app (also when it differs from the system) */
+    color-scheme: light;
+    /* no wait for a possible double-tap zoom: every tap acts at once (pinch zoom stays) */
+    touch-action: manipulation;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  /* everything that does something shows the hand (Tailwind v4 no longer does it for buttons); disabled does not */
+  :is(
+      button,
+      summary,
+      select,
+      label[for],
+      [role="button"],
+      [role="tab"],
+      [role="menuitem"],
+      [role="menuitemradio"],
+      [role="menuitemcheckbox"],
+      [role="option"],
+      [role="switch"],
+      [role="checkbox"],
+      [role="radio"],
+      [role="combobox"]
+    ):not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
   }
 }

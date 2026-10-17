@@ -414,3 +414,21 @@ async def test_checkin_setting_cannot_change_after_start(ctx: Ctx):
     # other details can still be edited
     resp = await ctx.client.patch(f"/tournaments/{tid}", json={"location": "Garten"}, headers=ctx.admin)
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_after_the_start_the_schedule_and_who_may_join_stay_but_the_rest_can_change(ctx: Ctx):
+    tid = await ctx.create()
+    await ctx.join(tid, 0)
+    await ctx.join(tid, 1)
+    assert (await ctx.start(tid)).status_code == 200
+    current = await ctx.get(tid)
+
+    for change in ({"start_time": "2099-01-01T10:00:00Z"}, {"join_policy": "invite_only"}, {"checkin_enabled": True}):
+        resp = await ctx.client.patch(f"/tournaments/{tid}", json=change, headers=ctx.admin)
+        assert resp.status_code == 409, change
+
+    unchanged = {"start_time": current["start_time"], "join_policy": current["join_policy"], "name": "Cup 2026"}
+    resp = await ctx.client.patch(f"/tournaments/{tid}", json=unchanged, headers=ctx.admin)
+    assert resp.status_code == 200
+    assert (await ctx.get(tid))["name"] == "Cup 2026"
