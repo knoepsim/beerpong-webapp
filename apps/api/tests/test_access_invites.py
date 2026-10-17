@@ -179,3 +179,17 @@ async def test_my_tournaments_lists_what_i_play_and_what_i_organize(ctx: Ctx):
     participating = players.json()["participating"]
     assert [t["tournament"]["id"] for t in participating] == [played["id"]]
     assert participating[0]["team"]["id"] == ctx.team_ids[0]
+
+
+@pytest.mark.asyncio
+async def test_my_tournaments_lists_where_i_am_a_referee(ctx: Ctx):
+    tournament = await ctx.create(name="Pfeifen")
+    referee = (await ctx.client.get("/users/me", headers=ctx.players[0])).json()["id"]
+    resp = await ctx.client.post(
+        f"/tournaments/{tournament['id']}/roles", json={"user_id": referee, "role": "referee"}, headers=ctx.admin
+    )
+    assert resp.status_code == 201
+
+    mine = (await ctx.client.get("/tournaments/me", headers=ctx.players[0])).json()["managing"]
+
+    assert [(t["tournament"]["id"], t["role"]) for t in mine] == [(tournament["id"], "referee")]

@@ -49,11 +49,11 @@ describe('TournamentCard', () => {
     expect(screen.getByText('Jan')).toBeInTheDocument()
   })
 
-  it('names the state while the tournament is being prepared, for organizers only', () => {
+  it('names the state while the tournament is being prepared, for admins, managers and referees', () => {
     const { rerender } = card({ role: TournamentRoleType.MANAGER })
     expect(screen.getByText('Anmeldung offen')).toBeInTheDocument()
 
-    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), role: TournamentRoleType.ADMIN }} />)
+    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), role: TournamentRoleType.REFEREE }} />)
     expect(screen.getByText('Check-in läuft')).toBeInTheDocument()
 
     // a player gets their own status instead of the state of the tournament
