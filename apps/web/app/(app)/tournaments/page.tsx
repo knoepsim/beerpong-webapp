@@ -44,7 +44,8 @@ const createTournamentSchema = z.object({
   name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
   location: z.string().optional(),
   description: z.string().optional(),
-  table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
+  // the field gives a number (NaN when empty): no coercion, so what goes in is what comes out
+  table_count: z.number({ error: "Gib die Zahl der Tische an." }).int().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
   visibility: z.nativeEnum(TournamentVisibility),
   join_policy: z.nativeEnum(JoinPolicy),
 });
@@ -89,7 +90,7 @@ export default function TournamentsPage() {
   const startMissing = showScheduleErrors && !schedule.start_time;
 
   const form = useForm<z.infer<typeof createTournamentSchema>>({
-    resolver: zodResolver(createTournamentSchema as any),
+    resolver: zodResolver(createTournamentSchema),
     defaultValues: {
       name: "",
       location: "",
@@ -265,7 +266,15 @@ export default function TournamentsPage() {
                       <FormItem>
                         <FormLabel>Anzahl Tische</FormLabel>
                         <FormControl>
-                          <Input type="number" inputMode="numeric" min={1} max={100} {...field} />
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={100}
+                            {...field}
+                            value={Number.isNaN(field.value) ? "" : field.value}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
                         </FormControl>
                         <FormDescription>Du kannst sie später benennen, hinzufügen und löschen.</FormDescription>
                         <FormMessage />

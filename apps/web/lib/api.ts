@@ -24,7 +24,7 @@ export class ApiError extends Error {
   constructor(public status: number, public data: Record<string, unknown>) {
     let msg = "Ein Fehler ist aufgetreten";
     if (Array.isArray(data?.detail)) {
-      msg = data.detail.map((e: any) => String(e.msg).replace(/^Value error, /, "")).join(", ");
+      msg = data.detail.map((e: { msg?: unknown }) => String(e.msg).replace(/^Value error, /, "")).join(", ");
     } else if (typeof data?.detail === "string") {
       msg = data.detail;
     }

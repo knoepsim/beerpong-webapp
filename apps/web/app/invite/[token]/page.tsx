@@ -3,7 +3,7 @@
 import { use, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { InvitationCard } from "@/components/invitation-card";
+import { TournamentPreviewCard } from "@/components/tournament-preview";
 import { LoadError } from "@/components/load-error";
 import { buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,7 +65,7 @@ export default function InviteLinkPage({ params }: Readonly<{ params: Promise<{ 
     );
   } else if (preview.data && !isUserLoading && !user) {
     content = (
-      <InvitationCard preview={preview.data} from="Du bist eingeladen">
+      <TournamentPreviewCard preview={preview.data} invitation={{ from: "Du bist eingeladen" }}>
         {preview.data.registration_open ? (
           <>
             <Link
@@ -81,7 +81,7 @@ export default function InviteLinkPage({ params }: Readonly<{ params: Promise<{ 
         ) : (
           <p className="text-sm font-medium">Die Anmeldung ist geschlossen.</p>
         )}
-      </InvitationCard>
+      </TournamentPreviewCard>
     );
   } else {
     // logged in: on the way to the invitation

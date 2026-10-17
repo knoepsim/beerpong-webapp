@@ -17,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Trash2, ShieldAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Markdown } from "@/components/markdown";
@@ -223,20 +224,21 @@ export function TournamentSettings({
         >
           <div className="space-y-2">
             <Label htmlFor="settings-slug">Adresse</Label>
-            <div className="flex items-center rounded-md border bg-background focus-within:ring-3 focus-within:ring-ring/50">
-              <span className="pl-3 text-sm text-muted-foreground" aria-hidden="true">/t/</span>
-              <Input
+            <InputGroup>
+              <InputGroupAddon>
+                <InputGroupText>/t/</InputGroupText>
+              </InputGroupAddon>
+              <InputGroupInput
                 id="settings-slug"
                 value={editSlug}
                 onChange={(e) => {
                   setEditSlug(e.target.value.toLowerCase());
                   update.reset();
                 }}
-                className="border-0 pl-0.5 shadow-none focus-visible:ring-0"
                 aria-invalid={!!slugError}
                 aria-describedby="settings-slug-hint"
               />
-            </div>
+            </InputGroup>
             {slugError && <p className="text-sm text-destructive">{slugError}</p>}
             <p id="settings-slug-hint" className="text-xs text-muted-foreground">
               {editSlug !== tournament.slug

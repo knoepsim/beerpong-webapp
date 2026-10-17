@@ -24,12 +24,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator,
-} from "@/components/ui/input-otp";
-import {
   Form,
   FormControl,
   FormField,
@@ -38,19 +32,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { z } from "zod";
-import { phoneSchema, toE164, toNationalDigits } from "@/lib/phone";
+import { codeSchema, phoneSchema, toE164 } from "@/lib/phone";
+import { profileSchema } from "@/lib/profile";
+import { PhoneInput, SmsCodeInput } from "@/components/phone-fields";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogOut, Save, User as UserIcon, Monitor, Moon, Sun, Smartphone, RefreshCwIcon } from "lucide-react";
-
-const profileSchema = z.object({
-  name: z.string().min(2, "Der Anzeigename muss mindestens 2 Zeichen lang sein."),
-  email: z.string().email("Bitte gib eine gültige E-Mail Adresse ein.").or(z.literal("")).optional(),
-});
-
-const codeSchema = z.object({
-  code: z.string().length(6, "Bitte gib den 6-stelligen Code ein."),
-});
 
 export default function ProfilePage() {
   const { user } = useCurrentUser();
@@ -78,7 +65,7 @@ export default function ProfilePage() {
   }, []);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema as any),
+    resolver: zodResolver(profileSchema),
     defaultValues: { 
       name: user?.name || "", 
       email: user?.email || "" 
@@ -93,12 +80,12 @@ export default function ProfilePage() {
   }, [user, profileForm]);
 
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
-    resolver: zodResolver(phoneSchema as any),
+    resolver: zodResolver(phoneSchema),
     defaultValues: { phone: "" },
   });
 
   const codeForm = useForm<z.infer<typeof codeSchema>>({
-    resolver: zodResolver(codeSchema as any),
+    resolver: zodResolver(codeSchema),
     defaultValues: { code: "" },
   });
 
@@ -333,23 +320,13 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Neue Handynummer</FormLabel>
                       <FormControl>
-                        <div className="flex rounded-md border border-input focus-within:ring-1 focus-within:ring-ring shadow-sm overflow-hidden" aria-invalid={!!phoneForm.formState.errors.phone}>
-                          <div className="flex items-center px-3 bg-muted text-sm text-muted-foreground select-none border-r">
-                            +49
-                          </div>
-                          <Input
-                            type="tel"
-                            autoComplete="tel-national"
-                            placeholder="151 12345678"
-                            {...field}
-                            onChange={(e) => {
-                              const val = toNationalDigits(e.target.value);
-                              field.onChange(val);
-                            }}
-                            disabled={isPhoneLoading}
-                            className="border-0 focus-visible:ring-0 rounded-l-none shadow-none flex-1"
-                          />
-                        </div>
+                        <PhoneInput
+                          name={field.name}
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          disabled={isPhoneLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -384,30 +361,11 @@ export default function ProfilePage() {
                           Erneut senden
                         </Button>
                       </div>
-                      <div className="flex justify-center">
-                          <InputOTP
-                            maxLength={6}
-                            disabled={isPhoneLoading}
-                            aria-invalid={!!codeForm.formState.errors.code}
-                            className={codeForm.formState.errors.code ? "border-destructive" : ""}
-                            value={codeForm.watch("code") || ""}
-                            onChange={(val) => {
-                              codeForm.setValue("code", val, { shouldValidate: true });
-                            }}
-                          >
-                            <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
-                              <InputOTPSlot index={0} />
-                              <InputOTPSlot index={1} />
-                              <InputOTPSlot index={2} />
-                            </InputOTPGroup>
-                            <InputOTPSeparator className="mx-2" />
-                            <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
-                              <InputOTPSlot index={3} />
-                              <InputOTPSlot index={4} />
-                              <InputOTPSlot index={5} />
-                            </InputOTPGroup>
-                          </InputOTP>
-                        </div>
+                      <SmsCodeInput
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        disabled={isPhoneLoading}
+                      />
                       <FormMessage className="text-center" />
                     </FormItem>
                   )}

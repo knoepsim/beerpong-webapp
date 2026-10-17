@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from '@/lib/test-fixtures/render'
 import { InvitationAnswer, invitationFrom } from '../invitation-answer'
-import { InvitationCard } from '../invitation-card'
+import { TournamentPreviewCard } from '../tournament-preview'
 import { api, ApiError } from '@/lib/api'
 import { JoinPolicy, type Invitation, type Team } from '@/types'
 
@@ -151,12 +151,12 @@ describe('InvitationAnswer', () => {
   })
 })
 
-describe('InvitationCard', () => {
+describe('TournamentPreviewCard as an invitation', () => {
   it('names the tournament, who invites, the teams and a closing deadline', () => {
     render(
-      <InvitationCard
+      <TournamentPreviewCard
         preview={{ ...preview, registration_end_time: '2099-06-30T18:00:00Z' }}
-        from={invitationFrom({ invited_by_name: 'Simon' })}
+        invitation={{ from: invitationFrom({ invited_by_name: 'Simon' }) }}
       />,
     )
     expect(screen.getByRole('heading', { name: 'Sommer Cup' })).toBeInTheDocument()
@@ -167,7 +167,7 @@ describe('InvitationCard', () => {
 
   it('shows a long description in short with "Mehr"', () => {
     const description = 'Regeln '.repeat(40)
-    render(<InvitationCard preview={{ ...preview, description, team_count: 1 }} from="x" />)
+    render(<TournamentPreviewCard preview={{ ...preview, description, team_count: 1 }} invitation={{ from: 'x' }} />)
     expect(screen.getByText('1 Team angemeldet')).toBeInTheDocument()
     const more = screen.getByRole('button', { name: 'Mehr' })
     fireEvent.click(more)
