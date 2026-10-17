@@ -68,23 +68,22 @@ function TableCard({
 
   return (
     <li className={cn("space-y-2 rounded-xl border bg-card p-3", late && "border-warning/60")}>
-      <div className="flex items-center gap-2">
-        <MapPin className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <h3 className="min-w-0 flex-1 truncate font-semibold">{table.name}</h3>
+      {/* the table name is what people look for: never cut off, the time goes to its own line */}
+      <div className="flex items-start gap-2">
+        <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <h3 className="min-w-0 flex-1 break-words text-lg font-semibold leading-snug">{table.name}</h3>
         {match ? (
-          <>
-            {since && (
-              <span className={cn("flex items-center gap-1 text-xs text-muted-foreground", late && "font-medium text-foreground")}>
-                {late && <TriangleAlert className="size-3.5 text-warning" aria-hidden="true" />}
-                {late ? `${sinceLabel(since, now)} nicht gestartet` : sinceLabel(since, now)}
-              </span>
-            )}
-            <MatchStatusBadge match={match} />
-          </>
+          <MatchStatusBadge match={match} className="mt-1" />
         ) : (
-          <span className="text-xs font-medium text-muted-foreground">Frei</span>
+          <span className="mt-1 text-xs font-medium text-muted-foreground">Frei</span>
         )}
       </div>
+      {match && since && (
+        <p className={cn("flex items-center gap-1 text-xs text-muted-foreground", late && "font-medium text-foreground")}>
+          {late && <TriangleAlert className="size-3.5 shrink-0 text-warning" aria-hidden="true" />}
+          {late ? `${sinceLabel(since, now)} nicht gestartet` : sinceLabel(since, now)}
+        </p>
+      )}
       {slot && <MatchRow slot={slot} teamsMap={teamsMap} highlightTeamId={highlightTeamId} aside={false} />}
       {next && (
         <p className="text-xs text-muted-foreground">
