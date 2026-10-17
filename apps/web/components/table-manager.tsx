@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { useAddTable, useDeleteTable, useRenameTable, useTournamentTables } from "@/hooks/queries/tournaments";
+import { errorMessage } from "@/lib/errors";
+import { LoadError } from "@/components/load-error";
 import { useConfirm } from "@/components/confirm-dialog";
 import type { TournamentTable } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -86,45 +87,24 @@ function TableCard({
 
 /** The tables of a tournament as cards: rename, delete (never the last one) and add. */
 export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }>) {
-  const [tables, setTables] = useState<TournamentTable[] | null>(null);
+  const { data: tables, error, refetch } = useTournamentTables(tournamentId);
+  const add = useAddTable(tournamentId);
+  const rename = useRenameTable(tournamentId);
+  const remove = useDeleteTable(tournamentId);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
-    try {
-      setTables(await api.tournaments.listTables(tournamentId));
-    } catch {
-      toast.error("Die Tische konnten nicht geladen werden.");
-    }
-  }, [tournamentId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleAdd = async () => {
-    try {
-      const table = await api.tournaments.addTable(tournamentId);
-      setTables((current) => [...(current ?? []), table]);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Der Tisch konnte nicht hinzugefügt werden.");
-    }
+  const startEditing = (id: string | null) => {
+    rename.reset();
+    setEditingId(id);
   };
 
-  const handleSave = async (table: TournamentTable, name: string) => {
+  const handleSave = (table: TournamentTable, name: string) => {
     if (name.trim() === table.name) {
-      setEditingId(null);
+      startEditing(null);
       return;
     }
-    try {
-      const saved = await api.tournaments.renameTable(tournamentId, table.id, name);
-      setTables((current) => current?.map((t) => (t.id === saved.id ? saved : t)) ?? null);
-      setEditingId(null);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Der Name konnte nicht gespeichert werden.");
-    }
+    rename.mutate({ tableId: table.id, name }, { onSuccess: () => startEditing(null) });
   };
 
   const handleDelete = (table: TournamentTable) => {
@@ -134,13 +114,15 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
       confirmLabel: "Tisch löschen",
       destructive: true,
       action: async () => {
-        await api.tournaments.deleteTable(tournamentId, table.id);
-        setTables((current) => current?.filter((t) => t.id !== table.id) ?? null);
+        await remove.mutateAsync(table.id);
       },
     });
   };
 
-  if (tables === null) return null;
+  if (error && !tables) {
+    return <LoadError error={error} fallback="Die Tische konnten nicht geladen werden." onRetry={() => void refetch()} />;
+  }
+  if (!tables) return null;
 
   return (
     <div className="space-y-3">
@@ -151,13 +133,10 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
               table={table}
               isOnlyTable={tables.length === 1}
               isEditing={editingId === table.id}
-              error={editingId === table.id ? error : null}
-              onEdit={() => {
-                setError(null);
-                setEditingId(table.id);
-              }}
-              onSave={(name) => void handleSave(table, name)}
-              onCancel={() => setEditingId(null)}
+              error={editingId === table.id && rename.error ? errorMessage(rename.error) : null}
+              onEdit={() => startEditing(table.id)}
+              onSave={(name) => handleSave(table, name)}
+              onCancel={() => startEditing(null)}
               onDelete={() => handleDelete(table)}
             />
           </li>
@@ -165,7 +144,8 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
         <li className="flex">
           <button
             type="button"
-            onClick={() => void handleAdd()}
+            onClick={() => add.mutate()}
+            disabled={add.isPending}
             className="flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <Plus className="size-5" aria-hidden="true" />

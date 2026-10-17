@@ -2,8 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
-import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
+import { isSlugError, useAssignRole, useDeleteTournament, useRevokeRole, useUpdateTournament } from "@/hooks/queries/tournaments";
+import { useUserSearch } from "@/hooks/queries/user";
+import { errorMessage } from "@/lib/errors";
+import type { Tournament, TournamentCreateRequest, TournamentUserRole } from "@/types";
 import { AccessFields } from "@/components/access-fields";
 import { InviteLinks } from "@/components/invite-links";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -13,7 +15,7 @@ import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type Sc
 import { JoinPolicy, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Play, Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
+import { Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,10 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Markdown } from "@/components/markdown";
-import { toast } from "sonner";
 
 /** A group of settings with its own save button right below its fields (what belongs together is saved together). */
 function SettingsCard({
@@ -69,24 +69,25 @@ export function TournamentSettings({
   tournament,
   roles,
   userRole,
-  onReload,
-}: {
+}: Readonly<{
   tournament: Tournament;
   roles: TournamentUserRole[];
   userRole: TournamentRoleType | null;
-  onReload: () => Promise<void>;
-}) {
+}>) {
   const router = useRouter();
   const confirm = useConfirm();
+  const update = useUpdateTournament(tournament.id);
+  const deleteTournament = useDeleteTournament(tournament.id);
+  const assignRole = useAssignRole(tournament.id);
+  const revokeRole = useRevokeRole(tournament.id);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<PublicUser[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  // the search runs for what was submitted, not for every key
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const search = useUserSearch(submittedQuery);
+  const searchResults = search.data ?? [];
 
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<TournamentRoleType>(TournamentRoleType.REFEREE);
-  const [isAssigning, setIsAssigning] = useState(false);
-
-
 
   // Edit details form state
   const [editName, setEditName] = useState(tournament.name);
@@ -95,7 +96,6 @@ export function TournamentSettings({
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
   const [editJoinPolicy, setEditJoinPolicy] = useState(tournament.join_policy);
   const [editSlug, setEditSlug] = useState(tournament.slug);
-  const [slugError, setSlugError] = useState<string | null>(null);
   const initialSchedule: ScheduleValues = {
     start_time: toLocalInput(tournament.start_time),
     registration_end_time: toLocalInput(tournament.registration_end_time),
@@ -107,6 +107,7 @@ export function TournamentSettings({
   const [schedule, setSchedule] = useState<ScheduleValues>(initialSchedule);
   const scheduleErrors = validateSchedule(schedule);
   const [saving, setSaving] = useState<"general" | "schedule" | "access" | null>(null);
+  const slugError = update.error && isSlugError(update.error) ? errorMessage(update.error) : null;
 
   // the schedule and who may join only matter before the start: afterwards they are not shown (the API keeps them too)
   const started = !!tournament.started_at;
@@ -121,60 +122,41 @@ export function TournamentSettings({
     editVisibility !== tournament.visibility || editJoinPolicy !== tournament.join_policy || editSlug !== tournament.slug;
 
   /** Each card saves only its own fields. */
-  const save = async (group: "general" | "schedule" | "access") => {
-    const payloads: Record<typeof group, Parameters<typeof api.tournaments.update>[1]> = {
+  const save = (group: "general" | "schedule" | "access") => {
+    const payloads: Record<typeof group, Partial<TournamentCreateRequest>> = {
       general: { name: editName, location: editLocation || undefined, description: editDescription || undefined },
       schedule: { start_time: toIsoOrNull(schedule.start_time) ?? undefined, ...scheduleToPayload(schedule) },
       access: { slug: editSlug, visibility: editVisibility, ...(started ? {} : { join_policy: editJoinPolicy }) },
     };
     setSaving(group);
-    try {
-      setSlugError(null);
-      const saved = await api.tournaments.update(tournament.id, payloads[group]);
-      toast.success("Gespeichert");
+    update.mutate(payloads[group], {
       // a changed address is the new page of the tournament
-      if (saved.slug !== tournament.slug) router.replace(`/t/${saved.slug}`);
-      else await onReload();
-    } catch (err) {
-      if (err instanceof ApiError && (err.data?.error_code === "SLUG_TAKEN" || err.data?.error_code === "INVALID_SLUG")) {
-        setSlugError(err.message);
-      } else {
-        toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
-      }
-    } finally {
-      setSaving(null);
-    }
+      onSuccess: (saved) => {
+        if (saved.slug !== tournament.slug) router.replace(`/t/${saved.slug}`);
+      },
+      onSettled: () => setSaving(null),
+    });
   };
 
-  const handleSearch = async () => {
+  // the same search again asks the server again (somebody may have registered in the meantime)
+  const handleSearch = () => {
     if (searchQuery.length < 2) return;
-    setIsSearching(true);
-    try {
-      const results = await api.users.search(searchQuery);
-      setSearchResults(results);
-    } catch (err) {
-      toast.error("Fehler bei der Suche");
-    } finally {
-      setIsSearching(false);
-    }
+    if (searchQuery === submittedQuery) void search.refetch();
+    else setSubmittedQuery(searchQuery);
   };
 
-  const handleAssignRole = async () => {
+  const handleAssignRole = () => {
     if (!selectedUser) return;
-    setIsAssigning(true);
-    try {
-      await api.roles.assign(tournament.id, selectedUser, selectedRole);
-      setSearchQuery("");
-      setSearchResults([]);
-      setSelectedUser("");
-      await onReload();
-      toast.success("Rolle erfolgreich zugewiesen!");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Fehler";
-      toast.error(msg);
-    } finally {
-      setIsAssigning(false);
-    }
+    assignRole.mutate(
+      { userId: selectedUser, role: selectedRole },
+      {
+        onSuccess: () => {
+          setSearchQuery("");
+          setSubmittedQuery("");
+          setSelectedUser("");
+        },
+      },
+    );
   };
 
   const handleRevokeRole = (role: TournamentUserRole) => {
@@ -185,9 +167,7 @@ export function TournamentSettings({
       confirmLabel: "Rolle entziehen",
       destructive: true,
       action: async () => {
-        await api.roles.revoke(tournament.id, role.id);
-        await onReload();
-        toast.success("Rolle entzogen.");
+        await revokeRole.mutateAsync(role.id);
       },
     });
   };
@@ -200,8 +180,7 @@ export function TournamentSettings({
       destructive: true,
       typeToConfirm: "LÖSCHEN",
       action: async () => {
-        await api.tournaments.delete(tournament.id);
-        toast.success("Turnier gelöscht.");
+        await deleteTournament.mutateAsync();
         router.push("/tournaments");
       },
     });
@@ -306,7 +285,7 @@ export function TournamentSettings({
                 value={editSlug}
                 onChange={(e) => {
                   setEditSlug(e.target.value.toLowerCase());
-                  setSlugError(null);
+                  update.reset();
                 }}
                 className="border-0 pl-0.5 shadow-none focus-visible:ring-0"
                 aria-invalid={!!slugError}
@@ -358,12 +337,17 @@ export function TournamentSettings({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
-                <Button variant="secondary" onClick={handleSearch} disabled={isSearching || searchQuery.length < 2}>
+                <Button variant="secondary" onClick={handleSearch} disabled={search.isFetching || searchQuery.length < 2}>
                   <Search className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
+            {search.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                {errorMessage(search.error, "Die Suche hat nicht geklappt. Versuch es noch einmal.")}
+              </p>
+            )}
             {searchResults.length > 0 && (
               <div className="space-y-3 bg-muted/20 p-3 rounded-lg border">
                 <div className="space-y-2">
@@ -393,7 +377,7 @@ export function TournamentSettings({
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full" onClick={handleAssignRole} disabled={!selectedUser || isAssigning}>
+                <Button className="w-full" onClick={handleAssignRole} disabled={!selectedUser || assignRole.isPending}>
                   <UserPlus className="h-4 w-4 mr-2" /> Zuweisen
                 </Button>
               </div>

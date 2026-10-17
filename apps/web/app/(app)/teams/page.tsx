@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import {
+  useCreateTeam,
+  useCreateTeamInvite,
+  useDeleteTeam,
+  useMyTeams,
+  useRenameTeam,
+} from "@/hooks/queries/teams";
+import { errorMessage } from "@/lib/errors";
+import { LoadError } from "@/components/load-error";
 import type { Team } from "@/types";
 import { Button } from "@/components/ui/button";
 import { TeamCard } from "@/components/team-card";
@@ -24,101 +31,65 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TeamsPage() {
-  const router = useRouter();
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const teamsQuery = useMyTeams();
+  const teams = teamsQuery.data ?? [];
+  const create = useCreateTeam();
+  const rename = useRenameTeam();
+  const remove = useDeleteTeam();
+  const createInvite = useCreateTeamInvite();
 
   const [createName, setCreateName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-
-  // Dialog States
   const [renameTeam, setRenameTeam] = useState<Team | null>(null);
   const [newName, setNewName] = useState("");
-  const [isRenaming, setIsRenaming] = useState(false);
-
   const [blockedTeam, setBlockedTeam] = useState<Team | null>(null);
   const confirm = useConfirm();
 
-  useEffect(() => {
-    void loadTeams();
-  }, []);
-
-  const loadTeams = async () => {
-    try {
-      const data = await api.teams.list();
-      setTeams(data);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Laden";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!createName.trim()) return;
+    create.mutate(createName.trim(), { onSuccess: () => setCreateName("") });
+  };
 
-    setIsCreating(true);
-    try {
-      await api.teams.create(createName.trim());
-      setCreateName("");
-      await loadTeams();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Erstellen";
-      setError(message);
-    } finally {
-      setIsCreating(false);
-    }
+  const inviteLink = async (team: Team) => {
+    const invite = await createInvite.mutateAsync(team.id);
+    return `${window.location.origin}/teams/join/${invite.token}`;
   };
 
   const handleCopyInvite = async (team: Team) => {
-    try {
-      const invite = await api.teams.createInvite(team.id);
-      const link = `${window.location.origin}/teams/join/${invite.token}`;
-      await navigator.clipboard.writeText(link);
-      toast.success("Einladungslink kopiert.");
-    } catch (err: unknown) {
-      toast.error("Fehler beim Erstellen der Einladung.");
-    }
+    const link = await inviteLink(team).catch(() => null); // the toast says what went wrong
+    if (!link) return;
+    await navigator.clipboard.writeText(link);
+    toast.success("Einladungslink kopiert.");
   };
 
   const handleShareInvite = async (team: Team) => {
+    const link = await inviteLink(team).catch(() => null);
+    if (!link) return;
+    if (!navigator.share) {
+      await navigator.clipboard.writeText(link);
+      toast.success("Einladungslink kopiert.");
+      return;
+    }
     try {
-      const invite = await api.teams.createInvite(team.id);
-      const link = `${window.location.origin}/teams/join/${invite.token}`;
-      if (navigator.share) {
-        await navigator.share({
-          title: `Komm in mein Team: ${team.name}`,
-          text: `Tritt meinem Team "${team.name}" bei Beerpong bei!`,
-          url: link,
-        });
-      } else {
-        await navigator.clipboard.writeText(link);
-        toast.success("Einladungslink kopiert! (Teilen wird nicht unterstützt)");
-      }
-    } catch (err: unknown) {
-      // User cancelled share or error
-      if (err instanceof Error && err.name !== 'AbortError') {
-        toast.error("Fehler beim Erstellen/Teilen der Einladung.");
-      }
+      await navigator.share({
+        title: `Komm in mein Team: ${team.name}`,
+        text: `Tritt meinem Team "${team.name}" bei Beerpong bei!`,
+        url: link,
+      });
+    } catch {
+      // closed without sharing
     }
   };
 
-  const handleRename = async () => {
+  const openRename = (team: Team) => {
+    rename.reset();
+    setNewName(team.name);
+    setRenameTeam(team);
+  };
+
+  const handleRename = () => {
     if (!renameTeam || !newName.trim()) return;
-    setIsRenaming(true);
-    try {
-      await api.teams.update(renameTeam.id, newName.trim());
-      setRenameTeam(null);
-      await loadTeams();
-      toast.success("Team erfolgreich umbenannt.");
-    } catch (err: unknown) {
-      toast.error("Fehler beim Umbenennen.");
-    } finally {
-      setIsRenaming(false);
-    }
+    rename.mutate({ id: renameTeam.id, name: newName.trim() }, { onSuccess: () => setRenameTeam(null) });
   };
 
   // tournaments in the way: say which; otherwise ask with the consequences
@@ -134,14 +105,12 @@ export default function TeamsPage() {
       confirmLabel: "Team löschen",
       destructive: true,
       action: async () => {
-        await api.teams.delete(team.id);
-        await loadTeams();
-        toast.success("Team gelöscht.");
+        await remove.mutateAsync(team.id);
       },
     });
   };
 
-  if (isLoading) {
+  if (teamsQuery.isPending) {
     return (
       <div className="mx-auto max-w-2xl px-4 pt-6 pb-20 md:pb-6 space-y-8">
         <div className="flex items-center justify-between">
@@ -162,44 +131,55 @@ export default function TeamsPage() {
         <h1 className="text-2xl font-bold">Meine Teams</h1>
       </div>
 
-      {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
+      <form onSubmit={handleCreate} className="space-y-2">
+        <div className="flex gap-2">
+          <Label htmlFor="team-name" className="sr-only">Name des neuen Teams</Label>
+          <Input
+            id="team-name"
+            placeholder="Neues Team gründen…"
+            className="h-11"
+            value={createName}
+            onChange={(e) => {
+              setCreateName(e.target.value);
+              create.reset();
+            }}
+            disabled={create.isPending}
+            aria-invalid={create.isError}
+            aria-describedby={create.isError ? "team-name-error" : undefined}
+          />
+          <Button type="submit" className="h-11 shrink-0" disabled={create.isPending || !createName.trim()}>
+            <Plus aria-hidden="true" />
+            Gründen
+          </Button>
         </div>
-      )}
-
-      <form onSubmit={handleCreate} className="flex gap-2">
-        <Label htmlFor="team-name" className="sr-only">Name des neuen Teams</Label>
-        <Input
-          id="team-name"
-          placeholder="Neues Team gründen…"
-          className="h-11"
-          value={createName}
-          onChange={(e) => setCreateName(e.target.value)}
-          disabled={isCreating}
-        />
-        <Button type="submit" className="h-11 shrink-0" disabled={isCreating || !createName.trim()}>
-          <Plus aria-hidden="true" />
-          Gründen
-        </Button>
+        {create.isError && (
+          <p id="team-name-error" className="text-sm text-destructive">
+            {errorMessage(create.error)}
+          </p>
+        )}
       </form>
 
-      {teams.length === 0 ? (
+      {teamsQuery.isError && (
+        <LoadError
+          error={teamsQuery.error}
+          fallback="Deine Teams konnten nicht geladen werden."
+          onRetry={() => void teamsQuery.refetch()}
+        />
+      )}
+      {teamsQuery.isSuccess && teams.length === 0 && (
         <EmptyState
           icon={Users}
           title="Keine Teams vorhanden"
           description="Gründe oben dein erstes Team und lade deinen Mitspieler ein."
         />
-      ) : (
+      )}
+      {teams.length > 0 && (
         <div className="space-y-3">
           {teams.map((t) => (
             <TeamCard
               key={t.id}
               team={t}
-              onRename={(team) => {
-                setNewName(team.name);
-                setRenameTeam(team);
-              }}
+              onRename={openRename}
               onDelete={handleDelete}
               onShare={handleShareInvite}
               onCopy={handleCopyInvite}
@@ -223,15 +203,17 @@ export default function TeamsPage() {
               id="rename"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              disabled={isRenaming}
+              disabled={rename.isPending}
+              aria-invalid={rename.isError}
             />
+            {rename.isError && <p className="mt-2 text-sm text-destructive">{errorMessage(rename.error)}</p>}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameTeam(null)} disabled={isRenaming}>
+            <Button variant="outline" onClick={() => setRenameTeam(null)} disabled={rename.isPending}>
               Abbrechen
             </Button>
-            <Button onClick={handleRename} disabled={!newName.trim() || isRenaming}>
-              {isRenaming ? "Speichere…" : "Speichern"}
+            <Button onClick={handleRename} disabled={!newName.trim() || rename.isPending}>
+              {rename.isPending ? "Wird gespeichert…" : "Namen speichern"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+beforeEach(() => vi.clearAllMocks())
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ConfirmProvider, useConfirm, type ConfirmOptions } from '../confirm-dialog'
+import { ApiError } from '@/lib/api'
+import { notifyError } from '@/lib/errors'
+
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('sonner', () => ({ toast }))
 
 function Ask({ options, onResult }: { options: ConfirmOptions; onResult: (ok: boolean) => void }) {
   const confirm = useConfirm()
@@ -40,15 +47,25 @@ describe('ConfirmProvider', () => {
     expect(action).not.toHaveBeenCalled()
   })
 
-  it('shows that it runs and keeps a failure in the dialog', async () => {
+  it('shows that it runs; a failure is a toast and the dialog stays open to try again', async () => {
     let fail!: (e: Error) => void
     setup({ action: () => new Promise<void>((_, reject) => (fail = reject)) })
     fireEvent.click(screen.getByRole('button', { name: 'Turnier starten' }))
     expect(await screen.findByRole('button', { name: 'Bitte warten…' })).toBeDisabled()
 
-    fail(new Error('Zu wenige Teams.'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Zu wenige Teams.')
+    fail(new ApiError(409, { detail: 'Zu wenige Teams.' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Zu wenige Teams.'))
     expect(screen.getByText('Turnier starten?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Turnier starten' })).toBeEnabled()
+  })
+
+  it('does not say an error twice that a mutation has reported already', async () => {
+    const error = new ApiError(409, { detail: 'Schon gestartet.' })
+    notifyError(error)
+    setup({ action: () => Promise.reject(error) })
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier starten' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Turnier starten' })).toBeEnabled())
+    expect(toast.error).toHaveBeenCalledTimes(1)
   })
 })
 

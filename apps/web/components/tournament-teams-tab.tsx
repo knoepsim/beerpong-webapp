@@ -1,0 +1,49 @@
+"use client";
+
+import { CheckinSummary } from "@/components/checkin-summary";
+import { TournamentTeamList } from "@/components/tournament-team-list";
+import { formatWhen } from "@/lib/format-when";
+import type { Tournament, TournamentTeam } from "@/types";
+
+/** The teams of a tournament; before the start with the check-in and, for the organization, removing a team. */
+export function TournamentTeamsTab({
+  tournament,
+  teams,
+  myTeamId,
+  canManage,
+  onCheckin,
+  onRemove,
+}: Readonly<{
+  tournament: Tournament;
+  teams: TournamentTeam[];
+  myTeamId?: string;
+  canManage: boolean;
+  onCheckin: (team: TournamentTeam, checkedIn: boolean) => void;
+  onRemove: (team: TournamentTeam) => void;
+}>) {
+  const checkinBeforeStart = tournament.checkin_enabled && !tournament.started_at;
+  const checkinStartsLater =
+    checkinBeforeStart && !tournament.checkin_open && tournament.checkin_auto_open && !!tournament.checkin_start_time;
+
+  return (
+    <div className="space-y-4">
+      {checkinBeforeStart && teams.length > 0 && <CheckinSummary teams={teams} />}
+      {checkinStartsLater && (
+        <p className="text-sm text-muted-foreground">Der Check-in beginnt {formatWhen(tournament.checkin_start_time!)}.</p>
+      )}
+      {teams.length === 0 ? (
+        <p className="py-8 text-center text-muted-foreground">Noch keine Teams angemeldet.</p>
+      ) : (
+        <TournamentTeamList
+          teams={teams}
+          myTeamId={myTeamId}
+          showCheckin={checkinBeforeStart}
+          checkinOpen={tournament.checkin_open}
+          canManage={canManage && !tournament.started_at}
+          onCheckin={onCheckin}
+          onRemove={onRemove}
+        />
+      )}
+    </div>
+  );
+}

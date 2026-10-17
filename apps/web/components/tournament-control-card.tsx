@@ -1,0 +1,57 @@
+"use client";
+
+import { Play } from "lucide-react";
+import { CheckinSummary } from "@/components/checkin-summary";
+import { PreparationControls } from "@/components/preparation-controls";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { planStart } from "@/lib/tournament-phase";
+import type { Tournament, TournamentTeam } from "@/types";
+
+/** The organization's controls before the start (registration, check-in, start); afterwards where results go. */
+export function TournamentControlCard({
+  tournament,
+  teams,
+  isStarting,
+  onSetOpen,
+  onStart,
+}: Readonly<{
+  tournament: Tournament;
+  teams: TournamentTeam[];
+  isStarting: boolean;
+  onSetOpen: (kind: "registration" | "checkin", open: boolean) => void;
+  onStart: () => void;
+}>) {
+  const plan = planStart(tournament, teams);
+  return (
+    <Card className="border-primary/50 bg-primary/5 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-primary">
+          <Play className="size-5" aria-hidden="true" />
+          Turnier-Leitstand
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {tournament.started_at ? (
+          <div className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-400">
+            <div className="size-2 animate-pulse rounded-full bg-green-600 motion-reduce:animate-none" aria-hidden="true" />
+            Ergebnisse können im Spielplan eingetragen werden.
+          </div>
+        ) : (
+          <>
+            <PreparationControls
+              tournament={tournament}
+              onRegistration={(open) => onSetOpen("registration", open)}
+              onCheckin={(open) => onSetOpen("checkin", open)}
+            />
+            {tournament.checkin_open && <CheckinSummary teams={teams} />}
+            <Button onClick={onStart} disabled={isStarting || !plan.canStart} className="w-full sm:w-auto" size="lg">
+              {isStarting ? "Wird gestartet…" : "Turnier starten"}
+            </Button>
+            {!plan.canStart && <p className="text-sm text-muted-foreground">{plan.description}</p>}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

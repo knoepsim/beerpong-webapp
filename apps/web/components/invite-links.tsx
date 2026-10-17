@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Copy, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import {
+  useCreateTournamentInvite,
+  useDeleteTournamentInvite,
+  useTournamentInvites,
+} from "@/hooks/queries/tournaments";
 import { useConfirm } from "@/components/confirm-dialog";
+import { LoadError } from "@/components/load-error";
 import type { TournamentInvite } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,40 +21,20 @@ const teamsText = (n: number) => (n === 1 ? "1 Team" : `${n} Teams`);
 
 /** The invitation links of a tournament: create them (with a name for the channel), copy, share, delete. */
 export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>) {
-  const [invites, setInvites] = useState<TournamentInvite[] | null>(null);
+  const { data: invites, error, refetch } = useTournamentInvites(tournamentId);
+  const create = useCreateTournamentInvite(tournamentId);
+  const remove = useDeleteTournamentInvite(tournamentId);
   const [label, setLabel] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
   const confirm = useConfirm();
 
-  const load = useCallback(async () => {
-    try {
-      setInvites(await api.tournaments.listInvites(tournamentId));
-    } catch {
-      toast.error("Die Einladungslinks konnten nicht geladen werden.");
-    }
-  }, [tournamentId]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsCreating(true);
-    try {
-      await api.tournaments.createInvite(tournamentId, label.trim());
-      setLabel("");
-      await load();
-    } catch {
-      toast.error("Der Link konnte nicht erstellt werden.");
-    } finally {
-      setIsCreating(false);
-    }
+    create.mutate(label.trim(), { onSuccess: () => setLabel("") });
   };
 
   const handleCopy = async (invite: TournamentInvite) => {
     await navigator.clipboard.writeText(inviteUrl(invite.token));
-    toast.success("Link kopiert");
+    toast.success("Link kopiert.");
   };
 
   const handleShare = async (invite: TournamentInvite) => {
@@ -67,13 +52,18 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
       confirmLabel: "Link löschen",
       destructive: true,
       action: async () => {
-        await api.tournaments.deleteInvite(tournamentId, invite.id);
-        await load();
+        await remove.mutateAsync(invite.id);
       },
     });
   };
 
   const canShare = typeof navigator !== "undefined" && "share" in navigator;
+
+  if (error && !invites) {
+    return (
+      <LoadError error={error} fallback="Die Einladungslinks konnten nicht geladen werden." onRetry={() => void refetch()} />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -132,9 +122,9 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
             maxLength={60}
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            disabled={isCreating}
+            disabled={create.isPending}
           />
-          <Button type="submit" className="shrink-0" disabled={isCreating}>
+          <Button type="submit" className="shrink-0" disabled={create.isPending}>
             Link erstellen
           </Button>
         </div>

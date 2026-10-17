@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { getRedirectParam } from "@/lib/auth";
+import { errorMessage } from "@/lib/errors";
+import { useRequestCode, useVerifyCode } from "@/hooks/queries/user";
 import { RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,11 +42,13 @@ const codeSchema = z.object({
 });
 
 export default function LoginPage() {
-  const router = useRouter();
   const [step, setStep] = useState<Step>("phone");
   const [currentPhone, setCurrentPhone] = useState("");
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const requestCode = useRequestCode();
+  const verifyCode = useVerifyCode();
+  const isLoading = requestCode.isPending || verifyCode.isPending;
+  const failure = step === "phone" ? requestCode.error : verifyCode.error;
+  const apiError = failure ? errorMessage(failure) : null;
 
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
     resolver: zodResolver(phoneSchema as any),
@@ -57,42 +60,33 @@ export default function LoginPage() {
     defaultValues: { code: "" },
   });
 
-  const onSubmitPhone = async (values: z.infer<typeof phoneSchema>) => {
-    setIsLoading(true);
-    setApiError(null);
-    try {
-      await api.auth.requestCode(toE164(values.phone));
-      setCurrentPhone(values.phone);
-      setStep("code");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Senden des Codes";
-      setApiError(message);
-    } finally {
-      setIsLoading(false);
-    }
+  const resetErrors = () => {
+    requestCode.reset();
+    verifyCode.reset();
   };
 
-  const onSubmitCode = async (values: z.infer<typeof codeSchema>) => {
-    setIsLoading(true);
-    setApiError(null);
-    try {
-      await api.auth.verify(toE164(currentPhone), values.code);
+  const onSubmitPhone = (values: z.infer<typeof phoneSchema>) => {
+    resetErrors();
+    requestCode.mutate(toE164(values.phone), {
+      onSuccess: () => {
+        setCurrentPhone(values.phone);
+        setStep("code");
+      },
+    });
+  };
 
-            const user = await api.users.me();
-      const redirectUrl = getRedirectParam();
-      
-      if (!user.email || !user.name || user.name === user.phone_number) {
-        setStep("new_user");
-      } else {
-        window.location.href = redirectUrl || "/tournaments";
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Ungültiger oder abgelaufener Code";
-      setApiError(message);
-      codeForm.setValue("code", "");
-    } finally {
-      setIsLoading(false);
-    }
+  const onSubmitCode = (values: z.infer<typeof codeSchema>) => {
+    resetErrors();
+    verifyCode.mutate(
+      { phoneNumber: toE164(currentPhone), code: values.code },
+      {
+        onSuccess: (user) => {
+          if (!user.email || !user.name || user.name === user.phone_number) setStep("new_user");
+          else window.location.href = getRedirectParam() || "/tournaments";
+        },
+        onError: () => codeForm.setValue("code", ""),
+      },
+    );
   };
 
   return (
@@ -223,7 +217,7 @@ export default function LoginPage() {
                   onClick={() => {
                     setStep("phone");
                     codeForm.reset();
-                    setApiError(null);
+                    resetErrors();
                   }}
                 >
                   Andere Nummer verwenden

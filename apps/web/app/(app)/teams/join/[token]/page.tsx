@@ -1,9 +1,9 @@
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
+import { useAcceptTeamInvite, useMyTeams, useTeamInvite } from "@/hooks/queries/teams";
+import { errorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,46 +13,21 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Users } from "lucide-react";
-import { toast } from "sonner";
-import { useCurrentUser } from "@/components/user-provider";
+import { useCurrentUser } from "@/hooks/queries/user";
 
 export default function JoinTeamPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = use(params);
   const token = resolvedParams.token;
   const router = useRouter();
   
-  const [isJoining, setIsJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const { user } = useCurrentUser();
+  const { data: myTeams } = useMyTeams({ enabled: !!user });
+  const { data: invite, isLoading, isError } = useTeamInvite(token);
+  const accept = useAcceptTeamInvite(token);
+  const isJoining = accept.isPending;
 
-  const { data: myTeams } = useQuery({
-    queryKey: ["teams"],
-    queryFn: () => api.teams.list(),
-    enabled: !!user,
-  });
-
-  const { data: invite, isLoading, isError } = useQuery({
-    queryKey: ["inviteDetails", token],
-    queryFn: () => api.teams.getInviteDetails(token),
-    retry: false,
-  });
-
-  const handleJoin = async () => {
-    setIsJoining(true);
-    setError(null);
-    try {
-      const team = await api.teams.acceptInvite(token);
-      // the team shows up in "Meine Teams", where everything about it is
-      toast.success(`Du bist jetzt im Team ${team.name}.`);
-      router.push("/teams");
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Der Link ist ungültig oder das Team ist bereits voll.";
-      setError(message);
-    } finally {
-      setIsJoining(false);
-    }
-  };
+  // the team shows up in "Meine Teams", where everything about it is
+  const handleJoin = () => accept.mutate(undefined, { onSuccess: () => router.push("/teams") });
 
   return (
     <div className="mx-auto max-w-sm px-4 pt-12">
@@ -81,9 +56,9 @@ export default function JoinTeamPage({ params }: { params: Promise<{ token: stri
               Die Einladung konnte nicht geladen werden oder ist ungültig.
             </div>
           )}
-          {error && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
+          {accept.isError && (
+            <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              {errorMessage(accept.error, "Der Link ist ungültig oder das Team ist bereits voll.")}
             </div>
           )}
           

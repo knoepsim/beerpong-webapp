@@ -1,19 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { render } from '@/lib/test-fixtures/render';
 import type { ReactNode } from 'react';
 import { MatchResultDialog } from '../match-result-dialog';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { ResultType } from '@/types';
 import type { Match, Result } from '@/types';
 import { makeMatch } from '@/lib/test-fixtures/bracket';
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
     results: { list: vi.fn(), create: vi.fn(), modify: vi.fn(), delete: vi.fn() },
     matches: { start: vi.fn(), undoStart: vi.fn() },
   },
 }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock('sonner', () => ({ toast }));
 vi.mock('@/components/ui/dialog', () => ({
   Dialog: ({ open, children }: { open: boolean; children: ReactNode }) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -42,19 +45,18 @@ const result = (overrides: Partial<Result> = {}): Result => ({
 
 function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = {}) {
   const onOpenChange = vi.fn();
-  const onSuccess = vi.fn();
   const view = render(
     <MatchResultDialog
+      tournamentId="t1"
       match={match()}
       teamA={teamA}
       teamB={teamB}
       open
       onOpenChange={onOpenChange}
-      onSuccess={onSuccess}
       {...props}
     />,
   );
-  return { onOpenChange, onSuccess, ...view };
+  return { onOpenChange, ...view };
 }
 
 const ready = () => screen.findByText('Wer hat gewonnen?');
@@ -68,6 +70,7 @@ const confirmDelete = () => {
 
 describe('MatchResultDialog', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     Object.values(results).forEach((fn) => fn.mockReset());
     results.list.mockResolvedValue([]);
   });
@@ -91,7 +94,7 @@ describe('MatchResultDialog', () => {
 
   it('creates a result for team A', async () => {
     results.create.mockResolvedValue(result());
-    const { onSuccess, onOpenChange } = setup();
+    const { onOpenChange } = setup();
     await ready();
 
     expect(saveButton()).toBeDisabled(); // no winner yet
@@ -104,8 +107,8 @@ describe('MatchResultDialog', () => {
     fireEvent.click(saveButton());
 
     await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'a', 4));
-    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith('Ergebnis gespeichert.');
   });
 
   it('saves the placeholder: without an entry the winner had all 10 cups left', async () => {
@@ -160,16 +163,17 @@ describe('MatchResultDialog', () => {
   it('shows a saving state and surfaces errors from the API', async () => {
     let reject!: (e: unknown) => void;
     results.create.mockReturnValue(new Promise((_, r) => (reject = r)));
-    const { onSuccess } = setup();
+    const { onOpenChange } = setup();
     await ready();
     fireEvent.click(screen.getAllByText('Alpha')[1].closest('button')!);
     fireEvent.change(cupsInput(), { target: { value: '3' } });
     fireEvent.click(saveButton());
 
     expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
-    reject(new Error('Spiel gesperrt'));
+    reject(new ApiError(409, { detail: 'Spiel gesperrt' }));
     expect(await screen.findByText('Spiel gesperrt')).toBeInTheDocument();
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled(); // said in the dialog, once
   });
 
   it('uses a generic message for non-Error failures', async () => {
@@ -179,13 +183,13 @@ describe('MatchResultDialog', () => {
     fireEvent.click(screen.getAllByText('Alpha')[1].closest('button')!);
     fireEvent.change(cupsInput(), { target: { value: '3' } });
     fireEvent.click(saveButton());
-    expect(await screen.findByText('Fehler beim Melden des Ergebnisses')).toBeInTheDocument();
+    expect(await screen.findByText('Das hat nicht geklappt. Versuch es noch einmal.')).toBeInTheDocument();
   });
 
   it('prefills an existing result and only allows saving changes', async () => {
     results.list.mockResolvedValue([result()]);
     results.modify.mockResolvedValue(result());
-    const { onSuccess } = setup();
+    const { onOpenChange } = setup();
     await ready();
 
     expect(cupsInput().value).toBe('4');
@@ -195,7 +199,8 @@ describe('MatchResultDialog', () => {
     fireEvent.change(cupsInput(), { target: { value: '6' } });
     fireEvent.click(saveButton());
     await waitFor(() => expect(results.modify).toHaveBeenCalledWith('m1', 'a', 6));
-    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith('Ergebnis geändert.');
   });
 
   it('treats a switched winner as a change', async () => {
@@ -220,7 +225,7 @@ describe('MatchResultDialog', () => {
   it('deletes an existing result', async () => {
     results.list.mockResolvedValue([result()]);
     results.delete.mockResolvedValue(result());
-    const { onSuccess, onOpenChange } = setup();
+    const { onOpenChange } = setup();
     await ready();
 
     fireEvent.click(screen.getByRole('button', { name: 'Ergebnis löschen' }));
@@ -228,8 +233,8 @@ describe('MatchResultDialog', () => {
     expect(screen.getByText('Das Finale ist wieder offen, das Turnier gilt nicht mehr als beendet.')).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole('button', { name: 'Ergebnis löschen' }).at(-1)!);
     await waitFor(() => expect(results.delete).toHaveBeenCalledWith('m1'));
-    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith('Ergebnis gelöscht.');
   });
 
   it('names who leaves the next match when a result is deleted', async () => {
@@ -242,7 +247,7 @@ describe('MatchResultDialog', () => {
 
   it('shows delete errors', async () => {
     results.list.mockResolvedValue([result()]);
-    results.delete.mockRejectedValueOnce(new Error('Löschen verboten'));
+    results.delete.mockRejectedValueOnce(new ApiError(409, { detail: 'Löschen verboten' }));
     setup();
     await ready();
     confirmDelete();
@@ -250,7 +255,7 @@ describe('MatchResultDialog', () => {
 
     results.delete.mockRejectedValueOnce('x');
     fireEvent.click(screen.getAllByRole('button', { name: 'Ergebnis löschen' }).at(-1)!);
-    expect(await screen.findByText('Fehler beim Löschen des Ergebnisses')).toBeInTheDocument();
+    expect(await screen.findByText('Das hat nicht geklappt. Versuch es noch einmal.')).toBeInTheDocument();
   });
 
   it('shows the label while deleting', async () => {
@@ -307,13 +312,15 @@ describe('MatchResultDialog', () => {
     expect(screen.queryByText('Bearbeiten gesperrt')).not.toBeInTheDocument();
   });
 
-  it('survives a failing load', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('does not offer the form without the history, and loads it again', async () => {
     results.list.mockRejectedValue(new Error('offline'));
     setup();
+    expect(await screen.findByText('Das Ergebnis konnte nicht geladen werden.')).toBeInTheDocument();
+    expect(screen.queryByText('Wer hat gewonnen?')).not.toBeInTheDocument();
+
+    results.list.mockResolvedValue([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     await ready();
-    expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
   });
 
   it('cancels', async () => {
@@ -339,15 +346,15 @@ describe('MatchResultDialog: start', () => {
   });
 
   it('starts a match at its table and shows the table', async () => {
-    const { onSuccess, onOpenChange } = setup({ match: match({ status: 'ready', table_id: 't', table_name: 'Terrasse' }) });
+    const { onOpenChange } = setup({ match: match({ status: 'ready', table_id: 't', table_name: 'Terrasse' }) });
     await ready();
 
     expect(screen.getByText('Terrasse')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Spiel starten' }));
 
     await waitFor(() => expect(api.matches.start).toHaveBeenCalledWith('m1'));
-    expect(onSuccess).toHaveBeenCalled();
-    expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith('Spiel an Terrasse gestartet.');
   });
 
   it('cannot start a match without a table, but the result can still be reported', async () => {

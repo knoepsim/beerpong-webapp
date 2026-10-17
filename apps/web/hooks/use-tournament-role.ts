@@ -1,4 +1,4 @@
-import { useCurrentUser } from "@/components/user-provider";
+import { useCurrentUser } from "@/hooks/queries/user";
 import type { TournamentUserRole } from "@/types";
 
 export function useTournamentRole(roles?: TournamentUserRole[]) {

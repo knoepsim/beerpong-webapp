@@ -5,7 +5,7 @@ import { TournamentRoleType } from '@/types';
 import type { TournamentUserRole, User } from '@/types';
 
 const useCurrentUser = vi.fn();
-vi.mock('@/components/user-provider', () => ({ useCurrentUser: () => useCurrentUser() }));
+vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }));
 
 const user = (overrides: Partial<User> = {}): User => ({
   id: 'u1',
