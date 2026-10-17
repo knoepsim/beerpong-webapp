@@ -561,6 +561,9 @@ describe('deleting the tournament', () => {
   const open = () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(screen.getByText('Turnier endgültig löschen'));
+    // deleting a tournament needs its name typed
+    expect(screen.getByRole('button', { name: 'Turnier löschen' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Zum Bestätigen/), { target: { value: 'Summer Cup' } });
   };
 
   it('deletes after a confirmation that names the consequences and leaves the page', async () => {

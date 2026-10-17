@@ -51,3 +51,20 @@ describe('ConfirmProvider', () => {
     expect(screen.getByText('Turnier starten?')).toBeInTheDocument()
   })
 })
+
+describe('ConfirmProvider: type to confirm', () => {
+  it('runs only after the text was typed, ignoring case and spaces at the ends', async () => {
+    const { onResult, action } = setup({ typeToConfirm: 'Sommer Cup', confirmLabel: 'Turnier löschen', destructive: true })
+    const button = screen.getByRole('button', { name: 'Turnier löschen' })
+    expect(button).toBeDisabled()
+
+    fireEvent.change(screen.getByLabelText(/Zum Bestätigen/), { target: { value: 'Sommer' } })
+    expect(button).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/Zum Bestätigen/), { target: { value: ' sommer cup ' } })
+    expect(button).toBeEnabled()
+
+    fireEvent.click(button)
+    await waitFor(() => expect(onResult).toHaveBeenCalledWith(true))
+    expect(action).toHaveBeenCalled()
+  })
+})

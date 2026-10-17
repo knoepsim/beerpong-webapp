@@ -11,6 +11,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export interface ConfirmOptions {
   /** A question with the action: "Turnier starten?" */
@@ -21,6 +23,11 @@ export interface ConfirmOptions {
   confirmLabel: string;
   /** Deleting or removing: the button is red. */
   destructive?: boolean;
+  /**
+   * For what cannot be undone and hits many people (deleting a tournament): this text must be typed first. The name
+   * of the thing makes people look at what they delete; case and spaces at the ends do not matter.
+   */
+  typeToConfirm?: string;
   /** Runs on confirmation; the dialog shows that it runs and stays open with the message if it fails. */
   action: () => Promise<void> | void;
 }
@@ -41,6 +48,7 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
   const [pending, setPending] = useState<Pending | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
   const current = useRef<Pending | null>(null);
 
   const confirm = useCallback<Confirm>(
@@ -49,6 +57,7 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
         const next = { ...options, resolve };
         current.current = next;
         setError(null);
+        setTyped("");
         setPending(next);
       }),
     [],
@@ -60,8 +69,11 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
     setPending(null);
   };
 
+  const needsTyping = !!pending?.typeToConfirm;
+  const typedRight = !needsTyping || typed.trim().toLowerCase() === pending?.typeToConfirm?.trim().toLowerCase();
+
   const run = async () => {
-    if (!pending) return;
+    if (!pending || !typedRight) return;
     setRunning(true);
     setError(null);
     try {
@@ -83,6 +95,22 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
             <AlertDialogTitle>{pending?.title}</AlertDialogTitle>
             {pending?.description && <AlertDialogDescription>{pending.description}</AlertDialogDescription>}
           </AlertDialogHeader>
+          {needsTyping && (
+            <div className="space-y-2">
+              <Label htmlFor="confirm-typed">
+                Zum Bestätigen <span className="font-semibold">{pending?.typeToConfirm}</span> eingeben
+              </Label>
+              <Input
+                id="confirm-typed"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                disabled={running}
+              />
+            </div>
+          )}
           {error && (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -90,7 +118,7 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
           )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={running}>Abbrechen</AlertDialogCancel>
-            <Button variant={pending?.destructive ? "destructive" : "default"} onClick={() => void run()} disabled={running}>
+            <Button variant={pending?.destructive ? "destructive" : "default"} onClick={() => void run()} disabled={running || !typedRight}>
               {running ? "Bitte warten..." : pending?.confirmLabel}
             </Button>
           </AlertDialogFooter>
