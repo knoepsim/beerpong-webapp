@@ -154,3 +154,15 @@ describe('BracketView', () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe('BracketView: active rounds next to each other', () => {
+  it('join into one band: no rounded corners where they meet', () => {
+    // match 1 (round 1) and match 3 (round 2) can both be played
+    render(<BracketView bracket={fiveTeamBracket()} teamsMap={fiveTeams} />)
+    const header = (name: string) => screen.getByRole('region', { name }).querySelector('header')!
+    expect(header('Viertelfinale').className).toContain('rounded-r-none')
+    expect(header('Viertelfinale').className).not.toContain('rounded-l-none')
+    expect(header('Halbfinale').className).toContain('rounded-l-none')
+    expect(header('Finale').className).not.toContain('bg-primary/10')
+  })
+})

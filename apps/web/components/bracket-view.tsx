@@ -157,8 +157,10 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
                 <header
                   className={cn(
                     "mb-1 h-12 flex flex-col justify-center rounded-md px-3",
-                    // rounds with matches that can be played right now stand out
+                    // rounds with matches that can be played right now stand out; neighbours read as one band
                     active.has(round.round) && "bg-primary/10 text-primary",
+                    active.has(round.round) && active.has(round.round - 1) && "rounded-l-none",
+                    active.has(round.round) && active.has(round.round + 1) && "rounded-r-none",
                   )}
                 >
                   <h3 className="text-xs font-semibold uppercase tracking-wider">
