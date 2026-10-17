@@ -86,19 +86,56 @@ export interface TournamentInvite {
   token: string;
   label: string | null;
   created_at: string;
-  /** Teams that joined through this link. */
-  uses: number;
+  /** A deleted link does not work any more; it stays with the invitations it brought. */
+  deleted: boolean;
+  /** Accounts that opened the link (each got an invitation) and how many of them play. */
+  opened: number;
+  joined: number;
 }
 
-/** What a stranger sees of a tournament before joining. */
+/** What somebody sees of a tournament before taking part: the tournament, nothing about who plays. */
 export interface TournamentPreview {
   tournament_id: string;
   slug: string;
   name: string;
   location: string | null;
+  description: string | null;
   start_time: string | null;
   registration_open: boolean;
   join_policy: JoinPolicy;
+  phase: TournamentPhase;
+  team_count: number;
+  /** Only a deadline that really closes the registration. */
+  registration_end_time: string | null;
+}
+
+export type InvitationStatus = "pending" | "accepted" | "declined" | "withdrawn";
+
+/** A personal invitation, as the invited person sees it. */
+export interface Invitation {
+  id: string;
+  status: InvitationStatus;
+  created_at: string;
+  tournament: TournamentPreview;
+  /** Invited directly by this person. */
+  invited_by_name: string | null;
+  /** Came from this link. */
+  link_label: string | null;
+  team_id: string | null;
+  team_name: string | null;
+}
+
+/** A personal invitation, as the organization sees it. */
+export interface TournamentInvitation {
+  id: string;
+  user_id: string;
+  user_name: string;
+  status: InvitationStatus;
+  /** The link it came from; null: invited directly. */
+  invite_id: string | null;
+  invited_by_name: string | null;
+  team_name: string | null;
+  created_at: string;
 }
 
 export type TournamentPhase =

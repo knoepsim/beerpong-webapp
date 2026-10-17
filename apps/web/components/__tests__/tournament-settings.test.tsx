@@ -412,22 +412,10 @@ describe('tables', () => {
 });
 
 describe('invitation links', () => {
-  const inviteOnly = { join_policy: JoinPolicy.INVITE_ONLY };
-
-  beforeEach(() => mocked.invites.mockResolvedValue([]));
-
-  it('are managed by organisers when joining needs an invitation', async () => {
-    setup(TournamentRoleType.MANAGER, inviteOnly);
-    expect(await screen.findByText('Einladungslinks')).toBeInTheDocument();
-    expect(mocked.invites).toHaveBeenCalledWith('t1');
-  });
-
-  it('are not offered to referees, nor when everybody may join', () => {
-    setup(TournamentRoleType.REFEREE, inviteOnly);
+  it('are not in the settings any more: inviting happens in the participants tab', () => {
+    setup(TournamentRoleType.ADMIN, { join_policy: JoinPolicy.INVITE_ONLY });
     expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
-    cleanup();
-    setup(TournamentRoleType.ADMIN);
-    expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
+    expect(mocked.invites).not.toHaveBeenCalled();
   });
 });
 

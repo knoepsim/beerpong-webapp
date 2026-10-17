@@ -1,29 +1,18 @@
 "use client";
 
 import { Calendar, MapPin, Share2, Users } from "lucide-react";
-import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatWhen } from "@/lib/format-when";
+import { shareOrCopy } from "@/lib/share";
 import { phaseLabel } from "@/lib/tournament-phase";
 import { JoinPolicy, type Tournament } from "@/types";
 
 /** Name, phase, when, where and how many teams: what a tournament is, at a glance. */
 export function TournamentHeader({ tournament, teamCount }: Readonly<{ tournament: Tournament; teamCount: number }>) {
-  const share = async () => {
-    // the plain address, without whatever is in the address bar (an invitation, a tab)
-    const url = `${window.location.origin}/t/${tournament.slug}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: tournament.name, url });
-      } catch {
-        // closed without sharing
-      }
-      return;
-    }
-    await navigator.clipboard.writeText(url);
-    toast.success("Turnier-Link kopiert.");
-  };
+  // the plain address, without whatever is in the address bar (an invitation, a tab)
+  const share = () =>
+    shareOrCopy({ title: tournament.name, url: `${window.location.origin}/t/${tournament.slug}` }, "Turnier-Link kopiert.");
 
   return (
     <div>

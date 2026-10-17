@@ -5,12 +5,27 @@ import { usePathname } from "next/navigation";
 import { Trophy, Users, UserCircle, LogOut, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { useCurrentUser } from "@/hooks/queries/user";
+import { useMyInvitations } from "@/hooks/queries/invitations";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/auth";
 
+/** The number of open invitations; for screen readers as words. */
+function NavBadge({ count, floating = false }: Readonly<{ count: number; floating?: boolean }>) {
+  if (count === 0) return null;
+  return (
+    <span
+      className={`min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-semibold leading-4 text-white tabular-nums ${floating ? "absolute -top-1.5 -right-2.5" : ""}`}
+    >
+      {count}
+      <span className="sr-only">{count === 1 ? " offene Einladung" : " offene Einladungen"}</span>
+    </span>
+  );
+}
+
 const navItems = [
-  { href: "/tournaments", label: "Turniere", icon: Trophy },
+  // an invitation belongs to the tournaments
+  { href: "/tournaments", label: "Turniere", icon: Trophy, also: "/invitations" },
   { href: "/teams", label: "Teams", icon: Users },
   { href: "/profile", label: "Profil", icon: UserCircle },
 ];
@@ -18,6 +33,11 @@ const navItems = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading } = useCurrentUser();
+  // open invitations wait in "Meine Turniere": their number at "Turniere"
+  const openInvitations = useMyInvitations({ enabled: !!user }).data?.length ?? 0;
+  const badgeFor = (href: string) => (href === "/tournaments" ? openInvitations : 0);
+  const isActiveItem = (item: (typeof navItems)[number]) =>
+    pathname.startsWith(item.href) || (!!item.also && pathname.startsWith(item.also));
   // somebody without login (a spectator on a public tournament) only has the page in front of him: no app navigation
   const isGuest = !isLoading && !user;
 
@@ -45,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Desktop nav */}
           <nav className={`hidden items-center gap-1 ${isGuest ? "" : "md:flex"}`}>
             {navItems.map((item) => {
-              const isActive = pathname.startsWith(item.href);
+              const isActive = isActiveItem(item);
               return (
                 <Link
                   key={item.href}
@@ -57,6 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
+                  <NavBadge count={badgeFor(item.href)} />
                 </Link>
               );
             })}
@@ -106,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <nav className={`fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/90 backdrop-blur-md md:hidden ${isGuest ? "hidden" : ""}`}>
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
-            const isActive = pathname.startsWith(item.href);
+            const isActive = isActiveItem(item);
             return (
               <Link
                 key={item.href}
@@ -116,7 +137,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                     : "text-muted-foreground"
                   }`}
               >
-                <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
+                <span className="relative">
+                  <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
+                  <NavBadge count={badgeFor(item.href)} floating />
+                </span>
                 {item.label}
               </Link>
             );

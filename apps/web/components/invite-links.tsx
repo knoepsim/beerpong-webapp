@@ -1,63 +1,136 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Share2, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import {
-  useCreateTournamentInvite,
-  useDeleteTournamentInvite,
-  useTournamentInvites,
-} from "@/hooks/queries/tournaments";
+import { ChevronDown, Copy, Share2, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
+import { InvitationRow } from "@/components/invitation-status";
 import { LoadError } from "@/components/load-error";
-import type { TournamentInvite } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTournamentInvitations } from "@/hooks/queries/invitations";
+import { useCreateTournamentInvite, useDeleteTournamentInvite, useTournamentInvites } from "@/hooks/queries/tournaments";
+import { copyLink, shareOrCopy } from "@/lib/share";
+import { cn } from "@/lib/utils";
+import type { TournamentInvitation, TournamentInvite } from "@/types";
 
 export const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`;
 
-const teamsText = (n: number) => (n === 1 ? "1 Team" : `${n} Teams`);
+const nameOf = (invite: TournamentInvite) => invite.label ?? "Einladungslink";
+/** "Link WhatsApp" for a named link, "Einladungslink" for one without a name. */
+const titleOf = (invite: TournamentInvite) => (invite.label ? `Link ${invite.label}` : "Einladungslink");
 
-/** The invitation links of a tournament: create them (with a name for the channel), copy, share, delete. */
-export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>) {
-  const { data: invites, error, refetch } = useTournamentInvites(tournamentId);
-  const create = useCreateTournamentInvite(tournamentId);
-  const remove = useDeleteTournamentInvite(tournamentId);
-  const [label, setLabel] = useState("");
+function countText(invite: TournamentInvite): string {
+  if (invite.opened === 0) return "Noch nicht geöffnet";
+  return `${invite.opened} geöffnet · ${invite.joined} dabei`;
+}
+
+function deleteConsequences(pending: number): string {
+  const parts = ["Wer den Link noch hat, wird damit nicht mehr eingeladen."];
+  if (pending === 1) parts.push("1 offene Einladung bleibt im Konto; du kannst sie einzeln entfernen.");
+  if (pending > 1) parts.push(`${pending} offene Einladungen bleiben im Konto; du kannst sie einzeln entfernen.`);
+  parts.push("Teams, die schon dabei sind, bleiben im Turnier.");
+  return parts.join(" ");
+}
+
+/** One link: copy, share, delete; open it to see the accounts that opened it and how far they are. */
+function LinkRow({
+  tournamentId,
+  invite,
+  invitations,
+}: Readonly<{ tournamentId: string; invite: TournamentInvite; invitations: TournamentInvitation[] }>) {
   const confirm = useConfirm();
+  const remove = useDeleteTournamentInvite(tournamentId);
+  const name = nameOf(invite);
+  const title = titleOf(invite);
 
-  const handleCreate = (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    create.mutate(label.trim(), { onSuccess: () => setLabel("") });
-  };
-
-  const handleCopy = async (invite: TournamentInvite) => {
-    await navigator.clipboard.writeText(inviteUrl(invite.token));
-    toast.success("Link kopiert.");
-  };
-
-  const handleShare = async (invite: TournamentInvite) => {
-    try {
-      await navigator.share({ title: "Einladung zum Turnier", url: inviteUrl(invite.token) });
-    } catch {
-      // closed without sharing
-    }
-  };
-
-  const handleDelete = (invite: TournamentInvite) => {
+  const handleDelete = () =>
     void confirm({
-      title: "Link löschen?",
-      description: "Wer den Link noch hat, kann damit nicht mehr beitreten. Teams, die schon beigetreten sind, bleiben im Turnier.",
+      title: `${title} löschen?`,
+      description: deleteConsequences(invitations.filter((i) => i.status === "pending").length),
       confirmLabel: "Link löschen",
       destructive: true,
       action: async () => {
         await remove.mutateAsync(invite.id);
       },
     });
-  };
 
-  const canShare = typeof navigator !== "undefined" && "share" in navigator;
+  return (
+    <li className="py-1">
+      <Collapsible>
+        <div className="flex items-center gap-1">
+          <CollapsibleTrigger className="group flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none">
+            <ChevronDown
+              className="size-4 shrink-0 -rotate-90 text-muted-foreground transition-transform group-data-[panel-open]:rotate-0 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+            <span className="min-w-0">
+              <span className={cn("block truncate font-medium", invite.deleted && "text-muted-foreground line-through")}>
+                {name}
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                {invite.deleted ? `Gelöscht · ${countText(invite)}` : countText(invite)}
+              </span>
+            </span>
+          </CollapsibleTrigger>
+          {!invite.deleted && (
+            <>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-10 shrink-0"
+                onClick={() => void copyLink(inviteUrl(invite.token))}
+                aria-label={`${title} kopieren`}
+              >
+                <Copy aria-hidden="true" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-10 shrink-0"
+                onClick={() => void shareOrCopy({ title: "Einladung zum Turnier", url: inviteUrl(invite.token) })}
+                aria-label={`${title} teilen`}
+              >
+                <Share2 aria-hidden="true" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleDelete}
+                aria-label={`${title} löschen`}
+              >
+                <Trash2 aria-hidden="true" />
+              </Button>
+            </>
+          )}
+        </div>
+        <CollapsibleContent>
+          {invitations.length === 0 ? (
+            <p className="ml-7 py-2 text-sm text-muted-foreground">Noch niemand hat den Link mit einem Konto geöffnet.</p>
+          ) : (
+            <ul className="ml-3 border-l pl-4">
+              {invitations.map((invitation) => (
+                <InvitationRow key={invitation.id} tournamentId={tournamentId} invitation={invitation} />
+              ))}
+            </ul>
+          )}
+        </CollapsibleContent>
+      </Collapsible>
+    </li>
+  );
+}
+
+/**
+ * The invitation links of a tournament: create them (with a name for the channel), copy, share, delete; each shows
+ * the accounts that opened it. Deleted links stay at the end with what they brought.
+ */
+export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>) {
+  const { data: invites, error, refetch } = useTournamentInvites(tournamentId);
+  const invitations = useTournamentInvitations(tournamentId).data ?? [];
+  const create = useCreateTournamentInvite(tournamentId);
+  const [label, setLabel] = useState("");
 
   if (error && !invites) {
     return (
@@ -65,55 +138,35 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
     );
   }
 
+  const ordered = [...(invites ?? [])].sort((a, b) => Number(a.deleted) - Number(b.deleted));
+
   return (
     <div className="space-y-4">
       {invites?.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          Es gibt keinen Einladungslink. Ohne Link kann niemand mehr beitreten.
+          Noch kein Link. Jeder Link zeigt dir, wer ihn geöffnet hat; lege für jeden Kanal einen eigenen an.
         </p>
       )}
-      <ul className="divide-y rounded-xl border">
-        {invites?.map((invite) => (
-          <li key={invite.id} className="flex items-center gap-2 p-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium leading-tight">{invite.label ?? "Einladungslink"}</p>
-              <p className="truncate font-mono text-xs text-muted-foreground">/invite/{invite.token}</p>
-              <p className="text-xs text-muted-foreground">{teamsText(invite.uses)} beigetreten</p>
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-10 shrink-0"
-              onClick={() => handleCopy(invite)}
-              aria-label={`Link ${invite.label ?? invite.token} kopieren`}
-            >
-              <Copy aria-hidden="true" />
-            </Button>
-            {canShare && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-10 shrink-0"
-                onClick={() => handleShare(invite)}
-                aria-label={`Link ${invite.label ?? invite.token} teilen`}
-              >
-                <Share2 aria-hidden="true" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-10 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => handleDelete(invite)}
-              aria-label={`Link ${invite.label ?? invite.token} löschen`}
-            >
-              <Trash2 aria-hidden="true" />
-            </Button>
-          </li>
-        ))}
-      </ul>
+      {ordered.length > 0 && (
+        <ul className="divide-y">
+          {ordered.map((invite) => (
+            <LinkRow
+              key={invite.id}
+              tournamentId={tournamentId}
+              invite={invite}
+              invitations={invitations.filter((i) => i.invite_id === invite.id)}
+            />
+          ))}
+        </ul>
+      )}
 
-      <form onSubmit={handleCreate} className="space-y-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          create.mutate(label.trim(), { onSuccess: () => setLabel("") });
+        }}
+        className="space-y-2"
+      >
         <Label htmlFor="invite-label">Neuer Link</Label>
         <div className="flex gap-2">
           <Input
@@ -129,7 +182,6 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
           </Button>
         </div>
       </form>
-
     </div>
   );
 }

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import {
   useCreateTeam,
-  useCreateTeamInvite,
   useDeleteTeam,
   useMyTeams,
   useRenameTeam,
 } from "@/hooks/queries/teams";
 import { errorMessage } from "@/lib/errors";
+import { useTeamInviteLink } from "@/hooks/use-team-invite-link";
 import { LoadError } from "@/components/load-error";
 import type { Team } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ import { TeamDeleteBlockers } from "@/components/delete-team-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
-import { toast } from "sonner";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -36,7 +35,7 @@ export default function TeamsPage() {
   const create = useCreateTeam();
   const rename = useRenameTeam();
   const remove = useDeleteTeam();
-  const createInvite = useCreateTeamInvite();
+  const inviteLink = useTeamInviteLink();
 
   const [createName, setCreateName] = useState("");
   const [renameTeam, setRenameTeam] = useState<Team | null>(null);
@@ -48,37 +47,6 @@ export default function TeamsPage() {
     e.preventDefault();
     if (!createName.trim()) return;
     create.mutate(createName.trim(), { onSuccess: () => setCreateName("") });
-  };
-
-  const inviteLink = async (team: Team) => {
-    const invite = await createInvite.mutateAsync(team.id);
-    return `${window.location.origin}/teams/join/${invite.token}`;
-  };
-
-  const handleCopyInvite = async (team: Team) => {
-    const link = await inviteLink(team).catch(() => null); // the toast says what went wrong
-    if (!link) return;
-    await navigator.clipboard.writeText(link);
-    toast.success("Einladungslink kopiert.");
-  };
-
-  const handleShareInvite = async (team: Team) => {
-    const link = await inviteLink(team).catch(() => null);
-    if (!link) return;
-    if (!navigator.share) {
-      await navigator.clipboard.writeText(link);
-      toast.success("Einladungslink kopiert.");
-      return;
-    }
-    try {
-      await navigator.share({
-        title: `Komm in mein Team: ${team.name}`,
-        text: `Tritt meinem Team "${team.name}" bei Beerpong bei!`,
-        url: link,
-      });
-    } catch {
-      // closed without sharing
-    }
   };
 
   const openRename = (team: Team) => {
@@ -181,8 +149,8 @@ export default function TeamsPage() {
               team={t}
               onRename={openRename}
               onDelete={handleDelete}
-              onShare={handleShareInvite}
-              onCopy={handleCopyInvite}
+              onShare={inviteLink.share}
+              onCopy={inviteLink.copy}
             />
           ))}
         </div>

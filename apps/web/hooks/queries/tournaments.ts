@@ -61,10 +61,11 @@ export function useBracket(id: string) {
   });
 }
 
-export function useTournamentInvites(id: string) {
+export function useTournamentInvites(id: string, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.tournamentInvites(id),
     queryFn: () => api.tournaments.listInvites(id),
+    enabled,
     meta: { errorMessage: "Die Einladungslinks konnten nicht geladen werden." },
   });
 }

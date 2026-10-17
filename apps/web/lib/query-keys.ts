@@ -12,6 +12,9 @@ export const queryKeys = {
   userSearch: (query: string) => ["users", "search", query] as const,
   myTournaments: ["tournaments", "mine"] as const,
   invite: (token: string) => ["invites", token] as const,
+  /** My invitations (the list and each one). */
+  invitations: ["invitations"] as const,
+  invitation: (id: string) => ["invitations", id] as const,
   /** All lookups of tournaments by address or id (a change of the tournament makes all of them stale). */
   tournamentLookups: ["tournament", "lookup"] as const,
   tournamentBySlug: (slug: string) => ["tournament", "lookup", "slug", slug] as const,
@@ -23,6 +26,7 @@ export const queryKeys = {
   tournamentRoles: (id: string) => ["tournament", id, "roles"] as const,
   tournamentTables: (id: string) => ["tournament", id, "tables"] as const,
   tournamentInvites: (id: string) => ["tournament", id, "invites"] as const,
+  tournamentInvitations: (id: string) => ["tournament", id, "invitations"] as const,
   bracket: (id: string) => ["tournament", id, "bracket"] as const,
   /** The result history of all matches (a changed bracket can change any of them). */
   results: ["results"] as const,
@@ -36,7 +40,14 @@ export const queryKeys = {
  */
 const SCOPE_KEYS: Record<LiveScope, (id: string) => QueryKey[]> = {
   tournament: () => [queryKeys.tournamentLookups, queryKeys.myTournaments],
-  teams: (id) => [queryKeys.tournamentTeams(id), queryKeys.myTournaments],
+  // who is invited changes with who plays (and the other way round); the links count both
+  teams: (id) => [
+    queryKeys.tournamentTeams(id),
+    queryKeys.tournamentInvitations(id),
+    queryKeys.tournamentInvites(id),
+    queryKeys.invitations,
+    queryKeys.myTournaments,
+  ],
   // the tables belong to the bracket: who plays where
   bracket: (id) => [queryKeys.bracket(id), queryKeys.tournamentTables(id), queryKeys.results, queryKeys.myTournaments],
   roles: (id) => [queryKeys.tournamentRoles(id), queryKeys.myTournaments],

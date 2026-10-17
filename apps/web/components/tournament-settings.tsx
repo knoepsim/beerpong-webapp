@@ -7,12 +7,11 @@ import { useUserSearch } from "@/hooks/queries/user";
 import { errorMessage } from "@/lib/errors";
 import type { Tournament, TournamentCreateRequest, TournamentUserRole } from "@/types";
 import { AccessFields } from "@/components/access-fields";
-import { InviteLinks } from "@/components/invite-links";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
-import { JoinPolicy, TournamentRoleType } from "@/types";
+import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
@@ -307,17 +306,6 @@ export function TournamentSettings({
               if (patch.join_policy) setEditJoinPolicy(patch.join_policy);
             }}
           />
-          {/* who joins how: only while teams can still join */}
-          {!started && tournament.join_policy === JoinPolicy.INVITE_ONLY && (
-            <div className="space-y-2 border-t pt-4">
-              <h3 className="text-sm font-medium">Einladungslinks</h3>
-              <p className="text-sm text-muted-foreground">
-                Wer einen dieser Links öffnet, kann dem Turnier mit einem Team beitreten. Lege für jeden Kanal einen
-                eigenen Link an und sieh, wie viele Teams darüber gekommen sind.
-              </p>
-              <InviteLinks tournamentId={tournament.id} />
-            </div>
-          )}
         </SettingsCard>
       )}
 
