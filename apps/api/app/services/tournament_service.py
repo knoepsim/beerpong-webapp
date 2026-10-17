@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -33,6 +34,26 @@ from typing import Annotated
 from app.core.database import DbSession
 from app.core.security import get_optional_user
 from app.models.user import User
+
+
+# settings that only matter before the start (the schedule and who may join)
+BEFORE_START_ONLY = (
+    "start_time",
+    "registration_end_time",
+    "registration_auto_close",
+    "checkin_enabled",
+    "checkin_start_time",
+    "checkin_auto_open",
+    "join_policy",
+)
+
+
+
+def _same(a, b) -> bool:
+    """Equal values; times without a zone (SQLite) count as UTC."""
+    if isinstance(a, datetime) and isinstance(b, datetime):
+        return (a if a.tzinfo else a.replace(tzinfo=UTC)) == (b if b.tzinfo else b.replace(tzinfo=UTC))
+    return a == b
 
 
 class TournamentService:
@@ -150,8 +171,10 @@ class TournamentService:
         if not update_data:
             return tournament
 
-        new_checkin_enabled = update_data.get("checkin_enabled", tournament.checkin_enabled)
-        if tournament.is_started and new_checkin_enabled != tournament.checkin_enabled:
+        # the schedule and who may join only matter before the start: afterwards they stay as they were
+        if tournament.is_started and any(
+            key in update_data and not _same(update_data[key], getattr(tournament, key)) for key in BEFORE_START_ONLY
+        ):
             raise TournamentAlreadyStartedError()
 
         if "slug" in update_data:

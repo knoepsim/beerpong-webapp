@@ -42,15 +42,12 @@ export function TournamentScheduleFields({
   errors,
   onChange,
   disabled = false,
-  checkinLocked = false,
   idPrefix = "schedule",
 }: {
   values: ScheduleValues;
   errors: ScheduleErrors;
   onChange: (patch: Partial<ScheduleValues>) => void;
   disabled?: boolean;
-  /** Check-in can no longer be switched once the tournament has started. */
-  checkinLocked?: boolean;
   idPrefix?: string;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
@@ -119,7 +116,7 @@ export function TournamentScheduleFields({
             onCheckedChange={(checked) =>
               onChange({ checkin_enabled: checked, ...(checked ? {} : { checkin_start_time: "", checkin_auto_open: false }) })
             }
-            disabled={disabled || checkinLocked}
+            disabled={disabled}
           />
         </div>
 
@@ -136,7 +133,7 @@ export function TournamentScheduleFields({
                   checkin_auto_open: e.target.value ? values.checkin_auto_open || !values.checkin_start_time : false,
                 })
               }
-              disabled={disabled || checkinLocked}
+              disabled={disabled}
               aria-invalid={!!errors.checkin_start_time}
               aria-describedby={id("checkin-start-hint")}
             />
@@ -149,7 +146,7 @@ export function TournamentScheduleFields({
               label="Check-in zu dieser Zeit automatisch öffnen"
               checked={values.checkin_auto_open}
               hasTime={!!values.checkin_start_time}
-              disabled={disabled || checkinLocked}
+              disabled={disabled}
               onCheckedChange={(checked) => onChange({ checkin_auto_open: checked })}
             />
           </div>

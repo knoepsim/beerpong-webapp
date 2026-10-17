@@ -8,11 +8,15 @@ export interface AccessValues {
   join_policy: JoinPolicy;
 }
 
-/** The two questions about access: who sees the results and who may join. Shared by create dialog and settings. */
+/**
+ * The two questions about access: who sees the results and who may join (only while teams can join: `joinable`).
+ * Shared by create dialog and settings.
+ */
 export function AccessFields({
   values,
   onChange,
-}: Readonly<{ values: AccessValues; onChange: (patch: Partial<AccessValues>) => void }>) {
+  joinable = true,
+}: Readonly<{ values: AccessValues; onChange: (patch: Partial<AccessValues>) => void; joinable?: boolean }>) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -24,15 +28,17 @@ export function AccessFields({
           onChange={(visibility) => onChange({ visibility })}
         />
       </div>
-      <div className="space-y-2">
-        <Label>Beitreten</Label>
-        <OptionSelect
-          label="Beitreten"
-          options={JOIN_OPTIONS}
-          value={values.join_policy}
-          onChange={(join_policy) => onChange({ join_policy })}
-        />
-      </div>
+      {joinable && (
+        <div className="space-y-2">
+          <Label>Beitreten</Label>
+          <OptionSelect
+            label="Beitreten"
+            options={JOIN_OPTIONS}
+            value={values.join_policy}
+            onChange={(join_policy) => onChange({ join_policy })}
+          />
+        </div>
+      )}
     </div>
   );
 }
