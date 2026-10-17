@@ -119,3 +119,13 @@ jobs:
         with:
           context: ./apps/api
           push: false
+
+      # The self-hosted runner keeps what every build leaves behind: without this its disk fills up. Removes the
+      # untagged images of the dry runs and build cache older than a day (recent cache keeps the next builds fast);
+      # tagged images and containers of the host stay untouched. Runs also after a failed or cancelled build.
+      - name: Clean up images and build cache
+        if: always()
+        run: |
+          docker image prune --force
+          docker builder prune --all --force --filter "until=24h"
+          docker system df
