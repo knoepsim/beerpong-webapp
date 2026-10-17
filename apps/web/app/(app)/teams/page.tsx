@@ -15,7 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DeleteTeamDialog } from "@/components/delete-team-dialog";
+import { TeamDeleteBlockers } from "@/components/delete-team-dialog";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -36,8 +37,8 @@ export default function TeamsPage() {
   const [newName, setNewName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
-  const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [blockedTeam, setBlockedTeam] = useState<Team | null>(null);
+  const confirm = useConfirm();
 
   useEffect(() => {
     void loadTeams();
@@ -120,19 +121,24 @@ export default function TeamsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteTeam) return;
-    setIsDeleting(true);
-    try {
-      await api.teams.delete(deleteTeam.id);
-      setDeleteTeam(null);
-      await loadTeams();
-      toast.success("Team gelöscht.");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Das Team konnte nicht gelöscht werden. Versuch es noch einmal.");
-    } finally {
-      setIsDeleting(false);
+  // tournaments in the way: say which; otherwise ask with the consequences
+  const handleDelete = (team: Team) => {
+    if (team.delete_blockers.length > 0) {
+      setBlockedTeam(team);
+      return;
     }
+    void confirm({
+      title: `${team.name} löschen?`,
+      description:
+        "Das Team verschwindet aus deinen Teams und kann nicht wiederhergestellt werden. Beendete Turniere zeigen es weiter mit seinen Ergebnissen.",
+      confirmLabel: "Team löschen",
+      destructive: true,
+      action: async () => {
+        await api.teams.delete(team.id);
+        await loadTeams();
+        toast.success("Team gelöscht.");
+      },
+    });
   };
 
   if (isLoading) {
@@ -194,7 +200,7 @@ export default function TeamsPage() {
                 setNewName(team.name);
                 setRenameTeam(team);
               }}
-              onDelete={setDeleteTeam}
+              onDelete={handleDelete}
               onShare={handleShareInvite}
               onCopy={handleCopyInvite}
             />
@@ -231,12 +237,7 @@ export default function TeamsPage() {
         </DialogContent>
       </Dialog>
 
-      <DeleteTeamDialog
-        team={deleteTeam}
-        isDeleting={isDeleting}
-        onClose={() => setDeleteTeam(null)}
-        onDelete={() => void handleDelete()}
-      />
+      <TeamDeleteBlockers team={blockedTeam} onClose={() => setBlockedTeam(null)} />
 
     </div>
   );

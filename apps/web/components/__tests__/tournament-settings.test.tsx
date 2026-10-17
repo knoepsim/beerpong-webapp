@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { render } from '@/lib/test-fixtures/render';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
 import { api, ApiError } from '@/lib/api';
@@ -55,7 +56,9 @@ vi.mock('@/components/ui/tabs', () => {
       useContext(Ctx).value === value ? <div>{children}</div> : null,
   };
 });
-vi.mock('@/components/ui/alert-dialog', () => {
+// the global confirmation dialog loads it early: react is imported here, not from the top of the file
+vi.mock('@/components/ui/alert-dialog', async () => {
+  const { createContext, useContext } = await import('react');
   const Ctx = createContext<(open: boolean) => void>(() => {});
   return {
     AlertDialog: ({ open, onOpenChange, children }: { open: boolean; onOpenChange: (o: boolean) => void; children: ReactNode }) =>
@@ -519,17 +522,18 @@ describe('role management', () => {
   const revokeButtons = () =>
     screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'));
 
-  it('revokes a role after confirmation', async () => {
+  it('revokes a role after a confirmation that names the consequence', async () => {
     mocked.revoke.mockResolvedValue(undefined);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(revokeButtons()[1]);
-    expect(screen.getByText('Rolle wirklich entziehen?')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    expect(screen.getByText('Rolle entziehen?')).toBeInTheDocument();
+    expect(screen.getByText('Ref Reese kann das Turnier danach nicht mehr als Schiedsrichter leiten.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
 
     await waitFor(() => expect(mocked.revoke).toHaveBeenCalledWith('t1', 'r2'));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle erfolgreich entzogen.'));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle entzogen.'));
     expect(onReload).toHaveBeenCalled();
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
   it('can cancel the confirmation', () => {
@@ -542,13 +546,14 @@ describe('role management', () => {
 
   it.each([
     [new Error('Nicht erlaubt'), 'Nicht erlaubt'],
-    ['boom', 'Fehler'],
-  ])('reports revoke failures (%s)', async (error, message) => {
+    ['boom', 'Das hat nicht geklappt. Versuch es noch einmal.'],
+  ])('shows a failed revoke in the dialog (%s)', async (error, message) => {
     mocked.revoke.mockRejectedValue(error);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(revokeButtons()[0]);
-    fireEvent.click(screen.getByText('Bestätigen'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument(); // stays open to try again or cancel
   });
 });
 
@@ -558,24 +563,24 @@ describe('deleting the tournament', () => {
     fireEvent.click(screen.getByText('Turnier endgültig löschen'));
   };
 
-  it('deletes after confirmation and leaves the page', async () => {
+  it('deletes after a confirmation that names the consequences and leaves the page', async () => {
     mocked.remove.mockResolvedValue(undefined);
     open();
-    expect(screen.getByText(/unwiderruflich löschen/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    expect(screen.getByText('Summer Cup löschen?')).toBeInTheDocument();
+    expect(screen.getByText(/lässt sich nicht rückgängig machen/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier löschen' }));
 
     await waitFor(() => expect(mocked.remove).toHaveBeenCalledWith('t1'));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/tournaments'));
     expect(toast.success).toHaveBeenCalledWith('Turnier gelöscht.');
   });
 
-  it('re-enables the button when deleting fails', async () => {
-    mocked.remove.mockRejectedValue(new Error('x'));
+  it('keeps the dialog open with the reason when deleting fails', async () => {
+    mocked.remove.mockRejectedValue(new Error('Das Turnier läuft noch.'));
     open();
-    fireEvent.click(screen.getByText('Bestätigen'));
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier löschen' }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler beim Löschen des Turniers'));
-    expect(screen.getByText('Turnier endgültig löschen').closest('button')).toBeEnabled();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier läuft noch.');
     expect(push).not.toHaveBeenCalled();
   });
 });

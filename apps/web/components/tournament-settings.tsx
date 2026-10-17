@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { PublicUser, Tournament, TournamentUserRole } from "@/types";
 import { AccessFields } from "@/components/access-fields";
 import { InviteLinks } from "@/components/invite-links";
+import { useConfirm } from "@/components/confirm-dialog";
 import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -27,16 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 /** A group of settings with its own save button right below its fields (what belongs together is saved together). */
 function SettingsCard({
@@ -84,6 +75,7 @@ export function TournamentSettings({
   onReload: () => Promise<void>;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<PublicUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -91,14 +83,8 @@ export function TournamentSettings({
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<TournamentRoleType>(TournamentRoleType.REFEREE);
   const [isAssigning, setIsAssigning] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
 
-  const [confirmState, setConfirmState] = useState<{
-    title: string;
-    description?: string;
-    action: () => void;
-  } | null>(null);
 
   // Edit details form state
   const [editName, setEditName] = useState(tournament.name);
@@ -189,36 +175,32 @@ export function TournamentSettings({
     }
   };
 
-  const handleRevokeRole = (roleId: string) => {
-    setConfirmState({
-      title: "Rolle wirklich entziehen?",
+  const handleRevokeRole = (role: TournamentUserRole) => {
+    const who = role.user_name || "Diese Person";
+    void confirm({
+      title: "Rolle entziehen?",
+      description: `${who} kann das Turnier danach nicht mehr ${role.role === TournamentRoleType.REFEREE ? "als Schiedsrichter leiten" : "verwalten"}.`,
+      confirmLabel: "Rolle entziehen",
+      destructive: true,
       action: async () => {
-        try {
-          await api.roles.revoke(tournament.id, roleId);
-          await onReload();
-          toast.success("Rolle erfolgreich entzogen.");
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Fehler";
-          toast.error(msg);
-        }
-      }
+        await api.roles.revoke(tournament.id, role.id);
+        await onReload();
+        toast.success("Rolle entzogen.");
+      },
     });
   };
 
   const handleDeleteTournament = () => {
-    setConfirmState({
-      title: "Möchtest du dieses Turnier wirklich unwiderruflich löschen?",
+    void confirm({
+      title: `${tournament.name} löschen?`,
+      description: "Das Turnier mit allen Anmeldungen, Spielen und Ergebnissen ist danach für alle weg. Das lässt sich nicht rückgängig machen.",
+      confirmLabel: "Turnier löschen",
+      destructive: true,
       action: async () => {
-        setIsDeleting(true);
-        try {
-          await api.tournaments.delete(tournament.id);
-          toast.success("Turnier gelöscht.");
-          router.push("/tournaments");
-        } catch (err) {
-          toast.error("Fehler beim Löschen des Turniers");
-          setIsDeleting(false);
-        }
-      }
+        await api.tournaments.delete(tournament.id);
+        toast.success("Turnier gelöscht.");
+        router.push("/tournaments");
+      },
     });
   };
 
@@ -425,7 +407,7 @@ export function TournamentSettings({
                     <span className="text-xs text-muted-foreground uppercase">{r.role}</span>
                   </div>
                   {(userRole === TournamentRoleType.ADMIN || (userRole === TournamentRoleType.MANAGER && r.role === TournamentRoleType.REFEREE)) && (
-                    <Button variant="ghost" size="sm" onClick={() => handleRevokeRole(r.id)}>
+                    <Button variant="ghost" size="sm" onClick={() => handleRevokeRole(r)}>
                       <UserMinus className="h-4 w-4 text-destructive" />
                     </Button>
                   )}
@@ -445,25 +427,13 @@ export function TournamentSettings({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Button variant="destructive" onClick={handleDeleteTournament} disabled={isDeleting}>
+            <Button variant="destructive" onClick={handleDeleteTournament}>
               <Trash2 className="mr-2 h-4 w-4" /> Turnier endgültig löschen
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <AlertDialog open={!!confirmState} onOpenChange={(open) => !open && setConfirmState(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
-            {confirmState?.description && <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={() => confirmState?.action()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Bestätigen</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

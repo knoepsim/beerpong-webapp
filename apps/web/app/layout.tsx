@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 import { ThemeProvider } from "@/components/theme-provider";
 import { UserProvider } from "@/components/user-provider";
 import { QueryProvider } from "@/components/query-provider";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { Toaster } from "@/components/ui/sonner";
 
 export default function RootLayout({
@@ -40,7 +41,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <UserProvider>
-              {children}
+              <ConfirmProvider>{children}</ConfirmProvider>
             </UserProvider>
             <Toaster />
           </ThemeProvider>

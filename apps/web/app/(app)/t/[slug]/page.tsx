@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Schedule } from "@/components/schedule";
 import { ParticipantStatus } from "@/components/participant-status";
+import { useConfirm } from "@/components/confirm-dialog";
 import { TablesBoard } from "@/components/tables-board";
 import { PodiumCard } from "@/components/podium-card";
 import { MatchResultDialog } from "@/components/match-result-dialog";
@@ -31,16 +32,6 @@ import { MapPin, Calendar, Users, Trophy, Play, Share2 } from "lucide-react";
 import { Markdown } from "@/components/markdown";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -72,10 +63,9 @@ export default function TournamentDetailPage({
   const [errorCode, setErrorCode] = useState<number | null>(null);
 
   
-  const [isConfirmLoading, setIsConfirmLoading] = useState(false);
-  const [confirmState, setConfirmState] = useState<{title: string, description?: string, action: () => Promise<void>} | null>(null);
 
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const confirm = useConfirm();
 
   const [isStartingTournament, setIsStartingTournament] = useState(false);
   const [tab, setTab] = useState<TournamentTab>(() => tabFromParam(tabParam));
@@ -173,33 +163,30 @@ export default function TournamentDetailPage({
 
   const handleLeave = () => {
     if (!myTournamentTeam) return;
-    setConfirmState({
+    void confirm({
       title: "Turnier verlassen?",
       description: `${myTournamentTeam.name} wird vom Turnier abgemeldet. Solange die Anmeldung offen ist, kannst du wieder beitreten.`,
+      confirmLabel: "Turnier verlassen",
+      destructive: true,
       action: async () => {
-        try {
-          await api.tournaments.leave(tournamentId);
-          await loadData();
-          toast.success("Du hast das Turnier verlassen.");
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
-        }
-      }
+        await api.tournaments.leave(tournamentId);
+        await loadData();
+        toast.success("Du hast das Turnier verlassen.");
+      },
     });
   };
 
   const handleRemoveTeam = (teamId: string, teamName: string) => {
-    setConfirmState({
-      title: `Möchtest du das Team "${teamName}" wirklich aus dem Turnier entfernen?`,
+    void confirm({
+      title: `${teamName} aus dem Turnier entfernen?`,
+      description: "Das Team ist dann nicht mehr angemeldet. Seine Spieler können es wieder anmelden, solange die Anmeldung offen ist.",
+      confirmLabel: "Team entfernen",
+      destructive: true,
       action: async () => {
-        try {
-          await api.tournaments.removeTeam(tournamentId, teamId);
-          await loadData();
-          toast.success("Team entfernt");
-        } catch (err: unknown) {
-          toast.error("Fehler beim Entfernen des Teams");
-        }
-      }
+        await api.tournaments.removeTeam(tournamentId, teamId);
+        await loadData();
+        toast.success(`${teamName} entfernt`);
+      },
     });
   };
 
@@ -216,12 +203,25 @@ export default function TournamentDetailPage({
   };
 
   const handleSetOpen = async (kind: "registration" | "checkin", open: boolean) => {
-    try {
+    const apply = async () => {
       if (kind === "registration") await api.tournaments.setRegistrationOpen(tournamentId, open);
       else await api.tournaments.setCheckinOpen(tournamentId, open);
       await loadData();
+    };
+    // opening the check-in has a consequence at the start: ask once; everything else is switched right away
+    if (kind === "checkin" && open) {
+      void confirm({
+        title: "Check-in öffnen?",
+        description: "Teams können sich ab jetzt vor Ort einchecken. Wer beim Turnierstart nicht eingecheckt ist, wird entfernt.",
+        confirmLabel: "Check-in öffnen",
+        action: apply,
+      });
+      return;
+    }
+    try {
+      await apply();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuche es noch einmal.");
+      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
     }
   };
 
@@ -232,9 +232,10 @@ export default function TournamentDetailPage({
       toast.error(plan.description);
       return;
     }
-    setConfirmState({
+    void confirm({
       title: "Turnier jetzt starten?",
-      description: tournament.registration_open ? `${plan.description} Die Anmeldung wird geschlossen.` : plan.description,
+      description: `${tournament.registration_open ? `${plan.description} Die Anmeldung wird geschlossen.` : plan.description} Der Spielplan wird ausgelost; danach können keine Teams mehr dazukommen.`,
+      confirmLabel: "Turnier starten",
       action: async () => {
         setIsStartingTournament(true);
         try {
@@ -245,8 +246,6 @@ export default function TournamentDetailPage({
               ? `Turnier gestartet. ${result.removed_team_ids.length} Team(s) ohne Check-in entfernt.`
               : "Turnier gestartet",
           );
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : "Fehler beim Turnierstart");
         } finally {
           setIsStartingTournament(false);
         }
@@ -562,29 +561,6 @@ export default function TournamentDetailPage({
         />
       )}
 
-      <AlertDialog open={!!confirmState} onOpenChange={(open) => !open && setConfirmState(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmState?.title}</AlertDialogTitle>
-            {confirmState?.description && <AlertDialogDescription>{confirmState?.description}</AlertDialogDescription>}
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction disabled={isConfirmLoading} onClick={async (e) => {
-              e.preventDefault();
-              setIsConfirmLoading(true);
-              try {
-                await confirmState?.action();
-                setConfirmState(null);
-              } finally {
-                setIsConfirmLoading(false);
-              }
-            }}>
-              {isConfirmLoading ? "Lädt..." : "Bestätigen"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

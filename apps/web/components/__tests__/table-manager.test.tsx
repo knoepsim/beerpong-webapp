@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { render } from '@/lib/test-fixtures/render'
 import { TableManager } from '../table-manager'
 import { api } from '@/lib/api'
 import type { TournamentTable } from '@/types'
