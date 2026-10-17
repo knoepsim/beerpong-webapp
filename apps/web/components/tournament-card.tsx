@@ -16,7 +16,8 @@ const ROLE_LABELS: Record<TournamentRoleType, string> = {
 
 const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
-const WEEKDAY_TIME = new Intl.DateTimeFormat("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+// the date tile names the day already: the text adds only the time
+const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 
 /** The date of the tournament as a small calendar tile: the first thing the eye looks for in an event list. */
 function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase }>) {
@@ -79,7 +80,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
         </h4>
 
         <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-          <span>{WEEKDAY_TIME.format(new Date(when))} Uhr</span>
+          <span>{TIME.format(new Date(when))} Uhr</span>
           {t.location && (
             <>
               <span aria-hidden="true">·</span>

@@ -22,6 +22,7 @@ import { phaseLabel, planStart } from "@/lib/tournament-phase";
 import { formatWhen } from "@/lib/format-when";
 import { useTournamentLive, type LiveScope } from "@/hooks/use-tournament-live";
 import { highestRole } from "@/lib/roles";
+import { tabFromParam, tabQuery, type TournamentTab } from "@/lib/tournament-tabs";
 import { PreparationControls } from "@/components/preparation-controls";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -42,8 +43,15 @@ import {
 import { RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export default function TournamentDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default function TournamentDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const { slug } = use(params);
+  const { tab: tabParam } = use(searchParams);
   const router = useRouter();
   const { user } = useCurrentUser();
 
@@ -69,7 +77,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
 
   const [isStartingTournament, setIsStartingTournament] = useState(false);
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState<TournamentTab>(() => tabFromParam(tabParam));
+  // the tab is part of the address: reload, back and shared links keep it (replace: tabs are no history steps)
+  const changeTab = (next: string) => {
+    const value = next as TournamentTab;
+    setTab(value);
+    window.history.replaceState(null, "", `${window.location.pathname}${tabQuery(value)}`);
+  };
 
   
 
@@ -326,6 +340,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
     );
   }
 
+  // a tab that is not there for me (tables before the start, settings without the role) shows the overview
+  const shownTab: TournamentTab =
+    (tab === "tables" && !bracket) || (tab === "admin" && !canManage) ? "overview" : tab;
   const matchTeamA = selectedMatch?.team_a_id ? teamsMap[selectedMatch.team_a_id] : undefined;
   const matchTeamB = selectedMatch?.team_b_id ? teamsMap[selectedMatch.team_b_id] : undefined;
 
@@ -335,27 +352,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">{tournament.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{tournament.name}</h1>
               {tournament.join_policy === JoinPolicy.OPEN && (
                 <Button variant="ghost" size="icon" onClick={handleShare} className="h-8 w-8" title="Turnier teilen">
                   <Share2 className="h-4 w-4 text-muted-foreground" />
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
               <Badge variant={tournament.phase === "running" ? "default" : "secondary"}>
                 {phaseLabel(tournament.phase)}
               </Badge>
               {tournament.start_time && (
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> 
-                  {new Date(tournament.start_time).toLocaleString("de-DE", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit"
-                  })} Uhr
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  {formatWhen(tournament.start_time)}
                 </span>
               )}
               {tournament.location && (
@@ -383,9 +394,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
         slug={slug}
         onJoined={loadData}
         onLeave={handleLeave}
+        compact={shownTab !== "overview"}
       />
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
+      <Tabs value={shownTab} onValueChange={changeTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
@@ -396,7 +408,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ slu
           <Button
             variant="outline"
             className={cn("mt-2 h-11 w-full", tab === "admin" && "border-primary bg-primary/10 text-primary")}
-            onClick={() => setTab("admin")}
+            onClick={() => changeTab("admin")}
             aria-pressed={tab === "admin"}
           >
             <ShieldAlert aria-hidden="true" />

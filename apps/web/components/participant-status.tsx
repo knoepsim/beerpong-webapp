@@ -23,15 +23,19 @@ const VARIANTS: Record<StatusTone, "error" | "warning" | "info" | "default" | "s
   done: "success",
 };
 
-function StatusCard({ status, children }: Readonly<{ status: MyStatus; children?: ReactNode }>) {
+function StatusCard({
+  status,
+  compact = false,
+  children,
+}: Readonly<{ status: MyStatus; compact?: boolean; children?: ReactNode }>) {
   const Icon = STATUS_ICONS[status.icon];
   return (
     // a lasting state, announced politely (not role="alert", which interrupts)
-    <Alert variant={VARIANTS[status.tone]} role="status" className="gap-x-3 rounded-xl px-4 py-3">
-      <Icon className="size-5" aria-hidden="true" />
+    <Alert variant={VARIANTS[status.tone]} role="status" className={compact ? "gap-x-2 rounded-xl px-3 py-2" : "gap-x-3 rounded-xl px-4 py-3"}>
+      <Icon className={compact ? "size-4" : "size-5"} aria-hidden="true" />
       <AlertTitle className="font-semibold leading-snug text-balance">{status.title}</AlertTitle>
-      {status.detail && <AlertDescription>{status.detail}</AlertDescription>}
-      {children && <div className="col-span-full mt-3 space-y-2">{children}</div>}
+      {!compact && status.detail && <AlertDescription>{status.detail}</AlertDescription>}
+      {!compact && children && <div className="col-span-full mt-3 space-y-2">{children}</div>}
     </Alert>
   );
 }
@@ -47,6 +51,8 @@ interface ParticipantStatusProps {
   slug: string;
   onJoined: () => void | Promise<void>;
   onLeave: () => void;
+  /** One line only (on the other tabs): the sentence stays, details, match and actions are on the overview. */
+  compact?: boolean;
 }
 
 /**
@@ -62,6 +68,7 @@ export function ParticipantStatus({
   slug,
   onJoined,
   onLeave,
+  compact = false,
 }: Readonly<ParticipantStatusProps>) {
   const slots = useMemo(() => (bracket ? allMatchSlots(buildBracketLayout(bracket)) : []), [bracket]);
   const now = useNow();
@@ -95,7 +102,7 @@ export function ParticipantStatus({
   if (!status) return null;
 
   return (
-    <StatusCard status={status}>
+    <StatusCard status={status} compact={compact}>
       {status.slot && <MatchRow slot={status.slot} teamsMap={teamsMap} highlightTeamId={team.id} />}
       {tournament.registration_open && (
         <Button variant="ghost" size="sm" onClick={onLeave} className="-ml-2 gap-1.5 text-muted-foreground">
