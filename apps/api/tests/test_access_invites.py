@@ -101,19 +101,31 @@ async def test_links_are_created_named_counted_and_deleted(ctx: Ctx):
     assert created.status_code == 201
     link = created.json()
     assert len(link["token"]) == 7
-    assert (link["label"], link["uses"]) == ("WhatsApp", 0)
+    assert (link["label"], link["opened"], link["joined"], link["deleted"]) == ("WhatsApp", 0, 0, False)
 
-    assert (await ctx.join(tid, 0, link["token"])).status_code == 201
-    assert (await ctx.join(tid, 1, link["token"])).status_code == 201
-    counted = {i["token"]: i["uses"] for i in await ctx.invites(tid)}
-    assert counted[link["token"]] == 2
+    # two accounts open the link, one of them joins with the invitation it got
+    for player in (ctx.players[0], ctx.players[2]):
+        assert (await ctx.client.post(f"/invites/{link['token']}/accept", headers=player)).status_code == 200
+    invitation = (await ctx.client.get("/invitations", headers=ctx.players[0])).json()[0]
+    accepted = await ctx.client.post(
+        f"/invitations/{invitation['id']}/accept", json={"team_id": ctx.team_ids[0]}, headers=ctx.players[0]
+    )
+    assert accepted.status_code == 200, accepted.text
+    counted = {i["token"]: (i["opened"], i["joined"]) for i in await ctx.invites(tid)}
+    assert counted[link["token"]] == (2, 1)
 
     deleted = await ctx.client.delete(f"/tournaments/{tid}/invites/{link['id']}", headers=ctx.admin)
     assert deleted.status_code == 204
-    assert link["token"] not in {i["token"] for i in await ctx.invites(tid)}
+    kept = next(i for i in await ctx.invites(tid) if i["token"] == link["token"])
+    assert kept["deleted"] and (kept["opened"], kept["joined"]) == (2, 1), "a deleted link keeps what it brought"
     assert (await ctx.client.get(f"/invites/{link['token']}")).status_code == 404
+    assert (await ctx.client.post(f"/invites/{link['token']}/accept", headers=ctx.outsider)).status_code == 404, (
+        "a deleted link does not invite anybody any more"
+    )
+    still_open = (await ctx.client.get("/invitations", headers=ctx.players[2])).json()
+    assert len(still_open) == 1, "open invitations stay when their link is deleted"
     teams = await ctx.client.get(f"/tournaments/{tid}/teams", headers=ctx.admin)
-    assert len(teams.json()) == 2, "teams that joined with the link stay"
+    assert len(teams.json()) == 1, "teams that joined with the link stay"
 
 
 @pytest.mark.asyncio
@@ -137,7 +149,8 @@ async def test_a_link_shows_what_a_stranger_needs_to_decide_and_nothing_else(ctx
     assert resp.status_code == 200
     assert set(resp.json()) == {
         "tournament_id", "slug", "name", "location", "start_time", "registration_open", "join_policy",
-    }
+        "description", "phase", "team_count", "registration_end_time",
+    }, "the tournament and how many teams, nothing about who plays"
     assert resp.json()["name"] == "Sommerfest"
     assert (await ctx.client.get("/invites/unknown")).status_code == 404
 

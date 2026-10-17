@@ -10,7 +10,7 @@ from app.core.slug import random_slug
 
 
 class TournamentInvite(Base):
-    """An invitation link /invite/{token}: whoever opens it may join the tournament with a team."""
+    """An invitation link /invite/{token}: whoever opens it while logged in gets a personal invitation."""
 
     __tablename__ = "tournament_invites"
 
@@ -20,3 +20,5 @@ class TournamentInvite(Base):
     label: Mapped[str | None] = mapped_column(String(60), nullable=True)
     created_by_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # a deleted link does not work any more, but stays with the invitations it brought (shown as deleted)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

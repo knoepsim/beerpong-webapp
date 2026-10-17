@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
@@ -69,20 +69,28 @@ class UserService:
 
 
     async def search_users(self, query: str) -> list[User]:
-        """Search users by name (substring) or by a complete German mobile number (exact).
+        """Search users by name (substring), a complete German mobile number or a complete e-mail address (exact).
 
-        Partial phone numbers are deliberately not matched, otherwise the endpoint could be
-        used to enumerate phone numbers.
+        Partial phone numbers and addresses are deliberately not matched, otherwise the endpoint could be
+        used to enumerate them.
         """
-        try:
-            condition = User.phone_number == normalize_german_mobile(query)
-        except ValueError:
-            escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            condition = User.name.ilike(f"%{escaped}%", escape="\\")
-        result = await self.db.execute(select(User).where(condition).order_by(User.name).limit(10))
+        query = query.strip()
+        result = await self.db.execute(select(User).where(_search_condition(query)).order_by(User.name).limit(10))
         return list(result.scalars().all())
 
 
+
+
+def _search_condition(query: str):
+    """A whole phone number or e-mail address finds exactly that person, anything else is a part of a name."""
+    try:
+        return User.phone_number == normalize_german_mobile(query)
+    except ValueError:
+        pass
+    if "@" in query:
+        return func.lower(User.email) == query.lower()
+    escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return User.name.ilike(f"%{escaped}%", escape="\\")
 
 
 def get_user_service(db: DbSession) -> UserService:
