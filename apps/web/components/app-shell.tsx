@@ -3,22 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Trophy, Users, UserCircle, LogOut, Wrench } from "lucide-react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useCurrentUser } from "@/hooks/queries/user";
 import { useMyInvitations } from "@/hooks/queries/invitations";
+import { useMyTournaments } from "@/hooks/queries/tournaments";
+import { groupTournaments, mergeMyTournaments } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/auth";
 
-/** The number of open invitations; for screen readers as words. */
-function NavBadge({ count, floating = false }: Readonly<{ count: number; floating?: boolean }>) {
-  if (count === 0) return null;
+/** A dot: there is something to look at (an open invitation, a tournament that runs); for screen readers in words. */
+function NavDot({ label, floating = false }: Readonly<{ label: string | null; floating?: boolean }>) {
+  if (!label) return null;
   return (
-    <span
-      className={`min-w-4 rounded-full bg-destructive px-1 text-center text-[10px] font-semibold leading-4 text-white tabular-nums ${floating ? "absolute -top-1.5 -right-2.5" : ""}`}
-    >
-      {count}
-      <span className="sr-only">{count === 1 ? " offene Einladung" : " offene Einladungen"}</span>
+    <span className={`size-2.5 rounded-full bg-destructive ${floating ? "absolute -top-0.5 -right-1" : ""}`}>
+      <span className="sr-only">{label}</span>
     </span>
   );
 }
@@ -33,9 +32,14 @@ const navItems = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading } = useCurrentUser();
-  // open invitations wait in "Meine Turniere": their number at "Turniere"
-  const openInvitations = useMyInvitations({ enabled: !!user }).data?.length ?? 0;
-  const badgeFor = (href: string) => (href === "/tournaments" ? openInvitations : 0);
+  // a dot at "Turniere" while an invitation waits there or a tournament of mine runs
+  const hasInvitations = (useMyInvitations({ enabled: !!user }).data?.length ?? 0) > 0;
+  const mine = useMyTournaments({ enabled: !!user }).data;
+  const hasRunning = useMemo(() => !!mine && groupTournaments(mergeMyTournaments(mine)).active.length > 0, [mine]);
+  let tournamentsDot: string | null = null;
+  if (hasInvitations) tournamentsDot = "Offene Einladung";
+  else if (hasRunning) tournamentsDot = "Turnier läuft";
+  const dotFor = (href: string) => (href === "/tournaments" ? tournamentsDot : null);
   const isActiveItem = (item: (typeof navItems)[number]) =>
     pathname.startsWith(item.href) || (!!item.also && pathname.startsWith(item.also));
   // somebody without login (a spectator on a public tournament) only has the page in front of him: no app navigation
@@ -77,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
-                  <NavBadge count={badgeFor(item.href)} />
+                  <NavDot label={dotFor(item.href)} />
                 </Link>
               );
             })}
@@ -139,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <span className="relative">
                   <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
-                  <NavBadge count={badgeFor(item.href)} floating />
+                  <NavDot label={dotFor(item.href)} floating />
                 </span>
                 {item.label}
               </Link>

@@ -6,8 +6,9 @@ import type { Tournament, TournamentCreateRequest, TournamentStartResponse, Tour
 
 // -- lists and lookups
 
-export function useMyTournaments() {
-  return useQuery({ queryKey: queryKeys.myTournaments, queryFn: api.tournaments.getMyTournaments });
+/** `enabled: false` while nobody is logged in. */
+export function useMyTournaments({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: queryKeys.myTournaments, queryFn: api.tournaments.getMyTournaments, enabled });
 }
 
 export function useTournamentBySlug(slug: string) {

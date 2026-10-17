@@ -133,10 +133,7 @@ export default function TournamentsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6 pb-4 space-y-10">
             <div className="space-y-4">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Trophy className="h-6 w-6 text-primary" />
-          Meine Turniere
-        </h2>
+        <h2 className="text-2xl font-bold">Meine Turniere</h2>
         {tournamentsQuery.isError && (
           <LoadError
             error={tournamentsQuery.error}

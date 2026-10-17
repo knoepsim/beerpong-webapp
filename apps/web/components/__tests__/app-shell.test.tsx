@@ -6,6 +6,7 @@ import { AppShell } from '../app-shell';
 const usePathname = vi.fn();
 const useCurrentUser = vi.fn();
 const useMyInvitations = vi.fn();
+const useMyTournaments = vi.fn();
 
 vi.mock('next/navigation', () => ({ usePathname: () => usePathname() }));
 vi.mock('next/link', () => ({
@@ -15,6 +16,7 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }));
 vi.mock('@/hooks/queries/invitations', () => ({ useMyInvitations: () => useMyInvitations() }));
+vi.mock('@/hooks/queries/tournaments', () => ({ useMyTournaments: () => useMyTournaments() }));
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <button>{children}</button>,
@@ -29,19 +31,32 @@ describe('AppShell', () => {
     usePathname.mockReturnValue('/teams');
     useCurrentUser.mockReturnValue({ user: { name: 'Ada', is_system_admin: false } });
     useMyInvitations.mockReturnValue({ data: [] });
+    useMyTournaments.mockReturnValue({ data: undefined });
   });
 
-  it('shows the number of open invitations at "Turniere" and keeps it active on an invitation', () => {
+  it('marks "Turniere" with a dot while an invitation waits, and keeps it active on an invitation', () => {
     useMyInvitations.mockReturnValue({ data: [{ id: 'i1' }, { id: 'i2' }] });
     usePathname.mockReturnValue('/invitations/i1');
     render(<AppShell><p>content</p></AppShell>);
 
-    expect(screen.getAllByText('offene Einladungen', { exact: false })).toHaveLength(2);
+    expect(screen.getAllByText('Offene Einladung')).toHaveLength(2); // desktop + mobile, no number
+    expect(screen.queryByText('2')).not.toBeInTheDocument();
     for (const link of screen.getAllByRole('link', { name: /Turniere/ })) {
       expect(link.className).toMatch(/text-primary/);
     }
   });
-  afterEach(() => vi.unstubAllGlobals());
+
+  it('marks "Turniere" while a tournament of mine runs, and not without', () => {
+    const running = { tournament: { id: 't1', started_at: '2026-10-17T18:00:00Z', finished_at: null } };
+    useMyTournaments.mockReturnValue({ data: { participating: [running], managing: [] } });
+    const { unmount } = render(<AppShell><p>content</p></AppShell>);
+    expect(screen.getAllByText('Turnier läuft')).toHaveLength(2);
+    unmount();
+
+    useMyTournaments.mockReturnValue({ data: { participating: [], managing: [] } });
+    render(<AppShell><p>content</p></AppShell>);
+    expect(screen.queryByText('Turnier läuft')).not.toBeInTheDocument();
+  });
 
   it('renders navigation, user name and children', () => {
     render(<AppShell><p>content</p></AppShell>);
