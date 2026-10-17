@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { fiveTeamBracket, fiveTeams } from '@/lib/test-fixtures/bracket'
 import type { TournamentTable } from '@/types'
 
-vi.mock('@/lib/api', () => ({ api: { matches: { start: vi.fn() } } }))
+vi.mock('@/lib/api', () => ({ api: { matches: { start: vi.fn(), undoStart: vi.fn() } } }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const tables: TournamentTable[] = [
@@ -17,7 +17,10 @@ const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString(
 const card = (name: string) => screen.getByRole('heading', { name }).closest('li')!
 
 describe('TablesBoard', () => {
-  beforeEach(() => vi.mocked(api.matches.start).mockReset().mockResolvedValue(undefined))
+  beforeEach(() => {
+    vi.mocked(api.matches.start).mockReset().mockResolvedValue(undefined)
+    vi.mocked(api.matches.undoStart).mockReset().mockResolvedValue(undefined)
+  })
 
   it('shows every table with its match and since when, free tables as free', () => {
     const bracket = fiveTeamBracket({
@@ -54,6 +57,17 @@ describe('TablesBoard', () => {
     fireEvent.click(within(card('Tisch 2')).getByRole('button', { name: 'Spiel starten' }))
     await waitFor(() => expect(api.matches.start).toHaveBeenCalledWith('m3'))
     expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('takes the start of a live match back with a small stop button', async () => {
+    const onChanged = vi.fn()
+    const bracket = fiveTeamBracket({ m1: { status: 'live', started_at: minutesAgo(3) } })
+    render(<TablesBoard bracket={bracket} tables={tables} teamsMap={fiveTeams} onResult={vi.fn()} onChanged={onChanged} />)
+
+    fireEvent.click(within(card('Tisch 1')).getByRole('button', { name: 'Start an Tisch 1 zurücknehmen' }))
+    await waitFor(() => expect(api.matches.undoStart).toHaveBeenCalledWith('m1'))
+    expect(onChanged).toHaveBeenCalled()
+    expect(within(card('Tisch 2')).queryByRole('button', { name: /zurücknehmen/ })).not.toBeInTheDocument() // only when live
   })
 
   it('keeps the queue closed until asked for', () => {

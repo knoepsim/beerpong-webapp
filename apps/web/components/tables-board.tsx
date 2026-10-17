@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, MapPin, Play, TriangleAlert } from "lucide-react";
+import { ChevronDown, MapPin, Play, Square, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -52,15 +52,16 @@ function TableCard({
   const late =
     match?.status === "ready" && !!match.on_table_at && minutesSince(match.on_table_at, now) >= NOT_STARTED_WARNING_MINUTES;
 
-  const start = async () => {
+  /** Start the match at the table, or take the start back (a slip happens under time pressure). */
+  const setStarted = async (started: boolean) => {
     if (!match) return;
     setStarting(true);
     try {
-      await api.matches.start(match.id);
-      toast.success(`Spiel ${slot?.number} an ${table.name} gestartet`);
+      await (started ? api.matches.start(match.id) : api.matches.undoStart(match.id));
+      toast.success(started ? `Spiel ${slot?.number} an ${table.name} gestartet` : `Start an ${table.name} zurückgenommen`);
       await onChanged();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Das Spiel konnte nicht gestartet werden. Versuch es noch einmal.");
+      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
     } finally {
       setStarting(false);
     }
@@ -93,9 +94,23 @@ function TableCard({
       {onResult && match && (
         <div className="flex gap-2">
           {match.status === "ready" && (
-            <Button variant="outline" className="h-10 flex-1 gap-1.5" onClick={start} disabled={starting}>
+            <Button variant="outline" className="h-10 flex-1 gap-1.5" onClick={() => setStarted(true)} disabled={starting}>
               <Play className="size-4 fill-current" aria-hidden="true" />
               {starting ? "Wird gestartet…" : "Spiel starten"}
+            </Button>
+          )}
+          {match.status === "live" && (
+            // small and without a word: the result is the main action of a live match
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-10 shrink-0"
+              onClick={() => setStarted(false)}
+              disabled={starting}
+              aria-label={`Start an ${table.name} zurücknehmen`}
+              title="Start zurücknehmen"
+            >
+              <Square className="size-4 fill-current" aria-hidden="true" />
             </Button>
           )}
           <Button
