@@ -111,7 +111,7 @@ class TableService:
         )
         table = result.scalar_one_or_none()
         if table is None:
-            raise NotFoundError("Table")
+            raise NotFoundError("Tisch")
         return table
 
     @staticmethod

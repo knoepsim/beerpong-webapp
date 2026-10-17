@@ -163,7 +163,7 @@ async def get_tournament_by_slug(
         return await service.get_tournament_for_user(tournament.id, viewer.id if viewer else None)
     except HTTPException:
         # a private tournament does not say that it exists
-        raise NotFoundError("Tournament") from None
+        raise NotFoundError("Turnier") from None
 
 
 @router.get(
@@ -176,7 +176,7 @@ async def get_tournament_by_slug(
 async def get_tournament_preview(slug: str, db: DbSession):
     tournament = await TournamentService(db).get_tournament_by_slug(slug)
     if tournament.join_policy != JoinPolicy.OPEN:
-        raise NotFoundError("Tournament")
+        raise NotFoundError("Turnier")
     return preview_of(tournament)
 
 

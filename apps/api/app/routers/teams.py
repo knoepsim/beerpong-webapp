@@ -62,7 +62,7 @@ async def get_team(
 async def _ensure_is_member(db: AsyncSession, team_id: UUID, user_id: UUID):
     members = await TeamService(db).get_team_members(team_id)
     if not any(m.user_id == user_id for m in members):
-        raise HTTPException(status_code=403, detail="Only team members can perform this action.")
+        raise HTTPException(status_code=403, detail="Das können nur Spieler dieses Teams.")
 
 
 @router.patch(

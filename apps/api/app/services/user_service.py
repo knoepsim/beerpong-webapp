@@ -21,7 +21,7 @@ class UserService:
         result = await self.db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user is None:
-            raise NotFoundError("User")
+            raise NotFoundError("Nutzer")
         return user
 
 

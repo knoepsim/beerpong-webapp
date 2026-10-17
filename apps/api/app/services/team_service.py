@@ -122,7 +122,7 @@ class TeamService:
             select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
         )
         if result.scalar_one_or_none() is None:
-            raise NotFoundError("Team membership")
+            raise NotFoundError("Teammitgliedschaft")
 
         invite = TeamInvite(
             team_id=team_id,

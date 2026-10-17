@@ -57,6 +57,7 @@ export function MatchResultDialog({
   // tapping the winner puts the cursor into its cups field (on a phone the number pad opens right away);
   // opening an existing result does not
   const [winnerTapped, setWinnerTapped] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [cupsLeft, setCupsLeft] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -73,6 +74,7 @@ export function MatchResultDialog({
       setWinnerId(null);
       setCupsLeft("");
       setWinnerTapped(false);
+      setConfirmDelete(false);
       setError(null);
       setExistingResult(null);
       setNextMatchHasResult(false);
@@ -178,6 +180,11 @@ export function MatchResultDialog({
     existingResult.winner_team_id !== winnerId ||
     String(existingResult.cups_left ?? DEFAULT_CUPS) !== (cupsLeft.trim() || String(DEFAULT_CUPS));
 
+  const savedWinner = existingResult?.winner_team_id === teamA.id ? teamA.name : teamB.name;
+  const deleteConsequence = nextMatchId
+    ? `${savedWinner} wird aus dem nächsten Spiel wieder entfernt, das Spiel ist wieder offen.`
+    : "Das Finale ist wieder offen, das Turnier gilt nicht mehr als beendet.";
+
   // the cups are optional: empty means all cups left (the placeholder)
   const isValid = winnerId !== null;
 
@@ -217,12 +224,8 @@ export function MatchResultDialog({
               </div>
             </div>
 
-            {/* Score display */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-2xl font-bold tabular-nums text-red-500">10</span>
-              <span className="text-lg text-muted-foreground font-light">:</span>
-              <span className="text-2xl font-bold tabular-nums text-blue-500">10</span>
-            </div>
+            {/* no score here: the table below shows the cups */}
+            <span className="shrink-0 text-xs text-muted-foreground">gegen</span>
 
             {/* Team B */}
             <div className="flex-1 min-w-0 text-left">
@@ -422,21 +425,40 @@ export function MatchResultDialog({
                     Abbrechen
                   </Button>
                   <Button onClick={handleSubmit} disabled={!isValid || !hasChanges || isSubmitting || nextMatchHasResult} className="flex-1">
-                    {isSubmitting ? "Wird gespeichert..." : existingResult ? "Überschreiben" : "Speichern"}
+                    {isSubmitting ? "Wird gespeichert..." : existingResult ? "Ergebnis ändern" : "Ergebnis speichern"}
                   </Button>
                 </div>
-                {existingResult && (
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleDelete}
-                    disabled={isDeleting || nextMatchHasResult}
-                    className="w-full"
-                  >
-                    {isDeleting ? "Wird gelöscht..." : "Ergebnis löschen"}
-                  </Button>
-                )}
               </div>
+
+              {/* deleting is far from the primary action and asks first, naming what happens */}
+              {existingResult && !nextMatchHasResult && (
+                <div className="mt-6 border-t pt-3">
+                  {confirmDelete ? (
+                    <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      <p className="font-medium">Ergebnis löschen?</p>
+                      <p className="text-muted-foreground">{deleteConsequence}</p>
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" className="flex-1" onClick={() => setConfirmDelete(false)} disabled={isDeleting}>
+                          Abbrechen
+                        </Button>
+                        <Button type="button" variant="destructive" className="flex-1" onClick={handleDelete} disabled={isDeleting}>
+                          {isDeleting ? "Wird gelöscht..." : "Ergebnis löschen"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full text-destructive hover:text-destructive"
+                    >
+                      Ergebnis löschen
+                    </Button>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

@@ -105,7 +105,7 @@ class TournamentService:
         )
         tournament = result.scalar_one_or_none()
         if tournament is None:
-            raise NotFoundError("Tournament")
+            raise NotFoundError("Turnier")
         return tournament
 
     async def get_tournament(self, tournament_id: UUID, *, for_update: bool = False) -> Tournament:
@@ -116,7 +116,7 @@ class TournamentService:
         """
         tournament = await tournament_repository.get_by_id(self.db, tournament_id, for_update=for_update)
         if tournament is None:
-            raise NotFoundError("Tournament")
+            raise NotFoundError("Turnier")
         if tournament.is_deleted:
             raise TournamentDeletedError()
         return tournament
@@ -148,7 +148,7 @@ class TournamentService:
             return tournament
         if await self.is_involved(tournament_id, user_id):
             return tournament
-        raise HTTPException(status_code=403, detail="You do not have access to this private tournament.")
+        raise HTTPException(status_code=403, detail="Dieses Turnier ist privat. Du hast keinen Zugriff.")
 
 
     @staticmethod
@@ -331,7 +331,7 @@ class TournamentService:
         team = result.scalar_one_or_none()
 
         if not team:
-            raise HTTPException(status_code=400, detail="User is not part of this tournament.")
+            raise HTTPException(status_code=400, detail="Du spielst in diesem Turnier nicht mit.")
 
         await self.db.execute(
             delete(TournamentTeam)
@@ -354,7 +354,7 @@ class TournamentService:
             )
         )
         if result.rowcount == 0:
-            raise HTTPException(status_code=400, detail="Team is not part of this tournament.")
+            raise HTTPException(status_code=400, detail="Dieses Team spielt in diesem Turnier nicht mit.")
         await bump(self.db, tournament_id, "teams")
 
 
@@ -380,7 +380,7 @@ class TournamentService:
         
         if not tournament_team:
             from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Team is not in this tournament.")
+            raise HTTPException(status_code=404, detail="Dieses Team spielt in diesem Turnier nicht mit.")
             
         tournament_team.is_checked_in = is_checked_in
         await bump(self.db, tournament_id, "teams")

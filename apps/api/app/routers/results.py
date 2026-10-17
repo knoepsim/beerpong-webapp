@@ -26,7 +26,7 @@ async def _get_match(db: AsyncSession, match_id: UUID) -> Match:
     result = await db.execute(select(Match).where(Match.id == match_id))
     match = result.scalar_one_or_none()
     if match is None:
-        raise NotFoundError("Match")
+        raise NotFoundError("Spiel")
     return match
 
 

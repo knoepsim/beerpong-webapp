@@ -80,7 +80,7 @@ class InviteService:
             )
         ).scalar_one_or_none()
         if invite is None:
-            raise NotFoundError("Invite")
+            raise NotFoundError("Einladung")
         await self.db.delete(invite)
 
     async def find(self, tournament_id: UUID, token: str | None) -> TournamentInvite | None:
@@ -103,5 +103,5 @@ class InviteService:
         )
         tournament = row.scalar_one_or_none()
         if tournament is None:
-            raise NotFoundError("Invite")
+            raise NotFoundError("Einladung")
         return preview_of(tournament)
