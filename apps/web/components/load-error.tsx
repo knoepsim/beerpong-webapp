@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { ErrorAlert } from "@/components/error-alert";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/errors";
 
@@ -11,12 +12,11 @@ export function LoadError({
   onRetry,
 }: Readonly<{ error: unknown; fallback: string; onRetry: () => void }>) {
   return (
-    <div role="alert" className="flex flex-col items-center gap-3 rounded-xl border border-destructive/40 p-6 text-center">
-      <p className="text-sm text-destructive">{errorMessage(error, fallback)}</p>
+    <ErrorAlert message={errorMessage(error, fallback)}>
       <Button variant="outline" onClick={onRetry}>
         <RefreshCw aria-hidden="true" />
         Erneut versuchen
       </Button>
-    </div>
+    </ErrorAlert>
   );
 }

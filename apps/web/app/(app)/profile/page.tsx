@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { errorMessage } from "@/lib/errors";
+import { Skeleton } from "@/components/ui/skeleton";
 import { logout } from "@/lib/auth";
 import { useCurrentUser, useRequestPhoneChange, useUpdateMe, useVerifyPhoneChange } from "@/hooks/queries/user";
 import { useTheme } from "next-themes";
@@ -131,7 +132,13 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    return <div className="p-8 text-center animate-pulse">Lade Profil…</div>;
+    return (
+      <div className="mx-auto max-w-xl space-y-6 px-4 pt-6">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-36 w-full rounded-xl" />
+      </div>
+    );
   }
 
   // Check if profile values changed to disable save button
@@ -140,7 +147,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 pt-6 pb-20 md:pb-6 space-y-6">
-      <h1 className="text-2xl font-bold">Einstellungen</h1>
+      <h1 className="text-2xl font-bold">Profil</h1>
 
       <Card>
         <CardHeader>
@@ -273,7 +280,7 @@ export default function ProfilePage() {
                 </button>
               </div>
             ) : (
-              <div className="h-9 w-[280px] rounded-lg bg-muted animate-pulse" />
+              <Skeleton className="h-9 w-[280px] rounded-lg" />
             )}
           </div>
         </CardContent>
@@ -411,7 +418,7 @@ export default function ProfilePage() {
                   className="w-full" 
                   disabled={isPhoneLoading}
                 >
-                  {isPhoneLoading ? "Überprüfe…" : "Bestätigen & Speichern"}
+                  {isPhoneLoading ? "Wird geprüft…" : "Nummer bestätigen"}
                 </Button>
               </form>
             </Form>

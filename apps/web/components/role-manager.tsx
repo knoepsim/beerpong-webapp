@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserMinus, UserPlus } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PersonSearch } from "@/components/person-search";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAssignRole, useRevokeRole } from "@/hooks/queries/tournaments";
@@ -61,7 +62,7 @@ function AssignRole({
   const action = (person: PublicUser) => {
     const held = roles.filter((r) => r.user_id === person.id).map((r) => r.role);
     if (held.includes(role)) {
-      return <span className="rounded-full border bg-muted px-2 py-0.5 text-xs font-medium">Ist {label}</span>;
+      return <Badge variant="secondary">Ist {label}</Badge>;
     }
     const current = strongestRole(held);
     return (

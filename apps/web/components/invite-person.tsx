@@ -1,6 +1,7 @@
 "use client";
 
 import { InvitationRow, InvitationStatusPill } from "@/components/invitation-status";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PersonSearch } from "@/components/person-search";
 import { useInvitePerson, useTournamentInvitations } from "@/hooks/queries/invitations";
@@ -21,7 +22,7 @@ function InviteAction({
   inviting: boolean;
 }>) {
   if (plays) {
-    return <span className="rounded-full border border-success/50 bg-success/10 px-2 py-0.5 text-xs font-medium">Dabei</span>;
+    return <Badge variant="success">Dabei</Badge>;
   }
   if (invitation?.status === "pending" || invitation?.status === "accepted") {
     return <InvitationStatusPill invitation={invitation} />;

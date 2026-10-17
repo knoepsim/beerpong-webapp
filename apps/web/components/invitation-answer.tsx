@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, Lock, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,9 +45,9 @@ function TeamChoice({ teams, value, onChange }: Readonly<{ teams: Team[]; value:
             <span className="block truncate text-xs text-muted-foreground">{membersText(team)}</span>
           </span>
           {!team.is_complete && (
-            <span className="shrink-0 rounded-full border border-warning/50 bg-warning/10 px-2 py-0.5 text-xs font-medium">
+            <Badge variant="warning">
               {team.members.length} von {team.max_size}
-            </span>
+            </Badge>
           )}
         </label>
       ))}

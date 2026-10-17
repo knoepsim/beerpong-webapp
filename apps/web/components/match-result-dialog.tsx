@@ -5,6 +5,7 @@ import { currentResult, useDeleteResult, useMatchResults, useSaveResult, useSetM
 import { errorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { LoadError } from "@/components/load-error";
+import { Spinner } from "@/components/ui/spinner";
 import type { Match, Result } from "@/types";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
@@ -72,7 +73,7 @@ export function MatchResultDialog({ tournamentId, match, teamA, teamB, open, onO
         )}
         {!loadError && isLoading && (
           <div className="flex justify-center p-4">
-            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+            <Spinner className="size-6 text-primary" />
           </div>
         )}
         {!loadError && !isLoading && (

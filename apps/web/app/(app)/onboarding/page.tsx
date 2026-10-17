@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useCreateTeam } from "@/hooks/queries/teams";
 import { useCurrentUser, useUpdateMe } from "@/hooks/queries/user";
 import { errorMessage } from "@/lib/errors";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getRedirectParam } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,7 +89,11 @@ export default function OnboardingPage() {
     });
 
   if (isLoading || profileComplete) {
-    return <div className="flex min-h-screen items-center justify-center p-4 text-muted-foreground animate-pulse">Lade…</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Skeleton className="h-80 w-full max-w-sm rounded-xl" />
+      </div>
+    );
   }
 
   return (
@@ -153,7 +158,7 @@ export default function OnboardingPage() {
                 {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
                 
                 <Button type="submit" className="w-full" disabled={isSaving}>
-                  {isSaving ? "Speichere…" : "Weiter"}
+                  {isSaving ? "Wird gespeichert…" : "Weiter"}
                 </Button>
               </form>
             </Form>
@@ -186,7 +191,7 @@ export default function OnboardingPage() {
                 {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
                 
                 <Button type="submit" className="w-full" disabled={isSaving}>
-                  {isSaving ? "Erstelle…" : "Team gründen & loslegen"}
+                  {isSaving ? "Wird erstellt…" : "Team gründen und loslegen"}
                 </Button>
                 
                 <Button 

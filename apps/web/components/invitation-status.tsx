@@ -1,15 +1,15 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useWithdrawInvitation } from "@/hooks/queries/invitations";
-import { cn } from "@/lib/utils";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import type { TournamentInvitation } from "@/types";
 
-const TONE: Record<TournamentInvitation["status"], string> = {
-  pending: "border-primary/40 bg-primary/10",
-  accepted: "border-success/50 bg-success/10",
-  declined: "border-border bg-muted text-muted-foreground",
-  withdrawn: "border-border bg-muted text-muted-foreground",
-};
+const VARIANT = {
+  pending: "info",
+  accepted: "success",
+  declined: "secondary",
+  withdrawn: "secondary",
+} as const satisfies Record<TournamentInvitation["status"], BadgeVariant>;
 
 const statusText = (invitation: TournamentInvitation) => {
   switch (invitation.status) {
@@ -27,9 +27,9 @@ const statusText = (invitation: TournamentInvitation) => {
 /** How far an invitation is, as the organization sees it. */
 export function InvitationStatusPill({ invitation }: Readonly<{ invitation: TournamentInvitation }>) {
   return (
-    <span className={cn("shrink-0 truncate rounded-full border px-2 py-0.5 text-xs font-medium", TONE[invitation.status])}>
-      {statusText(invitation)}
-    </span>
+    <Badge variant={VARIANT[invitation.status]} className="max-w-40">
+      <span className="truncate">{statusText(invitation)}</span>
+    </Badge>
   );
 }
 

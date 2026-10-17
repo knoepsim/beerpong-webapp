@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
 import { LoadError } from "@/components/load-error";
+import { Skeleton } from "@/components/ui/skeleton";
 import { InvitationItem } from "@/components/invitation-item";
 import { useMyInvitations } from "@/hooks/queries/invitations";
 import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
@@ -61,7 +62,7 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
   if (items.length === 0) return null;
   return (
     <section aria-label={title} className="space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.tournament.id}>
@@ -124,7 +125,7 @@ export default function TournamentsPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 pt-8 space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />
+          <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
     );
@@ -133,7 +134,7 @@ export default function TournamentsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6 pb-4 space-y-10">
             <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Meine Turniere</h2>
+        <h1 className="text-2xl font-bold">Meine Turniere</h1>
         {tournamentsQuery.isError && (
           <LoadError
             error={tournamentsQuery.error}
@@ -143,7 +144,7 @@ export default function TournamentsPage() {
         )}
         {invitations.length > 0 && (
           <section aria-label="Einladungen" className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Einladungen</h3>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Einladungen</h2>
             <ul className="space-y-3">
               {invitations.map((invitation) => (
                 <li key={invitation.id}>

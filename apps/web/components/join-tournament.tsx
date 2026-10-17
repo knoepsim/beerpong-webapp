@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/hooks/queries/user";
 import { useMyTeams } from "@/hooks/queries/teams";
 import { useJoinTournament } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
+import { ErrorAlert } from "@/components/error-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Team } from "@/types";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -104,12 +105,10 @@ function JoinDialog({
       <>
         <TeamSelect teams={teams} value={chosenId} onChange={setTeamId} />
         <Button className="w-full" onClick={handleJoin} disabled={!chosenId || join.isPending}>
-          {join.isPending ? "Beitreten…" : "Jetzt teilnehmen"}
+          {join.isPending ? "Wird angemeldet…" : "Jetzt teilnehmen"}
         </Button>
         {error && (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
+          <ErrorAlert message={error} />
         )}
       </>
     );

@@ -140,7 +140,7 @@ export default function LoginPage() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Sende Code…" : "Code anfordern"}
+                  {isLoading ? "Code wird gesendet…" : "Code anfordern"}
                 </Button>
                 <div className="text-center pt-2">
                   <Link href="/reset" className="text-xs text-muted-foreground hover:underline hover:text-primary">
@@ -208,7 +208,7 @@ export default function LoginPage() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Überprüfe…" : "Anmelden"}
+                  {isLoading ? "Wird geprüft…" : "Anmelden"}
                 </Button>
                 <Button
                   type="button"

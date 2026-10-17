@@ -104,7 +104,7 @@ export default function TournamentDetailPage({
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center space-y-4">
         <ShieldAlert className="size-16 text-muted-foreground" aria-hidden="true" />
-        <h2 className="text-2xl font-bold">Kein Zugriff</h2>
+        <h1 className="text-2xl font-bold">Kein Zugriff</h1>
         <p className="text-muted-foreground max-w-md">
           {error.message || "Du hast keinen Zugriff auf dieses Turnier oder es existiert nicht."}
         </p>

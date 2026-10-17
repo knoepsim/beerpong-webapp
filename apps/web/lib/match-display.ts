@@ -1,3 +1,4 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { cn } from "@/lib/utils";
 import type { Match, Team } from "@/types";
@@ -102,12 +103,16 @@ export function statusText(match: Match): string | null {
 }
 
 /** Badge colors by status: grey waits for a team, amber for a table, green can start, red is live. */
-export const STATUS_STYLE: Record<Exclude<Match["status"], "finished">, string> = {
-  waiting: "bg-muted text-muted-foreground",
-  queued: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  ready: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-  live: "bg-red-600 text-white", // white on red-600 keeps 4.5:1 in both themes
-};
+/**
+ * The look of each open status, as a badge: waiting is quiet, the queue a warning, ready a success; live is the one
+ * solid badge (white on red-600 keeps 4.5:1 in both themes).
+ */
+export const STATUS_BADGE = {
+  waiting: { variant: "secondary" },
+  queued: { variant: "warning" },
+  ready: { variant: "success" },
+  live: { variant: "default", className: "border-transparent bg-red-600 text-white" },
+} as const satisfies Record<Exclude<Match["status"], "finished">, { variant: BadgeVariant; className?: string }>;
 
 /**
  * The table to go to, only while it matters: at the table (ready), playing there (live), or still waiting for a

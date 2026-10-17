@@ -4,6 +4,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { useAcceptTeamInvite, useMyTeams, useTeamInvite } from "@/hooks/queries/teams";
 import { errorMessage } from "@/lib/errors";
+import { ErrorAlert } from "@/components/error-alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -52,14 +53,10 @@ export default function JoinTeamPage({ params }: { params: Promise<{ token: stri
             </div>
           )}
           {isError && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              Die Einladung konnte nicht geladen werden oder ist ungültig.
-            </div>
+            <ErrorAlert message="Die Einladung konnte nicht geladen werden oder ist ungültig." />
           )}
           {accept.isError && (
-            <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-              {errorMessage(accept.error, "Der Link ist ungültig oder das Team ist bereits voll.")}
-            </div>
+            <ErrorAlert message={errorMessage(accept.error, "Der Link ist ungültig oder das Team ist bereits voll.")} />
           )}
           
           
@@ -76,7 +73,7 @@ export default function JoinTeamPage({ params }: { params: Promise<{ token: stri
               onClick={handleJoin} 
               disabled={isJoining || isLoading || isError}
             >
-              {isJoining ? "Trete bei…" : "Einladung annehmen"}
+              {isJoining ? "Wird angenommen…" : "Einladung annehmen"}
             </Button>
           )}
           <Button 

@@ -3,6 +3,7 @@
 import { useCurrentUser } from "@/hooks/queries/user";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import { Spinner } from "@/components/ui/spinner";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const { user, isLoading } = useCurrentUser();
@@ -11,7 +12,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+        <Spinner className="size-8 text-primary" />
       </div>
     );
   }
