@@ -30,4 +30,5 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 # The session of a request, committed before the response is sent. With FastAPI's default scope ("request") the code
 # after `yield` runs only after the response went out, so a client asking again right away (create a team, then load
 # the list) could still read the old state.
-DbSession = Annotated[AsyncSession, Depends(get_db, scope="function")]
+# NOSONAR below: Sonar (python:S930) does not know the `scope` argument of Depends yet (FastAPI has it since 0.121)
+DbSession = Annotated[AsyncSession, Depends(get_db, scope="function")]  # NOSONAR

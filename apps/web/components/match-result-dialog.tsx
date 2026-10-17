@@ -120,7 +120,7 @@ export function MatchResultDialog({
     setIsSubmitting(true);
     setError(null);
     try {
-      const cups = cupsLeft.trim() ? parseInt(cupsLeft, 10) : DEFAULT_CUPS;
+      const cups = cupsLeft.trim() ? Number.parseInt(cupsLeft, 10) : DEFAULT_CUPS;
       if (existingResult) {
         await api.results.modify(matchId, winnerId, cups);
       } else {
@@ -171,11 +171,11 @@ export function MatchResultDialog({
   let leftCups = 10;
   let rightCups = 10;
   if (winnerId === teamA.id) {
-    leftCups = cupsLeft ? parseInt(cupsLeft, 10) : 10;
+    leftCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
     rightCups = 0;
   } else if (winnerId === teamB.id) {
     leftCups = 0;
-    rightCups = cupsLeft ? parseInt(cupsLeft, 10) : 10;
+    rightCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
   }
 
   const hasChanges = !existingResult ||
@@ -372,7 +372,7 @@ export function MatchResultDialog({
                           value={cupsLeft}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (val === "" || (parseInt(val) >= 1 && parseInt(val) <= 10)) setCupsLeft(val);
+                            if (val === "" || (Number.parseInt(val) >= 1 && Number.parseInt(val) <= 10)) setCupsLeft(val);
                           }}
                           className="mt-1.5 border-red-500/30 focus-visible:ring-red-500 text-center text-lg h-10 bg-background"
                           disabled={nextMatchHasResult}
@@ -407,7 +407,7 @@ export function MatchResultDialog({
                           value={cupsLeft}
                           onChange={(e) => {
                             const val = e.target.value;
-                            if (val === "" || (parseInt(val) >= 1 && parseInt(val) <= 10)) setCupsLeft(val);
+                            if (val === "" || (Number.parseInt(val) >= 1 && Number.parseInt(val) <= 10)) setCupsLeft(val);
                           }}
                           className="mt-1.5 border-blue-500/30 focus-visible:ring-blue-500 text-center text-lg h-10 bg-background"
                           disabled={nextMatchHasResult}
