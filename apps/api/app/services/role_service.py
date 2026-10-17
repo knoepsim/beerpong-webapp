@@ -51,20 +51,19 @@ class RoleService:
     ) -> TournamentUserRole:
         """Assign a role to a user in a tournament with hierarchy checks.
 
-        - Admin can assign any role
+        - Admin is whoever created the tournament: nobody can be made one
+        - Admin can assign Manager and Referee
         - Manager can only assign Referee
         """
+        if role == TournamentRoleType.ADMIN:
+            raise InsufficientRoleError("Admin ist, wer das Turnier erstellt hat. Vergeben lassen sich Manager und Schiedsrichter.")
+
         assigner_highest = await self.get_highest_role(tournament_id, assigner_id)
-        if assigner_highest is None:
-            raise InsufficientRoleError("You have no role in this tournament")
+        if assigner_highest is None or assigner_highest == TournamentRoleType.REFEREE:
+            raise InsufficientRoleError("Rollen vergeben dürfen Admin und Manager.")
 
-        # Manager can only assign Referee
         if assigner_highest == TournamentRoleType.MANAGER and role != TournamentRoleType.REFEREE:
-            raise InsufficientRoleError("Managers can only assign the Referee role")
-
-        # Referee cannot assign any role
-        if assigner_highest == TournamentRoleType.REFEREE:
-            raise InsufficientRoleError("Referees cannot assign roles")
+            raise InsufficientRoleError("Als Manager kannst du nur Schiedsrichter ernennen.")
 
         if await self.db.get(User, target_user_id) is None:
             raise NotFoundError("Nutzer")
@@ -78,7 +77,7 @@ class RoleService:
             )
         )
         if existing.scalar_one_or_none() is not None:
-            raise InsufficientRoleError("User already has this role")
+            raise InsufficientRoleError("Diese Person hat die Rolle schon.")
 
         new_role = TournamentUserRole(
             tournament_id=tournament_id,
@@ -114,7 +113,7 @@ class RoleService:
 
         # Must outrank the role being revoked
         if ROLE_HIERARCHY[revoker_highest] <= ROLE_HIERARCHY[role_entry.role]:
-            raise InsufficientRoleError("Cannot revoke a role of equal or higher rank")
+            raise InsufficientRoleError("Diese Rolle kannst du nicht entziehen.")
 
         await self.db.delete(role_entry)
         await bump(self.db, tournament_id, "roles")

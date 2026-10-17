@@ -11,6 +11,10 @@ const preview = (overrides: Partial<TournamentPreview> = {}): TournamentPreview 
   start_time: '2099-07-01T18:00:00Z',
   registration_open: true,
   join_policy: JoinPolicy.OPEN,
+  description: null,
+  phase: 'registration',
+  team_count: 0,
+  registration_end_time: null,
   ...overrides,
 })
 

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
 import { LoadError } from "@/components/load-error";
+import { InvitationItem } from "@/components/invitation-item";
+import { useMyInvitations } from "@/hooks/queries/invitations";
 import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
@@ -74,6 +76,7 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
 export default function TournamentsPage() {
   const router = useRouter();
   const tournamentsQuery = useMyTournaments();
+  const invitations = useMyInvitations().data ?? [];
   const data = tournamentsQuery.data;
   const create = useCreateTournament();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -130,16 +133,25 @@ export default function TournamentsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6 pb-4 space-y-10">
             <div className="space-y-4">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Trophy className="h-6 w-6 text-primary" />
-          Meine Turniere
-        </h2>
+        <h2 className="text-2xl font-bold">Meine Turniere</h2>
         {tournamentsQuery.isError && (
           <LoadError
             error={tournamentsQuery.error}
             fallback="Deine Turniere konnten nicht geladen werden."
             onRetry={() => void tournamentsQuery.refetch()}
           />
+        )}
+        {invitations.length > 0 && (
+          <section aria-label="Einladungen" className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Einladungen</h3>
+            <ul className="space-y-3">
+              {invitations.map((invitation) => (
+                <li key={invitation.id}>
+                  <InvitationItem invitation={invitation} />
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
         {groups && hasTournaments && (
           // a heading only appears when there is something under it
@@ -149,7 +161,7 @@ export default function TournamentsPage() {
             <TournamentSection title="Abgeschlossene Turniere" items={groups.finished} />
           </div>
         )}
-        {groups && !hasTournaments && (
+        {groups && !hasTournaments && invitations.length === 0 && (
           <EmptyState
             icon={Trophy}
             title="Noch keine Turniere"

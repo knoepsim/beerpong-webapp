@@ -114,12 +114,14 @@ class InviteCreate(BaseModel):
 
 
 class InviteResponse(BaseModel):
-    """An invitation link of a tournament with the number of teams that joined through it."""
+    """An invitation link of a tournament: how many accounts opened it and how many of them play."""
     id: UUID
     token: str
     label: str | None
     created_at: datetime
-    uses: int
+    deleted: bool = False
+    opened: int = 0
+    joined: int = 0
 
 
 class TournamentPreview(BaseModel):
@@ -131,6 +133,11 @@ class TournamentPreview(BaseModel):
     start_time: datetime | None
     registration_open: bool
     join_policy: JoinPolicy
+    description: str | None = None
+    phase: TournamentPhase
+    team_count: int = 0
+    # only a deadline that really closes the registration
+    registration_end_time: datetime | None = None
 
 
 class ParticipatingTournament(BaseModel):

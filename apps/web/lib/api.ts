@@ -16,6 +16,8 @@ import type {
   Result,
   MyTournamentsResponse,
   TournamentTeam,
+  Invitation,
+  TournamentInvitation,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -232,6 +234,15 @@ export const api = {
       }),
     deleteInvite: (tournamentId: string, inviteId: string) =>
       request<void>(`/tournaments/${tournamentId}/invites/${inviteId}`, { method: "DELETE" }),
+    listInvitations: (tournamentId: string) =>
+      request<TournamentInvitation[]>(`/tournaments/${tournamentId}/invitations`),
+    invitePerson: (tournamentId: string, userId: string) =>
+      request<TournamentInvitation>(`/tournaments/${tournamentId}/invitations`, {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId }),
+      }),
+    withdrawInvitation: (tournamentId: string, invitationId: string) =>
+      request<void>(`/tournaments/${tournamentId}/invitations/${invitationId}`, { method: "DELETE" }),
     create: (data: TournamentCreateRequest) =>
       request<Tournament>("/tournaments", {
         method: "POST",
@@ -271,6 +282,18 @@ export const api = {
   invites: {
     /** The tournament behind an invitation link; works without login. */
     get: (token: string) => request<TournamentPreview>(`/invites/${encodeURIComponent(token)}`),
+    /** Keeps the invitation of the link in my account (or opens a declined one again). */
+    accept: (token: string) => request<Invitation>(`/invites/${encodeURIComponent(token)}/accept`, { method: "POST" }),
+  },
+
+  invitations: {
+    /** My open invitations, while the tournament can still be joined. */
+    list: () => request<Invitation[]>("/invitations"),
+    get: (id: string) => request<Invitation>(`/invitations/${id}`),
+    accept: (id: string, teamId: string) =>
+      request<Invitation>(`/invitations/${id}/accept`, { method: "POST", body: JSON.stringify({ team_id: teamId }) }),
+    decline: (id: string) => request<Invitation>(`/invitations/${id}/decline`, { method: "POST" }),
+    reopen: (id: string) => request<Invitation>(`/invitations/${id}/reopen`, { method: "POST" }),
   },
 
   roles: {

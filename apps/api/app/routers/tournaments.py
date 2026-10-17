@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.database import DbSession
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, TournamentAlreadyStartedError
 from app.core.security import get_current_user, get_optional_user
 from app.models.tournament import JoinPolicy, Tournament
 from app.models.tournament_role import TournamentRoleType
@@ -22,8 +22,10 @@ from app.schemas.tournament import (
     InviteResponse,
     TournamentPreview,
 )
+from app.schemas.invitation import InvitationCreate, TournamentInvitationResponse
 from app.services.bracket_service import BracketService
-from app.services.invite_service import InviteService, preview_of
+from app.services.invitation_service import InvitationService
+from app.services.invite_service import InviteService, build_preview
 from app.services.lifecycle_service import LifecycleService
 from app.services.role_service import RoleService
 from app.services.team_service import TeamService
@@ -67,8 +69,8 @@ async def update_tournament(
     "/{tournament_id}/invites",
     response_model=list[InviteResponse],
     summary="Einladungslinks auflisten",
-    description="Alle Einladungslinks des Turniers mit der Zahl der Teams, die darüber beigetreten sind. "
-    "Nur Admin und Manager.",
+    description="Alle Einladungslinks des Turniers, auch gelöschte, mit der Zahl der Accounts, die sie geöffnet haben, "
+    "und wie viele davon mitspielen. Nur Admin und Manager.",
 )
 async def list_invites(
     tournament_id: UUID,
@@ -97,15 +99,15 @@ async def create_invite(
     await TournamentService(db).get_tournament(tournament_id)
     invite = await InviteService(db).create(tournament_id, current_user.id, body.label)
     await db.commit()
-    return InviteResponse(id=invite.id, token=invite.token, label=invite.label, created_at=invite.created_at, uses=0)
+    return InviteService.to_response(invite)
 
 
 @router.delete(
     "/{tournament_id}/invites/{invite_id}",
     status_code=204,
     summary="Einladungslink löschen",
-    description="Löscht einen Einladungslink. Teams, die darüber schon beigetreten sind, bleiben im Turnier. "
-    "Nur Admin und Manager.",
+    description="Der Link funktioniert danach nicht mehr und erscheint als gelöscht. Einladungen, die über ihn "
+    "angelegt wurden, bleiben (auch offene). Nur Admin und Manager.",
 )
 async def delete_invite(
     tournament_id: UUID,
@@ -116,6 +118,58 @@ async def delete_invite(
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     await InviteService(db).delete(tournament_id, invite_id)
     await db.commit()
+
+
+@router.get(
+    "/{tournament_id}/invitations",
+    response_model=list[TournamentInvitationResponse],
+    summary="Einladungen auflisten",
+    description="Alle persönlichen Einladungen: direkt oder über einen Link, mit Stand. Nur Admin und Manager.",
+)
+async def list_invitations(
+    tournament_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbSession,
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await TournamentService(db).get_tournament(tournament_id)
+    return await InvitationService(db).list_for_tournament(tournament_id)
+
+
+@router.post(
+    "/{tournament_id}/invitations",
+    response_model=TournamentInvitationResponse,
+    status_code=201,
+    summary="Person einladen",
+    description="Lädt eine Person direkt ein; die Einladung steht in ihrem Konto. Wer schon eingeladen ist, bleibt es "
+    "(abgelehnt oder entfernt: wieder offen). Nur Admin und Manager, bis zum Start.",
+)
+async def invite_person(
+    tournament_id: UUID,
+    body: InvitationCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbSession,
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    if (await TournamentService(db).get_tournament(tournament_id)).is_started:
+        raise TournamentAlreadyStartedError()
+    return await InvitationService(db).invite_user(tournament_id, body.user_id, current_user.id)
+
+
+@router.delete(
+    "/{tournament_id}/invitations/{invitation_id}",
+    status_code=204,
+    summary="Einladung entfernen",
+    description="Nimmt eine offene Einladung aus dem Konto der Person. Nur Admin und Manager.",
+)
+async def withdraw_invitation(
+    tournament_id: UUID,
+    invitation_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbSession,
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await InvitationService(db).withdraw(tournament_id, invitation_id)
 
 
 @router.delete(
@@ -177,7 +231,7 @@ async def get_tournament_preview(slug: str, db: DbSession):
     tournament = await TournamentService(db).get_tournament_by_slug(slug)
     if tournament.join_policy != JoinPolicy.OPEN:
         raise NotFoundError("Turnier")
-    return preview_of(tournament)
+    return await build_preview(db, tournament)
 
 
 @router.get(
@@ -201,7 +255,9 @@ async def join_tournament(
     current_user: Annotated[User, Depends(get_current_user)],
     db: DbSession,
 ):
-    return await TournamentService(db).join_tournament(tournament_id, body.team_id, body.invite_token)
+    return await TournamentService(db).join_tournament(
+        tournament_id, body.team_id, body.invite_token, user_id=current_user.id
+    )
 
 
 @router.delete(

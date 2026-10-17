@@ -2,30 +2,22 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { isSlugError, useAssignRole, useDeleteTournament, useRevokeRole, useUpdateTournament } from "@/hooks/queries/tournaments";
-import { useUserSearch } from "@/hooks/queries/user";
+import { isSlugError, useDeleteTournament, useUpdateTournament } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
 import type { Tournament, TournamentCreateRequest, TournamentUserRole } from "@/types";
 import { AccessFields } from "@/components/access-fields";
-import { InviteLinks } from "@/components/invite-links";
 import { useConfirm } from "@/components/confirm-dialog";
+import { RoleManager } from "@/components/role-manager";
 import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
-import { JoinPolicy, TournamentRoleType } from "@/types";
+import { TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Trash2, Search, UserPlus, UserMinus, ShieldAlert } from "lucide-react";
+import { Trash2, ShieldAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Markdown } from "@/components/markdown";
 
@@ -78,17 +70,6 @@ export function TournamentSettings({
   const confirm = useConfirm();
   const update = useUpdateTournament(tournament.id);
   const deleteTournament = useDeleteTournament(tournament.id);
-  const assignRole = useAssignRole(tournament.id);
-  const revokeRole = useRevokeRole(tournament.id);
-  const [searchQuery, setSearchQuery] = useState("");
-  // the search runs for what was submitted, not for every key
-  const [submittedQuery, setSubmittedQuery] = useState("");
-  const search = useUserSearch(submittedQuery);
-  const searchResults = search.data ?? [];
-
-  const [selectedUser, setSelectedUser] = useState<string>("");
-  const [selectedRole, setSelectedRole] = useState<TournamentRoleType>(TournamentRoleType.REFEREE);
-
   // Edit details form state
   const [editName, setEditName] = useState(tournament.name);
   const [editLocation, setEditLocation] = useState(tournament.location || "");
@@ -139,39 +120,6 @@ export function TournamentSettings({
   };
 
   // the same search again asks the server again (somebody may have registered in the meantime)
-  const handleSearch = () => {
-    if (searchQuery.length < 2) return;
-    if (searchQuery === submittedQuery) void search.refetch();
-    else setSubmittedQuery(searchQuery);
-  };
-
-  const handleAssignRole = () => {
-    if (!selectedUser) return;
-    assignRole.mutate(
-      { userId: selectedUser, role: selectedRole },
-      {
-        onSuccess: () => {
-          setSearchQuery("");
-          setSubmittedQuery("");
-          setSelectedUser("");
-        },
-      },
-    );
-  };
-
-  const handleRevokeRole = (role: TournamentUserRole) => {
-    const who = role.user_name || "Diese Person";
-    void confirm({
-      title: "Rolle entziehen?",
-      description: `${who} kann das Turnier danach nicht mehr ${role.role === TournamentRoleType.REFEREE ? "als Schiedsrichter leiten" : "verwalten"}.`,
-      confirmLabel: "Rolle entziehen",
-      destructive: true,
-      action: async () => {
-        await revokeRole.mutateAsync(role.id);
-      },
-    });
-  };
-
   const handleDeleteTournament = () => {
     void confirm({
       title: `${tournament.name} löschen?`,
@@ -186,10 +134,7 @@ export function TournamentSettings({
     });
   };
 
-  const canManage = (userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER);
-  const canAssignAdmin = userRole === TournamentRoleType.ADMIN;
-  const canAssignManager = userRole === TournamentRoleType.ADMIN;
-  const canAssignReferee = userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER;
+  const canManage = userRole === TournamentRoleType.ADMIN || userRole === TournamentRoleType.MANAGER;
 
   return (
     <div className="space-y-6">
@@ -307,101 +252,16 @@ export function TournamentSettings({
               if (patch.join_policy) setEditJoinPolicy(patch.join_policy);
             }}
           />
-          {/* who joins how: only while teams can still join */}
-          {!started && tournament.join_policy === JoinPolicy.INVITE_ONLY && (
-            <div className="space-y-2 border-t pt-4">
-              <h3 className="text-sm font-medium">Einladungslinks</h3>
-              <p className="text-sm text-muted-foreground">
-                Wer einen dieser Links öffnet, kann dem Turnier mit einem Team beitreten. Lege für jeden Kanal einen
-                eigenen Link an und sieh, wie viele Teams darüber gekommen sind.
-              </p>
-              <InviteLinks tournamentId={tournament.id} />
-            </div>
-          )}
         </SettingsCard>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Rollen & Berechtigungen</CardTitle>
-          <CardDescription>Verwalte, wer das Turnier bearbeiten oder Ergebnisse eintragen darf.</CardDescription>
+          <CardTitle>Rollen</CardTitle>
+          <CardDescription>Wer das Turnier mitverwaltet oder Ergebnisse einträgt.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="font-medium text-sm">Rolle zuweisen</h3>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1 flex gap-2">
-                <Input
-                  placeholder="Nutzername suchen…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                />
-                <Button variant="secondary" onClick={handleSearch} disabled={search.isFetching || searchQuery.length < 2}>
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            {search.isError && (
-              <p role="alert" className="text-sm text-destructive">
-                {errorMessage(search.error, "Die Suche hat nicht geklappt. Versuch es noch einmal.")}
-              </p>
-            )}
-            {searchResults.length > 0 && (
-              <div className="space-y-3 bg-muted/20 p-3 rounded-lg border">
-                <div className="space-y-2">
-                  <Label>Nutzer auswählen</Label>
-                  <Select value={selectedUser} onValueChange={(v) => v && setSelectedUser(v as string)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Nutzer wählen…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {searchResults.map(u => (
-                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Rolle auswählen</Label>
-                  <Select value={selectedRole} onValueChange={(v) => v && setSelectedRole(v as TournamentRoleType)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Rolle wählen…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {canAssignAdmin && <SelectItem value={TournamentRoleType.ADMIN}>Admin</SelectItem>}
-                      {canAssignManager && <SelectItem value={TournamentRoleType.MANAGER}>Manager</SelectItem>}
-                      {canAssignReferee && <SelectItem value={TournamentRoleType.REFEREE}>Schiedsrichter</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={handleAssignRole} disabled={!selectedUser || assignRole.isPending}>
-                  <UserPlus className="h-4 w-4 mr-2" /> Zuweisen
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-3 pt-4 border-t">
-            <h3 className="font-medium text-sm">Aktuelle Berechtigungen</h3>
-            <div className="space-y-2">
-              {roles.map(r => (
-                <div key={r.id} className="flex justify-between items-center p-2 border rounded-md bg-background">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">{r.user_name || r.user_id}</span>
-                    <span className="text-xs text-muted-foreground uppercase">{r.role}</span>
-                  </div>
-                  {(userRole === TournamentRoleType.ADMIN || (userRole === TournamentRoleType.MANAGER && r.role === TournamentRoleType.REFEREE)) && (
-                    <Button variant="ghost" size="sm" onClick={() => handleRevokeRole(r)}>
-                      <UserMinus className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+        <CardContent>
+          <RoleManager tournamentId={tournament.id} roles={roles} userRole={userRole} />
         </CardContent>
       </Card>
 

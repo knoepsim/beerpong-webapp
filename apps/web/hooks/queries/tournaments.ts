@@ -2,12 +2,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { successMessage } from "@/lib/query-client";
 import { queryKeys, tournamentKeys } from "@/lib/query-keys";
-import type { Tournament, TournamentCreateRequest, TournamentStartResponse, TournamentTeam } from "@/types";
+import { ROLE_INFO } from "@/lib/roles";
+import type { Tournament, TournamentCreateRequest, TournamentRoleType, TournamentStartResponse, TournamentTeam } from "@/types";
 
 // -- lists and lookups
 
-export function useMyTournaments() {
-  return useQuery({ queryKey: queryKeys.myTournaments, queryFn: api.tournaments.getMyTournaments });
+/** `enabled: false` while nobody is logged in. */
+export function useMyTournaments({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: queryKeys.myTournaments, queryFn: api.tournaments.getMyTournaments, enabled });
 }
 
 export function useTournamentBySlug(slug: string) {
@@ -61,10 +63,11 @@ export function useBracket(id: string) {
   });
 }
 
-export function useTournamentInvites(id: string) {
+export function useTournamentInvites(id: string, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.tournamentInvites(id),
     queryFn: () => api.tournaments.listInvites(id),
+    enabled,
     meta: { errorMessage: "Die Einladungslinks konnten nicht geladen werden." },
   });
 }
@@ -235,10 +238,22 @@ export function useDeleteTournamentInvite(id: string) {
 
 // -- roles
 
+interface AssignRole {
+  userId: string;
+  role: TournamentRoleType;
+  /** For the message: "Ada ist jetzt Schiedsrichter." */
+  userName: string;
+}
+
 export function useAssignRole(id: string) {
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) => api.roles.assign(id, userId, role),
-    meta: { invalidates: tournamentKeys(id, ["roles"]), successMessage: "Rolle zugewiesen." },
+    mutationFn: ({ userId, role }: AssignRole) => api.roles.assign(id, userId, role),
+    meta: {
+      invalidates: tournamentKeys(id, ["roles"]),
+      successMessage: successMessage(
+        (_: unknown, { userName, role }: AssignRole) => `${userName} ist jetzt ${ROLE_INFO[role].label}.`,
+      ),
+    },
   });
 }
 

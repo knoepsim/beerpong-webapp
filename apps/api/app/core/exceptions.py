@@ -133,6 +133,16 @@ class SlugTakenError(AppException):
         super().__init__(409, "SLUG_TAKEN", "Diese Adresse ist schon vergeben.")
 
 
+class AlreadyParticipantError(AppException):
+    def __init__(self):
+        super().__init__(409, "ALREADY_PARTICIPANT", "Diese Person spielt schon in diesem Turnier mit.")
+
+
+class InvitationAnsweredError(AppException):
+    def __init__(self):
+        super().__init__(409, "INVITATION_ANSWERED", "Diese Einladung ist schon beantwortet. Lade die Seite neu.")
+
+
 class InviteRequiredError(AppException):
     def __init__(self):
         super().__init__(403, "INVITE_REQUIRED", "Zum Beitreten brauchst du einen Einladungslink.")

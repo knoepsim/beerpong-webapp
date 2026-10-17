@@ -37,7 +37,7 @@ export const JOIN_OPTIONS: AccessOption<JoinPolicy>[] = [
     value: JoinPolicy.INVITE_ONLY,
     label: "Nur mit Einladungslink",
     summary: "Du verteilst Einladungslinks",
-    description: "Beitreten kann nur, wer einen Einladungslink bekommen hat. Die Links verwaltest du unter den Einstellungen.",
+    description: "Beitreten kann nur, wer eingeladen ist: per Link oder direkt. Einladen kannst du im Tab Teilnehmer.",
   },
 ];
 

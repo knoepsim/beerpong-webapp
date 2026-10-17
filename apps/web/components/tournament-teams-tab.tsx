@@ -2,6 +2,7 @@
 
 import { CheckinSummary } from "@/components/checkin-summary";
 import { TournamentTeamList } from "@/components/tournament-team-list";
+import { InvitationsPanel } from "@/components/invitations-panel";
 import { formatWhen } from "@/lib/format-when";
 import type { Tournament, TournamentTeam } from "@/types";
 
@@ -25,8 +26,14 @@ export function TournamentTeamsTab({
   const checkinStartsLater =
     checkinBeforeStart && !tournament.checkin_open && tournament.checkin_auto_open && !!tournament.checkin_start_time;
 
+  const participantIds = new Set(teams.flatMap((team) => team.members.map((m) => m.user_id)));
+
   return (
     <div className="space-y-4">
+      {/* inviting is work on the field of participants, only for the organization and only until the start */}
+      {canManage && !tournament.started_at && (
+        <InvitationsPanel tournamentId={tournament.id} participantIds={participantIds} />
+      )}
       {checkinBeforeStart && teams.length > 0 && <CheckinSummary teams={teams} />}
       {checkinStartsLater && (
         <p className="text-sm text-muted-foreground">Der Check-in beginnt {formatWhen(tournament.checkin_start_time!)}.</p>

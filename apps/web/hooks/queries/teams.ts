@@ -4,9 +4,12 @@ import { successMessage } from "@/lib/query-client";
 import { queryKeys } from "@/lib/query-keys";
 import type { Team } from "@/types";
 
-/** My teams; `enabled: false` while nobody is logged in. */
-export function useMyTeams({ enabled = true }: { enabled?: boolean } = {}) {
-  return useQuery({ queryKey: queryKeys.teams, queryFn: api.teams.list, enabled });
+/**
+ * My teams; `enabled: false` while nobody is logged in. `fresh`: asked again whenever the page is seen again (a team
+ * mate may have joined in the meantime, e.g. while the invitation link was being shared).
+ */
+export function useMyTeams({ enabled = true, fresh = false }: { enabled?: boolean; fresh?: boolean } = {}) {
+  return useQuery({ queryKey: queryKeys.teams, queryFn: api.teams.list, enabled, ...(fresh ? { staleTime: 0 } : {}) });
 }
 
 /** A new team shows up in "Meine Teams" right away (the list is loaded again before the mutation is done). */
