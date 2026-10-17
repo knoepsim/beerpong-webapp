@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Match, Result } from "@/types";
@@ -34,6 +34,9 @@ interface MatchResultDialogProps {
   onSuccess: () => void;
 }
 
+/** Without an entry the winner had all cups left: what the placeholder shows is what is saved. */
+const DEFAULT_CUPS = 10;
+
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
 
 /**
@@ -51,6 +54,9 @@ export function MatchResultDialog({
   const matchId = match.id;
   const nextMatchId = match.next_match_id;
   const [isStarting, setIsStarting] = useState(false);
+  // tapping the winner puts the cursor into its cups field (on a phone the number pad opens right away);
+  // opening an existing result does not
+  const [winnerTapped, setWinnerTapped] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [cupsLeft, setCupsLeft] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,6 +72,7 @@ export function MatchResultDialog({
     if (open) {
       setWinnerId(null);
       setCupsLeft("");
+      setWinnerTapped(false);
       setError(null);
       setExistingResult(null);
       setNextMatchHasResult(false);
@@ -109,7 +116,7 @@ export function MatchResultDialog({
     setIsSubmitting(true);
     setError(null);
     try {
-      const cups = cupsLeft.trim() ? parseInt(cupsLeft, 10) : undefined;
+      const cups = cupsLeft.trim() ? parseInt(cupsLeft, 10) : DEFAULT_CUPS;
       if (existingResult) {
         await api.results.modify(matchId, winnerId, cups);
       } else {
@@ -169,9 +176,16 @@ export function MatchResultDialog({
 
   const hasChanges = !existingResult ||
     existingResult.winner_team_id !== winnerId ||
-    (existingResult.cups_left?.toString() || "") !== cupsLeft.trim();
+    String(existingResult.cups_left ?? DEFAULT_CUPS) !== (cupsLeft.trim() || String(DEFAULT_CUPS));
 
-  const isValid = winnerId !== null && cupsLeft.trim() !== "";
+  // the cups are optional: empty means all cups left (the placeholder)
+  const isValid = winnerId !== null;
+
+  const chooseWinner = (teamId: string) => {
+    if (nextMatchHasResult) return;
+    setWinnerId(teamId);
+    setWinnerTapped(true);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -332,7 +346,7 @@ export function MatchResultDialog({
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamA.id ? "border-red-500 bg-red-500/5 ring-1 ring-red-500" : "border-border bg-card hover:bg-accent/50"
                       } ${nextMatchHasResult ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onClick={() => !nextMatchHasResult && setWinnerId(teamA.id)}
+                    onClick={() => chooseWinner(teamA.id)}
                     disabled={nextMatchHasResult}
                   >
                     <div className="flex flex-col items-center gap-2 w-full">
@@ -341,9 +355,11 @@ export function MatchResultDialog({
                     </div>
                     {winnerId === teamA.id && (
                       <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                        <Label htmlFor="cups_left_a" className="text-xs text-red-600 dark:text-red-400 font-medium">Übrige Becher *</Label>
+                        <Label htmlFor="cups_left_a" className="text-xs text-red-600 dark:text-red-400 font-medium">Übrige Becher</Label>
                         <Input
                           id="cups_left_a"
+                          autoFocus={winnerTapped}
+                          onFocus={(e) => e.target.select()}
                           type="number"
                           min={1}
                           max={10}
@@ -365,7 +381,7 @@ export function MatchResultDialog({
                     type="button"
                     className={`relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px] ${winnerId === teamB.id ? "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500" : "border-border bg-card hover:bg-accent/50"
                       } ${nextMatchHasResult ? "opacity-50 cursor-not-allowed" : ""}`}
-                    onClick={() => !nextMatchHasResult && setWinnerId(teamB.id)}
+                    onClick={() => chooseWinner(teamB.id)}
                     disabled={nextMatchHasResult}
                   >
                     <div className="flex flex-col items-center gap-2 w-full">
@@ -374,9 +390,11 @@ export function MatchResultDialog({
                     </div>
                     {winnerId === teamB.id && (
                       <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                        <Label htmlFor="cups_left_b" className="text-xs text-blue-600 dark:text-blue-400 font-medium">Übrige Becher *</Label>
+                        <Label htmlFor="cups_left_b" className="text-xs text-blue-600 dark:text-blue-400 font-medium">Übrige Becher</Label>
                         <Input
                           id="cups_left_b"
+                          autoFocus={winnerTapped}
+                          onFocus={(e) => e.target.select()}
                           type="number"
                           min={1}
                           max={10}

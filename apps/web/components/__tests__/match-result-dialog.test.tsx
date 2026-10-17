@@ -89,9 +89,10 @@ describe('MatchResultDialog', () => {
     const { onSuccess, onOpenChange } = setup();
     await ready();
 
-    expect(saveButton()).toBeDisabled();
+    expect(saveButton()).toBeDisabled(); // no winner yet
     fireEvent.click(screen.getAllByText('Alpha')[1].closest('button')!);
-    expect(saveButton()).toBeDisabled(); // cups missing
+    expect(cupsInput()).toHaveFocus(); // straight into the cups of the winner
+    expect(saveButton()).toBeEnabled(); // the cups are optional
 
     fireEvent.change(cupsInput(), { target: { value: '4' } });
     expect(saveButton()).toBeEnabled();
@@ -100,6 +101,22 @@ describe('MatchResultDialog', () => {
     await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'a', 4));
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('saves the placeholder: without an entry the winner had all 10 cups left', async () => {
+    results.create.mockResolvedValue(result());
+    setup();
+    await ready();
+    fireEvent.click(screen.getAllByText('Bravo')[1].closest('button')!);
+    fireEvent.click(saveButton());
+    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'b', 10));
+  });
+
+  it('does not jump into the cups when an existing result is opened', async () => {
+    results.list.mockResolvedValue([result()]);
+    setup();
+    await ready();
+    expect(cupsInput()).not.toHaveFocus();
   });
 
   it('creates a result for team B and ignores out-of-range cups', async () => {
