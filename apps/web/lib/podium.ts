@@ -8,12 +8,10 @@ export interface Podium {
   third: string[];
 }
 
-const loser = (match: Match): string | null =>
-  match.status !== "finished" || !match.winner_team_id
-    ? null
-    : match.team_a_id === match.winner_team_id
-      ? match.team_b_id
-      : match.team_a_id;
+function loser(match: Match): string | null {
+  if (match.status !== "finished" || !match.winner_team_id) return null;
+  return match.team_a_id === match.winner_team_id ? match.team_b_id : match.team_a_id;
+}
 
 /** The places of a finished knock-out: winner, runner-up and the two shared third places; null before the end. */
 export function podium(bracket: Bracket): Podium | null {

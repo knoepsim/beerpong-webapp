@@ -187,6 +187,9 @@ export function MatchResultDialog({
     ? `${savedWinner} wird aus dem nächsten Spiel wieder entfernt, das Spiel ist wieder offen.`
     : "Das Finale ist wieder offen, das Turnier gilt nicht mehr als beendet.";
 
+  let submitLabel = existingResult ? "Ergebnis ändern" : "Ergebnis speichern";
+  if (isSubmitting) submitLabel = "Wird gespeichert…";
+
   // the cups are optional: empty means all cups left (the placeholder)
   const isValid = winnerId !== null;
 
@@ -427,7 +430,7 @@ export function MatchResultDialog({
                     Abbrechen
                   </Button>
                   <Button onClick={handleSubmit} disabled={!isValid || !hasChanges || isSubmitting || nextMatchHasResult} className="flex-1">
-                    {isSubmitting ? "Wird gespeichert…" : existingResult ? "Ergebnis ändern" : "Ergebnis speichern"}
+                    {submitLabel}
                   </Button>
                 </div>
               </div>

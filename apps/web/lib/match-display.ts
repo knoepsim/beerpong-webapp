@@ -31,6 +31,9 @@ export interface SideInfo {
 const teamName = (teamsMap: Record<string, Team>, id: string | null) =>
   id === null ? null : teamsMap[id]?.name || "Unbekannt";
 
+/** Cups left at the end: the winner its cups, the loser none. */
+const scoreOf = (isWinner: boolean, cupsLeft: number) => (isWinner ? cupsLeft : 0);
+
 const placeholderFor = (source: number | null) => (source === null ? "Offen" : `Sieger Spiel ${source}`);
 
 export function describeSides(
@@ -50,7 +53,7 @@ export function describeSides(
       isWinner,
       isChampion: id !== null && id === championTeamId,
       isLoser: finished && id !== null && !isWinner,
-      score: finished && match.cups_left != null && id !== null ? (isWinner ? match.cups_left : 0) : null,
+      score: finished && match.cups_left != null && id !== null ? scoreOf(isWinner, match.cups_left) : null,
     };
   };
   return [build("a", match.team_a_id, sources.a), build("b", match.team_b_id, sources.b)];

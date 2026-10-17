@@ -66,6 +66,14 @@ function checkinDescription(tournament: Tournament, started: boolean): string {
   return "Geschlossen";
 }
 
+const lineTone = (done: boolean) => (done ? "bg-primary" : "bg-border");
+
+function circleTone(step: Step): string {
+  if (step.done) return "bg-primary border-primary text-primary-foreground";
+  if (step.active) return "bg-primary/10 border-primary text-primary ring-4 ring-primary/20";
+  return "bg-muted border-border text-muted-foreground";
+}
+
 /** Progress of a tournament: registration and (optional) check-in, then play. Registration and check-in can be open at the same time. */
 export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tournament }>) {
   const steps = buildSteps(tournament);
@@ -75,6 +83,10 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
       {steps.map((step, i) => {
         const isLast = i === steps.length - 1;
         const Icon = step.done ? Check : step.icon;
+        // a line is strong once the step before it is done; the outer ends are invisible
+        const lineBefore = i === 0 ? "opacity-0" : lineTone(steps[i - 1].done);
+        const lineAfter = isLast ? "opacity-0" : lineTone(step.done);
+        const circle = circleTone(step);
         return (
           <li
             key={step.key}
@@ -85,21 +97,15 @@ export function TournamentTimeline({ tournament }: Readonly<{ tournament: Tourna
               {/* Connector + circle: horizontal on desktop, vertical on mobile */}
               <div className="flex sm:flex-row flex-col items-center sm:w-full self-stretch sm:self-auto">
                 <div
-                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${i === 0 ? "opacity-0" : steps[i - 1].done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${lineBefore}`}
                 />
                 <div
-                  className={`relative z-10 flex items-center justify-center size-9 rounded-full border-2 shrink-0 text-base transition-colors ${
-                    step.done
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : step.active
-                        ? "bg-primary/10 border-primary text-primary ring-4 ring-primary/20"
-                        : "bg-muted border-border text-muted-foreground"
-                  }`}
+                  className={`relative z-10 flex items-center justify-center size-9 rounded-full border-2 shrink-0 text-base transition-colors ${circle}`}
                 >
                   <Icon className="size-4" aria-hidden="true" />
                 </div>
                 <div
-                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${isLast ? "opacity-0" : step.done ? "bg-primary" : "bg-border"}`}
+                  className={`sm:h-0.5 sm:min-h-0 sm:flex-1 w-0.5 flex-1 min-h-[1rem] ${lineAfter}`}
                 />
               </div>
 

@@ -88,7 +88,9 @@ async def test_a_registered_team_cannot_be_deleted_and_learns_why(ctx: Ctx):
     resp = await ctx.delete()
 
     assert resp.status_code == 409
-    assert "angemeldet" in resp.json()["detail"] and "Melde es dort ab" in resp.json()["detail"]
+    detail = resp.json()["detail"]
+    assert "angemeldet" in detail
+    assert "Melde es dort ab" in detail
 
 
 @pytest.mark.asyncio

@@ -43,10 +43,10 @@ const MatchResultDialog = dynamic(() => import("@/components/match-result-dialog
 export default function TournamentDetailPage({
   params,
   searchParams,
-}: {
+}: Readonly<{
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ tab?: string }>;
-}) {
+}>) {
   const { slug } = use(params);
   const { tab: tabParam } = use(searchParams);
   const router = useRouter();
@@ -239,7 +239,13 @@ export default function TournamentDetailPage({
     }
     void confirm({
       title: "Turnier jetzt starten?",
-      description: `${tournament.registration_open ? `${plan.description} Die Anmeldung wird geschlossen.` : plan.description} Der Spielplan wird ausgelost; danach können keine Teams mehr dazukommen.`,
+      description: [
+        plan.description,
+        tournament.registration_open ? "Die Anmeldung wird geschlossen." : null,
+        "Der Spielplan wird ausgelost; danach können keine Teams mehr dazukommen.",
+      ]
+        .filter(Boolean)
+        .join(" "),
       confirmLabel: "Turnier starten",
       action: async () => {
         setIsStartingTournament(true);

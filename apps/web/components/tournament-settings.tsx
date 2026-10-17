@@ -47,6 +47,8 @@ function SettingsCard({
   onSave: () => void;
   children: ReactNode;
 }>) {
+  let label = dirty ? `${title} speichern` : "Gespeichert";
+  if (saving) label = "Wird gespeichert…";
   return (
     <Card>
       <CardHeader>
@@ -56,7 +58,7 @@ function SettingsCard({
       <CardContent className="space-y-4">
         {children}
         <Button onClick={onSave} disabled={saving || invalid || !dirty}>
-          {saving ? "Wird gespeichert…" : dirty ? `${title} speichern` : "Gespeichert"}
+          {label}
         </Button>
       </CardContent>
     </Card>
