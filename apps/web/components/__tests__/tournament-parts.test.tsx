@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { TournamentHeader } from '../tournament-header'
 import { TournamentControlCard } from '../tournament-control-card'
 import { TournamentTeamsTab } from '../tournament-teams-tab'
@@ -8,7 +8,8 @@ import { ApiError } from '@/lib/api'
 import { makeTournament, makeTournamentTeam } from '@/lib/test-fixtures/tournament'
 import { JoinPolicy } from '@/types'
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+vi.mock('sonner', () => ({ toast }))
 
 describe('TournamentHeader', () => {
   it('shows name, phase, place and the number of teams', () => {
@@ -23,6 +24,27 @@ describe('TournamentHeader', () => {
     render(<TournamentHeader tournament={makeTournament({ join_policy: JoinPolicy.INVITE_ONLY })} teamCount={4} />)
     expect(screen.queryByRole('button', { name: /teilen/ })).not.toBeInTheDocument()
     expect(screen.getByText('4 Teams')).toBeInTheDocument()
+  })
+})
+
+describe('TournamentHeader: sharing', () => {
+  it('shares the plain address where the phone can share', async () => {
+    const share = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    render(<TournamentHeader tournament={makeTournament({ slug: 'cup' } as never)} teamCount={2} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cup teilen' }))
+    await waitFor(() => expect(share).toHaveBeenCalledWith({ title: 'Cup', url: `${window.location.origin}/t/cup` }))
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+  })
+
+  it('copies the address elsewhere and says so', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'share', { value: undefined, configurable: true })
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    render(<TournamentHeader tournament={makeTournament({ slug: 'cup' } as never)} teamCount={2} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Cup teilen' }))
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/t/cup`))
+    expect(toast.success).toHaveBeenCalledWith('Turnier-Link kopiert.')
   })
 })
 
@@ -43,6 +65,16 @@ describe('TournamentControlCard', () => {
 
     rerender(<TournamentControlCard {...props} isStarting tournament={makeTournament()} teams={teams} />)
     expect(screen.getByRole('button', { name: 'Wird gestartet…' })).toBeDisabled()
+  })
+
+  it('switches registration and check-in', () => {
+    const onSetOpen = vi.fn()
+    const tournament = makeTournament({ checkin_enabled: true })
+    render(<TournamentControlCard {...props} onSetOpen={onSetOpen} tournament={tournament} teams={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Anmeldung schließen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Check-in öffnen' }))
+    expect(onSetOpen).toHaveBeenCalledWith('registration', false)
+    expect(onSetOpen).toHaveBeenCalledWith('checkin', true)
   })
 
   it('points to the results after the start', () => {

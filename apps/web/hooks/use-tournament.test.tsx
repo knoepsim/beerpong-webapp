@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, waitFor } from '@testing-library/react'
 import { renderHook } from '@/lib/test-fixtures/render'
 import { useTournament } from './use-tournament'
-import { useCheckin, useStartTournament } from './queries/tournaments'
+import { useCheckin, useCreateTournament, useInvitePreview, useMyTournaments, useStartTournament, useTournamentById } from './queries/tournaments'
 import { api, ApiError } from '@/lib/api'
 import { queryKeys } from '@/lib/query-keys'
 import { makeTournament, makeTournamentTeam } from '@/lib/test-fixtures/tournament'
@@ -29,7 +29,11 @@ vi.mock('@/lib/api', async (importOriginal) => ({
       getBracket: vi.fn(),
       checkin: vi.fn(),
       startTournament: vi.fn(),
+      getMyTournaments: vi.fn(),
+      get: vi.fn(),
+      create: vi.fn(),
     },
+    invites: { get: vi.fn() },
     roles: { list: vi.fn() },
   },
 }))
@@ -114,5 +118,30 @@ describe('useStartTournament', () => {
     const { result } = renderHook(() => useStartTournament('t1'))
     await act(() => result.current.mutateAsync())
     expect(toast.success).toHaveBeenCalledWith('Turnier gestartet. 2 Teams ohne Check-in entfernt.')
+  })
+})
+
+describe('lookups and lists', () => {
+  it('load my tournaments, a tournament by its old id and the tournament behind an invitation', async () => {
+    t.getMyTournaments.mockResolvedValue({ participating: [], managing: [] } as never)
+    t.get.mockResolvedValue(tournament)
+    vi.mocked(api.invites.get).mockResolvedValue({ name: 'Cup' } as never)
+    const mine = renderHook(() => useMyTournaments())
+    const byId = renderHook(() => useTournamentById('t1'))
+    const invite = renderHook(() => useInvitePreview('tok'))
+    await waitFor(() => expect(mine.result.current.isSuccess && byId.result.current.isSuccess && invite.result.current.isSuccess).toBe(true))
+    expect(byId.result.current.data?.slug).toBe('cup')
+    expect(api.invites.get).toHaveBeenCalledWith('tok')
+  })
+
+  it('creates a tournament and leaves its errors to the form', async () => {
+    t.create.mockResolvedValue(tournament)
+    const { result } = renderHook(() => useCreateTournament())
+    await act(() => result.current.mutateAsync({ name: 'Cup' } as never))
+    expect(toast.success).toHaveBeenCalledWith('Turnier erstellt.')
+
+    t.create.mockRejectedValue(new ApiError(422, { detail: 'Name fehlt.' }))
+    await act(() => result.current.mutateAsync({} as never).catch(() => {}))
+    expect(toast.error).not.toHaveBeenCalled()
   })
 })

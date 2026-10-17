@@ -75,6 +75,19 @@ describe('InviteLinks', () => {
     expect(toast.success).toHaveBeenCalledWith('Link kopiert.')
   })
 
+  it('shares a link where the phone can share', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('closed', 'AbortError'))
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    mocked.list.mockResolvedValue([invite()])
+    render(<InviteLinks tournamentId="t1" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Link WhatsApp teilen' }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledWith({ title: 'Einladung zum Turnier', url: `${window.location.origin}/invite/abc2345` }))
+    expect(toast.error).not.toHaveBeenCalled() // closing the share sheet is no error
+    Reflect.deleteProperty(navigator, 'share')
+  })
+
   it('deletes only after the consequences were named', async () => {
     mocked.list.mockResolvedValue([invite()])
     mocked.remove.mockResolvedValue(undefined)
