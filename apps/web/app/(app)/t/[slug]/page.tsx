@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Schedule } from "@/components/schedule";
 import { ParticipantStatus } from "@/components/participant-status";
 import { TablesBoard } from "@/components/tables-board";
+import { PodiumCard } from "@/components/podium-card";
 import { MatchResultDialog } from "@/components/match-result-dialog";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
@@ -340,9 +341,11 @@ export default function TournamentDetailPage({
     );
   }
 
-  // a tab that is not there for me (tables before the start, settings without the role) shows the overview
+  // the tables only matter while it runs; a tab that is not there (tables before the start or after the end,
+  // settings without the role) shows the overview
+  const hasTables = !!bracket && !tournament.finished_at;
   const shownTab: TournamentTab =
-    (tab === "tables" && !bracket) || (tab === "admin" && !canManage) ? "overview" : tab;
+    (tab === "tables" && !hasTables) || (tab === "admin" && !canManage) ? "overview" : tab;
   const matchTeamA = selectedMatch?.team_a_id ? teamsMap[selectedMatch.team_a_id] : undefined;
   const matchTeamB = selectedMatch?.team_b_id ? teamsMap[selectedMatch.team_b_id] : undefined;
 
@@ -401,7 +404,7 @@ export default function TournamentDetailPage({
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
           <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
-          {bracket && <TabsTrigger value="tables" className="flex-1">Tische</TabsTrigger>}
+          {hasTables && <TabsTrigger value="tables" className="flex-1">Tische</TabsTrigger>}
           <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
         </TabsList>
         {canManage && (
@@ -417,6 +420,8 @@ export default function TournamentDetailPage({
         )}
 
         <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* the end of the tournament: the winner first */}
+          {tournament.finished_at && bracket && <PodiumCard bracket={bracket} teamsMap={teamsMap} />}
           {canManage && (
             <Card className="border-primary/50 shadow-sm bg-primary/5">
               <CardHeader className="pb-3">
@@ -493,7 +498,7 @@ export default function TournamentDetailPage({
           )}
         </TabsContent>
 
-        {bracket && (
+        {hasTables && bracket && (
           <TabsContent value="tables" className="mt-6">
             <TablesBoard
               bracket={bracket}
