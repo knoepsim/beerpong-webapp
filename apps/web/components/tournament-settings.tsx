@@ -196,7 +196,7 @@ export function TournamentSettings({
       description: "Das Turnier mit allen Anmeldungen, Spielen und Ergebnissen ist danach für alle weg. Das lässt sich nicht rückgängig machen.",
       confirmLabel: "Turnier löschen",
       destructive: true,
-      typeToConfirm: tournament.name,
+      typeToConfirm: "LÖSCHEN",
       action: async () => {
         await api.tournaments.delete(tournament.id);
         toast.success("Turnier gelöscht.");

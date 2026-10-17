@@ -24,8 +24,8 @@ export interface ConfirmOptions {
   /** Deleting or removing: the button is red. */
   destructive?: boolean;
   /**
-   * For what cannot be undone and hits many people (deleting a tournament): this text must be typed first. The name
-   * of the thing makes people look at what they delete; case and spaces at the ends do not matter.
+   * For what cannot be undone and hits many people (deleting a tournament): this text ("LÖSCHEN") must be typed
+   * first, so it is never confirmed in passing; case and spaces at the ends do not matter.
    */
   typeToConfirm?: string;
   /** Runs on confirmation; the dialog shows that it runs and stays open with the message if it fails. */
