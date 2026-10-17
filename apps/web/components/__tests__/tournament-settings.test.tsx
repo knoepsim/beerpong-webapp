@@ -154,7 +154,7 @@ describe('visibility per role', () => {
     for (const title of ['Allgemein', 'Zeitplan', 'Tische', 'Link & Zugang', 'Rollen', 'Gefahrenzone']) {
       expect(screen.getByText(title, { selector: '[data-slot=card-title]' })).toBeInTheDocument();
     }
-    expect(screen.getAllByRole('button', { name: /entziehen/ })).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /entziehen/ })).toHaveLength(2); // manager and referee: the admin role stays with who created it
     expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument(); // everybody may join
   });
 

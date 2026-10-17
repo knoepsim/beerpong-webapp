@@ -24,17 +24,20 @@ export const ROLE_INFO: Record<TournamentRoleType, { label: string; description:
   },
   [TournamentRoleType.ADMIN]: {
     label: "Admin",
-    description: "Darf alles, auch Manager und Admins ernennen und das Turnier löschen.",
+    description: "Hat das Turnier erstellt: darf alles, auch Manager ernennen und das Turnier löschen.",
   },
 };
 
-/** The roles somebody may give (the same rules as the API): admins all, managers only referees. */
+/**
+ * The roles somebody may give and take (the same rules as the API): admins managers and referees, managers only
+ * referees. Admin is whoever created the tournament: nobody gives or takes it.
+ */
 export function assignableRoles(own: TournamentRoleType | null): TournamentRoleType[] {
-  if (own === TournamentRoleType.ADMIN) return [TournamentRoleType.REFEREE, TournamentRoleType.MANAGER, TournamentRoleType.ADMIN];
+  if (own === TournamentRoleType.ADMIN) return [TournamentRoleType.REFEREE, TournamentRoleType.MANAGER];
   if (own === TournamentRoleType.MANAGER) return [TournamentRoleType.REFEREE];
   return [];
 }
 
-/** Whether somebody may take this role away: admins every role, managers only referees. */
+/** Whether somebody may take this role away: admins managers and referees, managers only referees. */
 export const mayRevoke = (own: TournamentRoleType | null, role: TournamentRoleType) =>
   assignableRoles(own).includes(role);

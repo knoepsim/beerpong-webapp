@@ -16,7 +16,7 @@ import { logout } from "@/lib/auth";
 function NavDot({ label, floating = false }: Readonly<{ label: string | null; floating?: boolean }>) {
   if (!label) return null;
   return (
-    <span className={`size-2.5 rounded-full bg-destructive ${floating ? "absolute -top-0.5 -right-1" : ""}`}>
+    <span className={`size-2.5 rounded-full bg-primary ring-2 ring-background ${floating ? "absolute -top-0.5 -right-1" : ""}`}>
       <span className="sr-only">{label}</span>
     </span>
   );

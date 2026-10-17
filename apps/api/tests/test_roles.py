@@ -55,6 +55,18 @@ async def test_admin_assigns_and_lists_roles(ctx: Ctx):
 
 
 @pytest.mark.asyncio
+async def test_nobody_is_made_admin_it_is_who_created_the_tournament(ctx: Ctx):
+    resp = await ctx.assign(0, 1, "admin")
+    assert resp.status_code == 403
+    assert "erstellt" in resp.json()["detail"]
+    admin_role = next(
+        r for r in (await ctx.client.get(f"/tournaments/{ctx.tid}/roles", headers=ctx.headers[0])).json()
+        if r["role"] == "admin"
+    )
+    assert (await ctx.revoke(0, admin_role["id"])).status_code == 403, "the admin role cannot be taken away"
+
+
+@pytest.mark.asyncio
 async def test_manager_may_only_assign_referee(ctx: Ctx):
     await ctx.assign(0, 1, "manager")
     assert (await ctx.assign(1, 2, "referee")).status_code == 201

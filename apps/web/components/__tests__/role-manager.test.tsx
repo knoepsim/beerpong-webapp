@@ -41,13 +41,14 @@ describe('RoleManager', () => {
     expect(names).toEqual(['Alice AdminAdmin', 'Max ManagerManager', 'Ref ReeseSchiedsrichter'])
   })
 
-  it('lets an admin choose any role as a card, then add a person found', async () => {
+  it('lets an admin choose manager or referee as a card (never admin), then add a person found', async () => {
     vi.mocked(api.users.search).mockResolvedValue([{ id: 'u9', name: 'Zed Zimmer' }, { id: 'u3', name: 'Max Manager' }] as never)
     vi.mocked(api.roles.assign).mockResolvedValue(roles[0])
     render(<RoleManager tournamentId="t1" roles={roles} userRole={TournamentRoleType.ADMIN} />)
 
     await search('ze')
     expect(screen.getByRole('radio', { name: /^Schiedsrichter/ })).toBeChecked() // the default
+    expect(screen.queryByRole('radio', { name: /^Admin/ })).not.toBeInTheDocument() // who created the tournament
     fireEvent.click(screen.getByRole('radio', { name: /^Manager/ }))
 
     expect(await screen.findByText('Ist Manager')).toBeInTheDocument() // Max holds it already
@@ -61,8 +62,8 @@ describe('RoleManager', () => {
     vi.mocked(api.users.search).mockResolvedValue([{ id: 'u2', name: 'Ref Reese' }] as never)
     render(<RoleManager tournamentId="t1" roles={roles} userRole={TournamentRoleType.ADMIN} />)
     await search('re')
-    fireEvent.click(screen.getByRole('radio', { name: /^Admin/ }))
-    const row = (await screen.findByRole('button', { name: 'Ref Reese als Admin hinzufügen' })).closest('li')!
+    fireEvent.click(screen.getByRole('radio', { name: /^Manager/ }))
+    const row = (await screen.findByRole('button', { name: 'Ref Reese als Manager hinzufügen' })).closest('li')!
     expect(within(row).getByText('Schiedsrichter')).toBeInTheDocument()
   })
 
@@ -103,8 +104,9 @@ describe('RoleManager', () => {
 })
 
 describe('roles', () => {
-  it('follow the rules of the API: admins give and take all, managers referees, referees nothing', () => {
-    expect(assignableRoles(TournamentRoleType.ADMIN)).toHaveLength(3)
+  it('follow the rules of the API: nobody gives admin, admins the others, managers referees', () => {
+    expect(assignableRoles(TournamentRoleType.ADMIN)).toEqual([TournamentRoleType.REFEREE, TournamentRoleType.MANAGER])
+    expect(mayRevoke(TournamentRoleType.ADMIN, TournamentRoleType.ADMIN)).toBe(false)
     expect(assignableRoles(TournamentRoleType.MANAGER)).toEqual([TournamentRoleType.REFEREE])
     expect(assignableRoles(null)).toEqual([])
     expect(mayRevoke(TournamentRoleType.MANAGER, TournamentRoleType.MANAGER)).toBe(false)
