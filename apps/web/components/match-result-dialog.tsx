@@ -7,6 +7,7 @@ import type { Match, Result } from "@/types";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
+import { formatWhen } from "@/lib/format-when";
 import { BeerpongTable } from "@/components/BeerpongTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,8 @@ interface MatchResultDialogProps {
 /** Without an entry the winner had all cups left: what the placeholder shows is what is saved. */
 const DEFAULT_CUPS = 10;
 
-const timeOf = (iso: string) => new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const timeOf = (iso: string) => TIME.format(new Date(iso));
 
 /**
  * The organization's view of a match: start it at its table (or take the start back) and report its result.
@@ -256,7 +258,7 @@ export function MatchResultDialog({
                   className="w-full h-11 mb-3 gap-2 border-emerald-600/30 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/10 hover:border-emerald-500/50"
                 >
                   <Play className="w-4 h-4 fill-current" aria-hidden="true" />
-                  {isStarting ? "Wird gestartet..." : "Spiel starten"}
+                  {isStarting ? "Wird gestartet…" : "Spiel starten"}
                 </Button>
               )}
               {match.status === "live" && (
@@ -300,7 +302,7 @@ export function MatchResultDialog({
                       {allResults.map((r) => (
                         <div key={r.id} className="text-xs border-b last:border-0 pb-2 last:pb-0">
                           <div className="flex justify-between text-muted-foreground">
-                            <span>{new Date(r.created_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}</span>
+                            <span>{formatWhen(r.created_at)}</span>
                             <span>{r.reported_by_username || "Unbekannt"}</span>
                           </div>
                           <div className="mt-1 font-medium">
@@ -425,7 +427,7 @@ export function MatchResultDialog({
                     Abbrechen
                   </Button>
                   <Button onClick={handleSubmit} disabled={!isValid || !hasChanges || isSubmitting || nextMatchHasResult} className="flex-1">
-                    {isSubmitting ? "Wird gespeichert..." : existingResult ? "Ergebnis ändern" : "Ergebnis speichern"}
+                    {isSubmitting ? "Wird gespeichert…" : existingResult ? "Ergebnis ändern" : "Ergebnis speichern"}
                   </Button>
                 </div>
               </div>
@@ -442,7 +444,7 @@ export function MatchResultDialog({
                           Abbrechen
                         </Button>
                         <Button type="button" variant="destructive" className="flex-1" onClick={handleDelete} disabled={isDeleting}>
-                          {isDeleting ? "Wird gelöscht..." : "Ergebnis löschen"}
+                          {isDeleting ? "Wird gelöscht…" : "Ergebnis löschen"}
                         </Button>
                       </div>
                     </div>

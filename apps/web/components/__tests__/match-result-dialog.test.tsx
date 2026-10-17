@@ -166,7 +166,7 @@ describe('MatchResultDialog', () => {
     fireEvent.change(cupsInput(), { target: { value: '3' } });
     fireEvent.click(saveButton());
 
-    expect(await screen.findByText('Wird gespeichert...')).toBeDisabled();
+    expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
     reject(new Error('Spiel gesperrt'));
     expect(await screen.findByText('Spiel gesperrt')).toBeInTheDocument();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -259,7 +259,7 @@ describe('MatchResultDialog', () => {
     setup();
     await ready();
     confirmDelete();
-    expect(await screen.findByText('Wird gelöscht...')).toBeDisabled();
+    expect(await screen.findByText('Wird gelöscht…')).toBeDisabled();
   });
 
   it('toggles and renders the history of all entries', async () => {

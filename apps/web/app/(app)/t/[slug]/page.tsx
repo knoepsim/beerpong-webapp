@@ -15,7 +15,7 @@ import { ParticipantStatus } from "@/components/participant-status";
 import { useConfirm } from "@/components/confirm-dialog";
 import { TablesBoard } from "@/components/tables-board";
 import { PodiumCard } from "@/components/podium-card";
-import { MatchResultDialog } from "@/components/match-result-dialog";
+import dynamic from "next/dynamic";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
 import { CheckinSummary } from "@/components/checkin-summary";
@@ -34,6 +34,11 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { RefreshCw, ShieldAlert } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+
+// only referees, managers and admins open it: the dialog with its cup animation is loaded then, not for everybody
+const MatchResultDialog = dynamic(() => import("@/components/match-result-dialog").then((m) => m.MatchResultDialog), {
+  ssr: false,
+});
 
 export default function TournamentDetailPage({
   params,

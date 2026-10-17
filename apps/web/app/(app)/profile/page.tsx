@@ -323,7 +323,7 @@ export default function ProfilePage() {
                           setPhoneStep(1);
                         }
                       }}
-                      className="text-primary hover:underline font-medium focus:outline-none cursor-pointer"
+                      className="text-primary hover:underline font-medium cursor-pointer rounded-sm outline-hidden focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
                       Ändern?
                     </span>
@@ -348,6 +348,7 @@ export default function ProfilePage() {
                           </div>
                           <Input
                             type="tel"
+                            autoComplete="tel-national"
                             placeholder="151 12345678"
                             {...field}
                             onChange={(e) => {

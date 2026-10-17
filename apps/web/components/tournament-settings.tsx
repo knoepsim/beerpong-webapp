@@ -56,7 +56,7 @@ function SettingsCard({
       <CardContent className="space-y-4">
         {children}
         <Button onClick={onSave} disabled={saving || invalid || !dirty}>
-          {saving ? "Wird gespeichert..." : dirty ? `${title} speichern` : "Gespeichert"}
+          {saving ? "Wird gespeichert…" : dirty ? `${title} speichern` : "Gespeichert"}
         </Button>
       </CardContent>
     </Card>
@@ -241,7 +241,7 @@ export function TournamentSettings({
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   rows={5}
-                  placeholder="Turnier-Regeln, Zeitplan, Preise..."
+                  placeholder="Turnier-Regeln, Zeitplan, Preise…"
                 />
               </TabsContent>
               <TabsContent value="preview">
@@ -249,7 +249,7 @@ export function TournamentSettings({
                   {editDescription ? (
                     <Markdown>{editDescription}</Markdown>
                   ) : (
-                    <span className="text-muted-foreground italic">Keine Beschreibung...</span>
+                    <span className="text-muted-foreground italic">Keine Beschreibung…</span>
                   )}
                 </div>
               </TabsContent>
@@ -351,7 +351,7 @@ export function TournamentSettings({
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 flex gap-2">
                 <Input
-                  placeholder="Nutzername suchen..."
+                  placeholder="Nutzername suchen…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -368,7 +368,7 @@ export function TournamentSettings({
                   <Label>Nutzer auswählen</Label>
                   <Select value={selectedUser} onValueChange={(v) => v && setSelectedUser(v as string)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Nutzer wählen..." />
+                      <SelectValue placeholder="Nutzer wählen…" />
                     </SelectTrigger>
                     <SelectContent>
                       {searchResults.map(u => (
@@ -382,7 +382,7 @@ export function TournamentSettings({
                   <Label>Rolle auswählen</Label>
                   <Select value={selectedRole} onValueChange={(v) => v && setSelectedRole(v as TournamentRoleType)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Rolle wählen..." />
+                      <SelectValue placeholder="Rolle wählen…" />
                     </SelectTrigger>
                     <SelectContent>
                       {canAssignAdmin && <SelectItem value={TournamentRoleType.ADMIN}>Admin</SelectItem>}

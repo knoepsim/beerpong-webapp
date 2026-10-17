@@ -95,7 +95,7 @@ function TableCard({
           {match.status === "ready" && (
             <Button variant="outline" className="h-10 flex-1 gap-1.5" onClick={start} disabled={starting}>
               <Play className="size-4 fill-current" aria-hidden="true" />
-              {starting ? "Wird gestartet..." : "Spiel starten"}
+              {starting ? "Wird gestartet…" : "Spiel starten"}
             </Button>
           )}
           <Button

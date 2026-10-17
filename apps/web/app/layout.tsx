@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -13,6 +13,15 @@ const heading = Plus_Jakarta_Sans({
   variable: "--font-display",
   subsets: ["latin", "latin-ext"],
 });
+
+// the browser bar and native controls (scrollbars, date fields) in the colours of the page
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#F5F5F7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0C0C12" },
+  ],
+  colorScheme: "light dark",
+};
 
 export const metadata: Metadata = {
   title: "Bierpong Turnier",

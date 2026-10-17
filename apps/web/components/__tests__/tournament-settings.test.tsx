@@ -372,7 +372,7 @@ describe('editing the tournament: each card saves its own fields', () => {
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.click(saveOf('Allgemein'));
 
-    expect(await screen.findByText('Wird gespeichert...')).toBeDisabled();
+    expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
     reject(new Error('Das hat nicht geklappt.'));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Das hat nicht geklappt.'));
   });
@@ -388,7 +388,7 @@ describe('editing the tournament: each card saves its own fields', () => {
   it('previews an empty description with a placeholder', () => {
     setup(TournamentRoleType.ADMIN, { description: null });
     fireEvent.click(screen.getByText('Vorschau'));
-    expect(screen.getByText('Keine Beschreibung...')).toBeInTheDocument();
+    expect(screen.getByText('Keine Beschreibung…')).toBeInTheDocument();
   });
 });
 
@@ -434,7 +434,7 @@ describe('invitation links', () => {
 
 describe('role management', () => {
   const alice = { id: 'u9', name: 'Zed Zimmer' } as User;
-  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen...');
+  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen…');
   const searchButton = () => document.querySelector('.lucide-search')!.closest('button')!;
 
   it('requires two characters before searching', () => {

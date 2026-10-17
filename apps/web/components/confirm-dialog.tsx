@@ -119,7 +119,7 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
           <AlertDialogFooter>
             <AlertDialogCancel disabled={running}>Abbrechen</AlertDialogCancel>
             <Button variant={pending?.destructive ? "destructive" : "default"} onClick={() => void run()} disabled={running || !typedRight}>
-              {running ? "Bitte warten..." : pending?.confirmLabel}
+              {running ? "Bitte warten…" : pending?.confirmLabel}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

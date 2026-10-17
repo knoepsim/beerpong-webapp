@@ -124,6 +124,7 @@ export default function LoginPage() {
                           </div>
                           <Input
                             type="tel"
+                            autoComplete="tel-national"
                             placeholder="151 12345678"
                             {...field}
                             onChange={(e) => {

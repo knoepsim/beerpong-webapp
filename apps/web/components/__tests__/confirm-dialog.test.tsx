@@ -44,7 +44,7 @@ describe('ConfirmProvider', () => {
     let fail!: (e: Error) => void
     setup({ action: () => new Promise<void>((_, reject) => (fail = reject)) })
     fireEvent.click(screen.getByRole('button', { name: 'Turnier starten' }))
-    expect(await screen.findByRole('button', { name: 'Bitte warten...' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Bitte warten…' })).toBeDisabled()
 
     fail(new Error('Zu wenige Teams.'))
     expect(await screen.findByRole('alert')).toHaveTextContent('Zu wenige Teams.')

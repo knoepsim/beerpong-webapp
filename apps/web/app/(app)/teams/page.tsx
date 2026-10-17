@@ -231,7 +231,7 @@ export default function TeamsPage() {
               Abbrechen
             </Button>
             <Button onClick={handleRename} disabled={!newName.trim() || isRenaming}>
-              {isRenaming ? "Speichere..." : "Speichern"}
+              {isRenaming ? "Speichere…" : "Speichern"}
             </Button>
           </DialogFooter>
         </DialogContent>

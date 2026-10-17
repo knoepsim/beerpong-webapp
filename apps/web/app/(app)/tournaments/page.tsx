@@ -264,7 +264,7 @@ export default function TournamentsPage() {
                     <FormItem>
                       <FormLabel>Beschreibung (Markdown unterstützt)</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise..." className="min-h-24" {...field} />
+                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise…" className="min-h-24" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

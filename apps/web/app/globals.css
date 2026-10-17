@@ -149,6 +149,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* native controls follow the theme of the app (also when it differs from the system) */
+    color-scheme: light;
+    /* no wait for a possible double-tap zoom: every tap acts at once (pinch zoom stays) */
+    touch-action: manipulation;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-background text-foreground;
   }

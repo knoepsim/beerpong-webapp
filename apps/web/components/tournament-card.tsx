@@ -14,7 +14,9 @@ const ROLE_LABELS: Record<TournamentRoleType, string> = {
   [TournamentRoleType.REFEREE]: "Schiedsrichter",
 };
 
-const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+const DAY = new Intl.DateTimeFormat("de-DE", { day: "numeric" });
+// "Okt." -> "Okt": the tile is too small for the dot
+const MONTH = new Intl.DateTimeFormat("de-DE", { month: "short" });
 
 // the date tile names the day already: the text adds only the time
 const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
@@ -32,8 +34,8 @@ function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase
       )}
       aria-hidden="true"
     >
-      <span className="text-xl font-bold tabular-nums">{date.getDate()}</span>
-      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide">{MONTHS[date.getMonth()]}</span>
+      <span className="text-xl font-bold tabular-nums">{DAY.format(date)}</span>
+      <span className="mt-1 text-[11px] font-semibold uppercase tracking-wide">{MONTH.format(date).replace(".", "")}</span>
     </div>
   );
 }
@@ -68,7 +70,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
     <Link
       href={`/t/${t.slug}`}
       className={cn(
-        "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-none transition",
+        "group flex items-center gap-3 rounded-2xl border bg-card p-3 shadow-xs outline-hidden transition",
         "hover:border-primary/40 hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50",
       )}
     >
