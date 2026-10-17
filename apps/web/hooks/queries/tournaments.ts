@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 import { successMessage } from "@/lib/query-client";
 import { queryKeys, tournamentKeys } from "@/lib/query-keys";
-import type { Tournament, TournamentCreateRequest, TournamentStartResponse, TournamentTeam } from "@/types";
+import { ROLE_INFO } from "@/lib/roles";
+import type { Tournament, TournamentCreateRequest, TournamentRoleType, TournamentStartResponse, TournamentTeam } from "@/types";
 
 // -- lists and lookups
 
@@ -237,10 +238,22 @@ export function useDeleteTournamentInvite(id: string) {
 
 // -- roles
 
+interface AssignRole {
+  userId: string;
+  role: TournamentRoleType;
+  /** For the message: "Ada ist jetzt Schiedsrichter." */
+  userName: string;
+}
+
 export function useAssignRole(id: string) {
   return useMutation({
-    mutationFn: ({ userId, role }: { userId: string; role: string }) => api.roles.assign(id, userId, role),
-    meta: { invalidates: tournamentKeys(id, ["roles"]), successMessage: "Rolle zugewiesen." },
+    mutationFn: ({ userId, role }: AssignRole) => api.roles.assign(id, userId, role),
+    meta: {
+      invalidates: tournamentKeys(id, ["roles"]),
+      successMessage: successMessage(
+        (_: unknown, { userName, role }: AssignRole) => `${userName} ist jetzt ${ROLE_INFO[role].label}.`,
+      ),
+    },
   });
 }
 

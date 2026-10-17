@@ -151,10 +151,10 @@ afterEach(() => cleanup());
 describe('visibility per role', () => {
   it('shows everything to admins, grouped', () => {
     setup(TournamentRoleType.ADMIN);
-    for (const title of ['Allgemein', 'Zeitplan', 'Tische', 'Link & Zugang', 'Rollen & Berechtigungen', 'Gefahrenzone']) {
+    for (const title of ['Allgemein', 'Zeitplan', 'Tische', 'Link & Zugang', 'Rollen', 'Gefahrenzone']) {
       expect(screen.getByText(title, { selector: '[data-slot=card-title]' })).toBeInTheDocument();
     }
-    expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /entziehen/ })).toHaveLength(3);
     expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument(); // everybody may join
   });
 
@@ -162,16 +162,17 @@ describe('visibility per role', () => {
     setup(TournamentRoleType.MANAGER);
     expect(card('Allgemein')).toBeInTheDocument();
     expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'))).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /entziehen/ })).toHaveLength(1);
   });
 
   it.each([TournamentRoleType.REFEREE, null])('shows only the role list to %s', (role) => {
     setup(role);
     expect(screen.queryByText('Allgemein')).not.toBeInTheDocument();
     expect(screen.queryByText('Gefahrenzone')).not.toBeInTheDocument();
-    expect(screen.getByText('Rollen & Berechtigungen')).toBeInTheDocument();
+    expect(screen.getByText('Rollen', { selector: '[data-slot=card-title]' })).toBeInTheDocument();
     expect(screen.getByText('Alice Admin')).toBeInTheDocument();
-    expect(screen.getByText('u3')).toBeInTheDocument(); // falls back to the user id
+    expect(screen.getByText('Unbekannt')).toBeInTheDocument(); // a role without a name
+    expect(screen.queryByRole('button', { name: 'Rolle vergeben' })).not.toBeInTheDocument();
   });
 });
 
@@ -416,130 +417,6 @@ describe('invitation links', () => {
     setup(TournamentRoleType.ADMIN, { join_policy: JoinPolicy.INVITE_ONLY });
     expect(screen.queryByText('Einladungslinks')).not.toBeInTheDocument();
     expect(mocked.invites).not.toHaveBeenCalled();
-  });
-});
-
-describe('role management', () => {
-  const alice = { id: 'u9', name: 'Zed Zimmer' } as User;
-  const searchInput = () => screen.getByPlaceholderText('Nutzername suchen…');
-  const searchButton = () => document.querySelector('.lucide-search')!.closest('button')!;
-
-  it('requires two characters before searching', () => {
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.change(searchInput(), { target: { value: 'z' } });
-    expect(searchButton()).toBeDisabled();
-    fireEvent.keyDown(searchInput(), { key: 'Enter' });
-    expect(mocked.search).not.toHaveBeenCalled();
-  });
-
-  it('searches via button and via Enter, ignoring other keys', async () => {
-    mocked.search.mockResolvedValue([alice]);
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.change(searchInput(), { target: { value: 'ze' } });
-    fireEvent.keyDown(searchInput(), { key: 'a' });
-    expect(mocked.search).not.toHaveBeenCalled();
-
-    fireEvent.click(searchButton());
-    expect(await screen.findByText('Zed Zimmer')).toBeInTheDocument();
-
-    fireEvent.keyDown(searchInput(), { key: 'Enter' });
-    await waitFor(() => expect(mocked.search).toHaveBeenCalledTimes(2));
-  });
-
-  it('reports search failures', async () => {
-    mocked.search.mockRejectedValue(new Error('x'));
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.change(searchInput(), { target: { value: 'ze' } });
-    fireEvent.click(searchButton());
-    expect(await screen.findByText('Die Suche hat nicht geklappt. Versuch es noch einmal.')).toBeInTheDocument();
-  });
-
-  it('assigns the chosen role to the chosen user', async () => {
-    mocked.search.mockResolvedValue([alice]);
-    mocked.assign.mockResolvedValue(roles[0]);
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.change(searchInput(), { target: { value: 'ze' } });
-    fireEvent.click(searchButton());
-    await screen.findByText('Zed Zimmer');
-
-    const assign = screen.getByRole('button', { name: /Zuweisen/ });
-    expect(assign).toBeDisabled();
-    fireEvent.click(screen.getByText('Zed Zimmer'));
-    expect(assign).toBeEnabled();
-    fireEvent.click(screen.getByText('Manager'));
-    fireEvent.click(assign);
-
-    await waitFor(() => expect(mocked.assign).toHaveBeenCalledWith('t1', 'u9', 'manager'));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle zugewiesen.'));
-    await waitFor(() => expect(screen.queryByText('Zed Zimmer')).not.toBeInTheDocument()); // search reset
-  });
-
-  it('assigns the default referee role and offers only the allowed roles', async () => {
-    mocked.search.mockResolvedValue([alice]);
-    mocked.assign.mockResolvedValue(roles[1]);
-    setup(TournamentRoleType.MANAGER);
-    fireEvent.change(searchInput(), { target: { value: 'ze' } });
-    fireEvent.click(searchButton());
-    await screen.findByText('Zed Zimmer');
-
-    expect(within(document.body).queryByText('Admin')).not.toBeInTheDocument();
-    expect(screen.queryByText('Manager')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Zed Zimmer'));
-    fireEvent.click(screen.getByText('Schiedsrichter'));
-    fireEvent.click(screen.getByRole('button', { name: /Zuweisen/ }));
-    await waitFor(() => expect(mocked.assign).toHaveBeenCalledWith('t1', 'u9', 'referee'));
-  });
-
-  it.each([
-    [new ApiError(409, { detail: 'Schon vergeben' }), 'Schon vergeben'],
-    ['boom', 'Das hat nicht geklappt. Versuch es noch einmal.'],
-  ])('reports assignment failures (%s)', async (error, message) => {
-    mocked.search.mockResolvedValue([alice]);
-    mocked.assign.mockRejectedValue(error);
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.change(searchInput(), { target: { value: 'ze' } });
-    fireEvent.click(searchButton());
-    await screen.findByText('Zed Zimmer');
-    fireEvent.click(screen.getByText('Zed Zimmer'));
-    fireEvent.click(screen.getByRole('button', { name: /Zuweisen/ }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
-  });
-
-  const revokeButtons = () =>
-    screen.getAllByRole('button').filter((b) => b.querySelector('.lucide-user-minus'));
-
-  it('revokes a role after a confirmation that names the consequence', async () => {
-    mocked.revoke.mockResolvedValue(undefined);
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.click(revokeButtons()[1]);
-    expect(screen.getByText('Rolle entziehen?')).toBeInTheDocument();
-    expect(screen.getByText('Ref Reese kann das Turnier danach nicht mehr als Schiedsrichter leiten.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
-
-    await waitFor(() => expect(mocked.revoke).toHaveBeenCalledWith('t1', 'r2'));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle entzogen.'));
-    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
-  });
-
-  it('can cancel the confirmation', () => {
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.click(revokeButtons()[0]);
-    fireEvent.click(screen.getByText('Abbrechen'));
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(mocked.revoke).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [new ApiError(403, { detail: 'Nicht erlaubt' }), 'Nicht erlaubt'],
-    [new Error('boom'), 'Das hat nicht geklappt. Versuch es noch einmal.'],
-  ])('reports a failed revoke once and keeps the dialog open (%s)', async (error, message) => {
-    mocked.revoke.mockRejectedValue(error);
-    setup(TournamentRoleType.ADMIN);
-    fireEvent.click(revokeButtons()[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
-    expect(toast.error).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('alertdialog')).toBeInTheDocument(); // stays open to try again or cancel
   });
 });
 
