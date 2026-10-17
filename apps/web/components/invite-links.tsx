@@ -27,7 +27,7 @@ export function InviteLinks({ tournamentId }: Readonly<{ tournamentId: string }>
   const [label, setLabel] = useState("");
   const confirm = useConfirm();
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     create.mutate(label.trim(), { onSuccess: () => setLabel("") });
   };

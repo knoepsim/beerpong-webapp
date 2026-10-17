@@ -183,7 +183,8 @@ export function useStartTournament(id: string) {
       invalidates: tournamentKeys(id, ["tournament", "teams", "bracket"]),
       successMessage: successMessage(({ removed_team_ids: removed }: TournamentStartResponse) => {
         if (removed.length === 0) return "Turnier gestartet.";
-        return `Turnier gestartet. ${removed.length === 1 ? "1 Team" : `${removed.length} Teams`} ohne Check-in entfernt.`;
+        const teams = removed.length === 1 ? "1 Team" : `${removed.length} Teams`;
+        return `Turnier gestartet. ${teams} ohne Check-in entfernt.`;
       }),
     },
   });

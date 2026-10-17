@@ -44,7 +44,7 @@ export default function TeamsPage() {
   const [blockedTeam, setBlockedTeam] = useState<Team | null>(null);
   const confirm = useConfirm();
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!createName.trim()) return;
     create.mutate(createName.trim(), { onSuccess: () => setCreateName("") });

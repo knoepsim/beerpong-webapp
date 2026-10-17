@@ -8,6 +8,7 @@ import { useMyTeams } from "@/hooks/queries/teams";
 import { useJoinTournament } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Team } from "@/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,11 +26,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
  * `onJoined` is for a page that goes somewhere else afterwards (the tournament page itself is loaded again anyway).
  */
 export function JoinTournament({
-  tournamentId,
-  tournamentName,
-  inviteToken,
   loginRedirect,
-  onJoined,
+  ...props
 }: Readonly<{
   tournamentId: string;
   tournamentName: string;
@@ -38,11 +36,28 @@ export function JoinTournament({
   loginRedirect: string;
   onJoined?: () => void;
 }>) {
+  const { user, isLoading } = useCurrentUser();
+  if (isLoading) return null;
+  if (!user) {
+    return (
+      <Link href={`/login?redirect=${encodeURIComponent(loginRedirect)}`} className={buttonVariants({ size: "lg" })}>
+        Anmelden und beitreten
+      </Link>
+    );
+  }
+  return <JoinDialog {...props} />;
+}
+
+function JoinDialog({
+  tournamentId,
+  tournamentName,
+  inviteToken,
+  onJoined,
+}: Readonly<{ tournamentId: string; tournamentName: string; inviteToken?: string | null; onJoined?: () => void }>) {
   const router = useRouter();
-  const { user, isLoading: isUserLoading } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [teamId, setTeamId] = useState("");
-  const teamsQuery = useMyTeams({ enabled: open && !!user });
+  const teamsQuery = useMyTeams({ enabled: open });
   const join = useJoinTournament(tournamentId);
   const teams = teamsQuery.data ?? [];
   // the only team is chosen already
@@ -87,23 +102,7 @@ export function JoinTournament({
   } else {
     content = (
       <>
-        <div className="space-y-2">
-          <Label>Dein Team</Label>
-          <Select value={chosenId} onValueChange={(val) => setTeamId(val || "")}>
-            <SelectTrigger>
-              <span className={chosenId ? "text-foreground" : "text-muted-foreground"}>
-                {chosenId ? teams.find((t) => t.id === chosenId)?.name : "Team auswählen…"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {teams.map((t) => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.name} {!t.is_complete && "(Unvollständig)"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <TeamSelect teams={teams} value={chosenId} onChange={setTeamId} />
         <Button className="w-full" onClick={handleJoin} disabled={!chosenId || join.isPending}>
           {join.isPending ? "Beitreten…" : "Jetzt teilnehmen"}
         </Button>
@@ -116,15 +115,6 @@ export function JoinTournament({
     );
   }
 
-  if (isUserLoading) return null;
-  if (!user) {
-    return (
-      <Link href={`/login?redirect=${encodeURIComponent(loginRedirect)}`} className={buttonVariants({ size: "lg" })}>
-        Anmelden und beitreten
-      </Link>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger className={buttonVariants({ size: "lg" })}>Mit Team beitreten</DialogTrigger>
@@ -133,10 +123,30 @@ export function JoinTournament({
           <DialogTitle>Turnier beitreten</DialogTitle>
           <DialogDescription>Wähle ein Team, um an {tournamentName} teilzunehmen.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 pt-4">
-          {content}
-        </div>
+        <div className="space-y-4 pt-4">{content}</div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TeamSelect({ teams, value, onChange }: Readonly<{ teams: Team[]; value: string; onChange: (id: string) => void }>) {
+  return (
+    <div className="space-y-2">
+      <Label>Dein Team</Label>
+      <Select value={value} onValueChange={(val) => onChange(val || "")}>
+        <SelectTrigger>
+          <span className={value ? "text-foreground" : "text-muted-foreground"}>
+            {value ? teams.find((t) => t.id === value)?.name : "Team auswählen…"}
+          </span>
+        </SelectTrigger>
+        <SelectContent>
+          {teams.map((t) => (
+            <SelectItem key={t.id} value={t.id}>
+              {t.name} {!t.is_complete && "(Unvollständig)"}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
