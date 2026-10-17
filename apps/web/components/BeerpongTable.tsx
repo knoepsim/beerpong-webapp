@@ -153,15 +153,12 @@ export function BeerpongTable({ leftCups, rightCups, className, compact = false 
   ].sort((a, b) => a.y - b.y);
 
   return (
-    <div
-      className={cn("w-full max-w-5xl mx-auto p-2  overflow-x-auto no-scrollbar", className)}
-      style={{ perspective: "1000px" }}
-    >
+    // no overflow handling here: cups and shadow stand out over the table, nothing is cut off or scrolls
+    <div className={cn("w-full max-w-5xl mx-auto p-2", className)} style={{ perspective: "1000px", marginBlock: giveBack }}>
       <div className="w-full mx-auto">
         <div
           className={`relative w-full ${aspectClass} bg-zinc-900 border-4 sm:border-8 border-zinc-800 rounded-xl shadow-2xl transition-all`}
           style={{
-            marginBlock: giveBack,
             transform: "rotateX(60deg)",
             transformStyle: "preserve-3d",
             boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
