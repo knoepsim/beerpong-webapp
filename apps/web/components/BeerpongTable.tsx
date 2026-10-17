@@ -153,8 +153,14 @@ export function BeerpongTable({ leftCups, rightCups, className, compact = false 
   ].sort((a, b) => a.y - b.y);
 
   return (
-    // no overflow handling here: cups and shadow stand out over the table, nothing is cut off or scrolls
-    <div className={cn("w-full max-w-5xl mx-auto p-2", className)} style={{ perspective: "1000px", marginBlock: giveBack }}>
+    // no overflow handling here: cups and shadow stand out over the table, nothing is cut off or scrolls.
+    // Decoration only: it lets taps through to what it overlaps (it reaches into the space above) and is hidden from
+    // screen readers, the texts around it say the same.
+    <div
+      className={cn("pointer-events-none w-full max-w-5xl mx-auto p-2", className)}
+      style={{ perspective: "1000px", marginBlock: giveBack }}
+      aria-hidden="true"
+    >
       <div className="w-full mx-auto">
         <div
           className={`relative w-full ${aspectClass} bg-zinc-900 border-4 sm:border-8 border-zinc-800 rounded-xl shadow-2xl transition-all`}
