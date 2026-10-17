@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { errorMessage } from "@/lib/errors";
 import { logout } from "@/lib/auth";
-import { useCurrentUser } from "@/components/user-provider";
+import { useCurrentUser, useRequestPhoneChange, useUpdateMe, useVerifyPhoneChange } from "@/hooks/queries/user";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,21 +52,25 @@ const codeSchema = z.object({
 });
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const { user, reload } = useCurrentUser();
+  const { user } = useCurrentUser();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
-  const [isSaving, setIsSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const updateMe = useUpdateMe({ successMessage: "Profil gespeichert." });
+  const requestPhoneChange = useRequestPhoneChange();
+  const verifyPhoneChange = useVerifyPhoneChange();
 
   // Phone Change State
   const [isPhoneDialogOpen, setIsPhoneDialogOpen] = useState(false);
   const [currentPhone, setCurrentPhone] = useState("");
   const [phoneStep, setPhoneStep] = useState<1 | 2>(1);
-  const [isPhoneLoading, setIsPhoneLoading] = useState(false);
-  const [phoneApiError, setPhoneApiError] = useState<string | null>(null);
+  const isPhoneLoading = requestPhoneChange.isPending || verifyPhoneChange.isPending;
+  const phoneFailure = requestPhoneChange.error ?? verifyPhoneChange.error;
+  const phoneApiError = phoneFailure ? errorMessage(phoneFailure) : null;
+  const resetPhoneErrors = () => {
+    requestPhoneChange.reset();
+    verifyPhoneChange.reset();
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -98,56 +101,34 @@ export default function ProfilePage() {
     defaultValues: { code: "" },
   });
 
-  const onSubmitProfile = async (values: z.infer<typeof profileSchema>) => {
-    setIsSaving(true);
-    setApiError(null);
-    setSuccess(false);
-    try {
-      const updatedUser = await api.users.updateMe(values);
-      await reload();
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setApiError(err.message || "Fehler beim Speichern");
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const onSubmitProfile = (values: z.infer<typeof profileSchema>) => updateMe.mutate(values);
 
   const handleLogout = () => void logout();
 
-  async function onSubmitPhone(values: z.infer<typeof phoneSchema>) {
-    setIsPhoneLoading(true);
-    setPhoneApiError(null);
-    try {
-      await api.users.requestPhoneChange(toE164(values.phone));
-      setCurrentPhone(values.phone);
-      setPhoneStep(2);
-    } catch (err: any) {
-      setPhoneApiError(err.message || "Fehler bei der Anfrage.");
-    } finally {
-      setIsPhoneLoading(false);
-    }
+  function onSubmitPhone(values: z.infer<typeof phoneSchema>) {
+    resetPhoneErrors();
+    requestPhoneChange.mutate(toE164(values.phone), {
+      onSuccess: () => {
+        setCurrentPhone(values.phone);
+        setPhoneStep(2);
+      },
+    });
   }
 
-  async function onSubmitCode(values: z.infer<typeof codeSchema>) {
-    setIsPhoneLoading(true);
-    setPhoneApiError(null);
-    try {
-      await api.users.verifyPhoneChange(toE164(currentPhone), values.code);
-      await reload();
-      setIsPhoneDialogOpen(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-      phoneForm.reset();
-      codeForm.reset();
-      setPhoneStep(1);
-    } catch (err: unknown) {
-      setPhoneApiError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-    } finally {
-      setIsPhoneLoading(false);
-    }
-  };
+  function onSubmitCode(values: z.infer<typeof codeSchema>) {
+    resetPhoneErrors();
+    verifyPhoneChange.mutate(
+      { phoneNumber: toE164(currentPhone), code: values.code },
+      {
+        onSuccess: () => {
+          setIsPhoneDialogOpen(false);
+          phoneForm.reset();
+          codeForm.reset();
+          setPhoneStep(1);
+        },
+      },
+    );
+  }
 
   if (!user) {
     return <div className="p-8 text-center animate-pulse">Lade Profil…</div>;
@@ -181,7 +162,7 @@ export default function ProfilePage() {
               <Button 
                 variant="outline" 
                 onClick={() => {
-                  setPhoneApiError(null);
+                  resetPhoneErrors();
                   phoneForm.reset();
                   codeForm.reset();
                   setPhoneStep(1);
@@ -227,14 +208,17 @@ export default function ProfilePage() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
                 <Button 
                   type="submit"
-                  disabled={isSaving || isProfileUnchanged} 
+                  disabled={updateMe.isPending || isProfileUnchanged} 
                   className="w-full sm:w-auto"
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  {isSaving ? "Speichere…" : "Speichern"}
+                  {updateMe.isPending ? "Wird gespeichert…" : "Profil speichern"}
                 </Button>
-                {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
-                {success && <p className="text-sm text-green-500 font-medium">Profil erfolgreich aktualisiert!</p>}
+                {updateMe.isError && (
+                  <p role="alert" className="text-sm text-destructive font-medium">
+                    {errorMessage(updateMe.error)}
+                  </p>
+                )}
               </div>
             </form>
           </Form>
@@ -315,11 +299,11 @@ export default function ProfilePage() {
                     <span 
                       role="button"
                       tabIndex={0}
-                      onClick={() => { setPhoneApiError(null); setPhoneStep(1); }} 
+                      onClick={() => { resetPhoneErrors(); setPhoneStep(1); }} 
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          setPhoneApiError(null);
+                          resetPhoneErrors();
                           setPhoneStep(1);
                         }
                       }}

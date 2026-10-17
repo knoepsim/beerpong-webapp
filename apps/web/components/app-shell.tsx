@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Trophy, Users, UserCircle, LogOut, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCurrentUser } from "./user-provider";
+import { useCurrentUser } from "@/hooks/queries/user";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/auth";

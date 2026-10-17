@@ -7,7 +7,8 @@ import type { TournamentInvite } from '@/types'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('sonner', () => ({ toast }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: { tournaments: { listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn() } },
 }))
 
@@ -71,7 +72,20 @@ describe('InviteLinks', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Link WhatsApp kopieren' }))
 
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(`${window.location.origin}/invite/abc2345`))
-    expect(toast.success).toHaveBeenCalledWith('Link kopiert')
+    expect(toast.success).toHaveBeenCalledWith('Link kopiert.')
+  })
+
+  it('shares a link where the phone can share', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('closed', 'AbortError'))
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true })
+    mocked.list.mockResolvedValue([invite()])
+    render(<InviteLinks tournamentId="t1" />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Link WhatsApp teilen' }))
+
+    await waitFor(() => expect(share).toHaveBeenCalledWith({ title: 'Einladung zum Turnier', url: `${window.location.origin}/invite/abc2345` }))
+    expect(toast.error).not.toHaveBeenCalled() // closing the share sheet is no error
+    Reflect.deleteProperty(navigator, 'share')
   })
 
   it('deletes only after the consequences were named', async () => {
@@ -85,11 +99,16 @@ describe('InviteLinks', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Link löschen' }))
     await waitFor(() => expect(mocked.remove).toHaveBeenCalledWith('t1', 'i1'))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Link gelöscht.'))
   })
 
   it('reports failures', async () => {
     mocked.list.mockRejectedValue(new Error('x'))
     render(<InviteLinks tournamentId="t1" />)
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Die Einladungslinks konnten nicht geladen werden.'))
+    expect(await screen.findByText('Die Einladungslinks konnten nicht geladen werden.')).toBeInTheDocument()
+
+    mocked.list.mockResolvedValue([invite()])
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }))
+    expect(await screen.findByText('WhatsApp')).toBeInTheDocument()
   })
 })

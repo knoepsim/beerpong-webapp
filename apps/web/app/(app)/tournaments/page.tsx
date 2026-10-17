@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import type { MyTournamentsResponse } from "@/types";
+import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournaments";
+import { errorMessage } from "@/lib/errors";
+import { LoadError } from "@/components/load-error";
 import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
@@ -27,8 +28,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Calendar, Trophy, Users, ShieldAlert } from "lucide-react";
+import { Plus, Trophy } from "lucide-react";
 import { AccessFields } from "@/components/access-fields";
 import { EmptyState } from "@/components/ui/empty-state";
 import { z } from "zod";
@@ -73,14 +73,12 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
 
 export default function TournamentsPage() {
   const router = useRouter();
-  const [data, setData] = useState<MyTournamentsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const tournamentsQuery = useMyTournaments();
+  const data = tournamentsQuery.data;
+  const create = useCreateTournament();
   const [dialogOpen, setDialogOpen] = useState(false);
   const organizes = !!data?.managing.some((m) => m.role === TournamentRoleType.ADMIN || m.role === TournamentRoleType.MANAGER);
 
-  const [isCreating, setIsCreating] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [schedule, setSchedule] = useState<ScheduleValues>(EMPTY_SCHEDULE);
   const [showScheduleErrors, setShowScheduleErrors] = useState(false);
   const scheduleErrors = validateSchedule(schedule);
@@ -98,29 +96,11 @@ export default function TournamentsPage() {
     },
   });
 
-  useEffect(() => {
-    void loadTournaments();
-  }, []);
-
-  const loadTournaments = async () => {
-    try {
-      const response = await api.tournaments.getMyTournaments();
-      setData(response);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Laden";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onSubmit = async (values: z.infer<typeof createTournamentSchema>) => {
+  const onSubmit = (values: z.infer<typeof createTournamentSchema>) => {
     setShowScheduleErrors(true);
     if (!schedule.start_time || Object.keys(scheduleErrors).length > 0) return;
-    setIsCreating(true);
-    setApiError(null);
-    try {
-      const t = await api.tournaments.create({
+    create.mutate(
+      {
         name: values.name.trim(),
         location: values.location?.trim() || undefined,
         description: values.description?.trim() || undefined,
@@ -129,24 +109,15 @@ export default function TournamentsPage() {
         table_count: values.table_count,
         visibility: values.visibility,
         join_policy: values.join_policy,
-      });
-      setDialogOpen(false);
-      form.reset();
-      setSchedule(EMPTY_SCHEDULE);
-      setShowScheduleErrors(false);
-      router.push(`/t/${t.slug}`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Fehler beim Erstellen";
-      setApiError(message);
-    } finally {
-      setIsCreating(false);
-    }
+      },
+      { onSuccess: (tournament) => router.push(`/t/${tournament.slug}`) },
+    );
   };
 
   const groups = useMemo(() => (data ? groupTournaments(mergeMyTournaments(data)) : null), [data]);
   const hasTournaments = !!groups && groups.active.length + groups.planned.length + groups.finished.length > 0;
 
-  if (isLoading) {
+  if (tournamentsQuery.isPending) {
     return (
       <div className="mx-auto max-w-2xl px-4 pt-8 space-y-4">
         {[1, 2, 3].map((i) => (
@@ -163,20 +134,22 @@ export default function TournamentsPage() {
           <Trophy className="h-6 w-6 text-primary" />
           Meine Turniere
         </h2>
-        {error && (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
+        {tournamentsQuery.isError && (
+          <LoadError
+            error={tournamentsQuery.error}
+            fallback="Deine Turniere konnten nicht geladen werden."
+            onRetry={() => void tournamentsQuery.refetch()}
+          />
         )}
-        
-        {groups && hasTournaments ? (
+        {groups && hasTournaments && (
           // a heading only appears when there is something under it
           <div className="space-y-8">
             <TournamentSection title="Aktive Turniere" items={groups.active} />
             <TournamentSection title="Geplante Turniere" items={groups.planned} />
             <TournamentSection title="Abgeschlossene Turniere" items={groups.finished} />
           </div>
-        ) : (
+        )}
+        {groups && !hasTournaments && (
           <EmptyState
             icon={Trophy}
             title="Noch keine Turniere"
@@ -193,7 +166,7 @@ export default function TournamentsPage() {
             form.reset();
             setSchedule(EMPTY_SCHEDULE);
             setShowScheduleErrors(false);
-            setApiError(null);
+            create.reset();
           }
         }}>
           {/* the one highlighted action only for whoever organizes tournaments already; for players it is secondary */}
@@ -254,7 +227,7 @@ export default function TournamentsPage() {
                     ...(startMissing ? { start_time: "Bitte gib ein Startdatum und eine Startzeit an." } : {}),
                   }}
                   onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))}
-                  disabled={isCreating}
+                  disabled={create.isPending}
                 />
 
                 <FormField
@@ -298,14 +271,18 @@ export default function TournamentsPage() {
                   </div>
                 </div>
 
-                {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
+                {create.isError && (
+                  <p role="alert" className="text-sm text-destructive font-medium">
+                    {errorMessage(create.error)}
+                  </p>
+                )}
 
                 <Button
                   type="submit"
                   className="w-full mt-2"
-                  disabled={isCreating}
+                  disabled={create.isPending}
                 >
-                  {isCreating ? "Erstelle…" : "Turnier erstellen"}
+                  {create.isPending ? "Wird erstellt…" : "Turnier erstellen"}
                 </Button>
               </form>
             </Form>

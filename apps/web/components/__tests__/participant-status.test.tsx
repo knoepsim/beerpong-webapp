@@ -7,7 +7,7 @@ import { JoinPolicy } from '@/types'
 
 vi.mock('@/components/join-tournament', () => ({ JoinTournament: () => <button type="button">Mit Team beitreten</button> }))
 
-const base = { teamsMap: fiveTeams, canManage: false, slug: 'cup', onJoined: vi.fn(), onLeave: vi.fn(), bracket: null }
+const base = { teamsMap: fiveTeams, canManage: false, slug: 'cup', onLeave: vi.fn(), bracket: null }
 
 describe('ParticipantStatus', () => {
   it('lets a registered team leave only while the registration is open', () => {

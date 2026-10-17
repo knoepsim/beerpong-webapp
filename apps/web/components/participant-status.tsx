@@ -49,7 +49,6 @@ interface ParticipantStatusProps {
   /** Organizers without a team get no join card: they have their own controls. */
   canManage: boolean;
   slug: string;
-  onJoined: () => void | Promise<void>;
   onLeave: () => void;
   /** One line only (on the other tabs): the sentence stays, details, match and actions are on the overview. */
   compact?: boolean;
@@ -66,7 +65,6 @@ export function ParticipantStatus({
   teamsMap,
   canManage,
   slug,
-  onJoined,
   onLeave,
   compact = false,
 }: Readonly<ParticipantStatusProps>) {
@@ -90,7 +88,7 @@ export function ParticipantStatus({
         }}
       >
         {!invite && (
-          <JoinTournament tournamentId={tournament.id} tournamentName={tournament.name} loginRedirect={`/t/${slug}`} onJoined={onJoined} />
+          <JoinTournament tournamentId={tournament.id} tournamentName={tournament.name} loginRedirect={`/t/${slug}`} />
         )}
       </StatusCard>
     );

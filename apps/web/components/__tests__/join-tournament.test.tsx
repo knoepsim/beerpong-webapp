@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { render } from '@/lib/test-fixtures/render'
 import { JoinTournament } from '../join-tournament'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { Team } from '@/types'
 
 const push = vi.fn()
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 const useCurrentUser = vi.fn()
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
-vi.mock('@/components/user-provider', () => ({ useCurrentUser: () => useCurrentUser() }))
+vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }))
 vi.mock('sonner', () => ({ toast }))
-vi.mock('@/lib/api', () => ({ api: { teams: { list: vi.fn() }, tournaments: { join: vi.fn() } } }))
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()), api: { teams: { list: vi.fn() }, tournaments: { join: vi.fn() } } }))
 
 const team = (id: string, name: string): Team => ({ id, name, is_complete: true }) as Team
 const mocked = { teams: vi.mocked(api.teams.list), join: vi.mocked(api.tournaments.join) }
@@ -51,7 +53,7 @@ describe('JoinTournament', () => {
 
     await waitFor(() => expect(mocked.join).toHaveBeenCalledWith('t1', 'a', 'abc2345'))
     await waitFor(() => expect(onJoined).toHaveBeenCalled())
-    expect(toast.success).toHaveBeenCalledWith('Turnier erfolgreich beigetreten')
+    expect(toast.success).toHaveBeenCalledWith('Du bist dabei. Viel Erfolg!')
   })
 
   it('sends somebody without a team to the teams page', async () => {
@@ -64,12 +66,13 @@ describe('JoinTournament', () => {
 
   it('shows what the server says when joining is refused', async () => {
     mocked.teams.mockResolvedValue([team('a', 'Becherhelden')])
-    mocked.join.mockRejectedValue(new Error('Zum Beitreten brauchst du einen Einladungslink.'))
+    mocked.join.mockRejectedValue(new ApiError(403, { detail: 'Zum Beitreten brauchst du einen Einladungslink.' }))
     const onJoined = open()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Jetzt teilnehmen' }))
 
     expect(await screen.findByText('Zum Beitreten brauchst du einen Einladungslink.')).toBeInTheDocument()
     expect(onJoined).not.toHaveBeenCalled()
+    expect(toast.error).not.toHaveBeenCalled() // it is said in the dialog, not twice
   })
 })

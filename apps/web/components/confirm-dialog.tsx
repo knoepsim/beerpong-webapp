@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { notifyError } from "@/lib/errors";
 
 export interface ConfirmOptions {
   /** A question with the action: "Turnier starten?" */
@@ -28,7 +29,10 @@ export interface ConfirmOptions {
    * first, so it is never confirmed in passing; case and spaces at the ends do not matter.
    */
   typeToConfirm?: string;
-  /** Runs on confirmation; the dialog shows that it runs and stays open with the message if it fails. */
+  /**
+   * Runs on confirmation; the dialog shows that it runs. If it fails, the toast says why (once, also when a mutation
+   * has said it already) and the dialog stays open to try again or cancel.
+   */
   action: () => Promise<void> | void;
 }
 
@@ -42,12 +46,11 @@ interface Pending extends ConfirmOptions {
 
 /**
  * One confirmation dialog for the whole app: actions with consequences (start, delete, remove, open check-in) ask
- * the same way everywhere, show that they run, and name a failure right in the dialog.
+ * the same way everywhere and show that they run; a failure is a toast like every other one.
  */
 export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [pending, setPending] = useState<Pending | null>(null);
   const [running, setRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const current = useRef<Pending | null>(null);
 
@@ -56,7 +59,6 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
       new Promise<boolean>((resolve) => {
         const next = { ...options, resolve };
         current.current = next;
-        setError(null);
         setTyped("");
         setPending(next);
       }),
@@ -75,12 +77,11 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
   const run = async () => {
     if (!pending || !typedRight) return;
     setRunning(true);
-    setError(null);
     try {
       await pending.action();
       close(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
+      notifyError(err);
     } finally {
       setRunning(false);
     }
@@ -110,11 +111,6 @@ export function ConfirmProvider({ children }: Readonly<{ children: ReactNode }>)
                 disabled={running}
               />
             </div>
-          )}
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={running}>Abbrechen</AlertDialogCancel>

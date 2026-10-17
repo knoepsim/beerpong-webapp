@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from '@/lib/test-fixtures/render'
 import { TableManager } from '../table-manager'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import type { TournamentTable } from '@/types'
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 vi.mock('sonner', () => ({ toast }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   api: { tournaments: { listTables: vi.fn(), addTable: vi.fn(), renameTable: vi.fn(), deleteTable: vi.fn() } },
 }))
 
@@ -39,6 +40,7 @@ describe('TableManager', () => {
   it('adds a table that gets its name from the server', async () => {
     await setup([table(1)])
     mocked.add.mockResolvedValue(table(2))
+    mocked.list.mockResolvedValue([table(1), table(2)]) // what the list says when it is loaded again
 
     fireEvent.click(screen.getByRole('button', { name: 'Tisch hinzufügen' }))
 
@@ -49,6 +51,7 @@ describe('TableManager', () => {
   it('renames a table: the pencil opens the field, Enter saves', async () => {
     await setup([table(1), table(2)])
     mocked.rename.mockResolvedValue(table(1, 'Pool'))
+    mocked.list.mockResolvedValue([table(1, 'Pool'), table(2)])
 
     fireEvent.click(screen.getByRole('button', { name: 'Tisch 1 umbenennen' }))
     const input = screen.getByRole('textbox', { name: 'Name von Tisch 1' })
@@ -76,7 +79,7 @@ describe('TableManager', () => {
 
   it('says at the field why a name is refused and keeps it open', async () => {
     await setup([table(1), table(2)])
-    mocked.rename.mockRejectedValue(new Error('Einen Tisch mit diesem Namen gibt es schon.'))
+    mocked.rename.mockRejectedValue(new ApiError(409, { detail: 'Einen Tisch mit diesem Namen gibt es schon.' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Tisch 1 umbenennen' }))
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'tisch 2' } })
@@ -89,6 +92,7 @@ describe('TableManager', () => {
   it('deletes a table only after it was confirmed', async () => {
     await setup([table(1), table(2)])
     mocked.remove.mockResolvedValue(undefined)
+    mocked.list.mockResolvedValue([table(1)])
 
     fireEvent.click(screen.getByRole('button', { name: 'Tisch 2 löschen' }))
     expect(screen.getByText('Tisch 2 löschen?')).toBeInTheDocument()
@@ -107,7 +111,7 @@ describe('TableManager', () => {
 
   it('reports what the server refuses', async () => {
     await setup([table(1)])
-    mocked.add.mockRejectedValue(new Error('Ein Turnier kann höchstens 100 Tische haben.'))
+    mocked.add.mockRejectedValue(new ApiError(400, { detail: 'Ein Turnier kann höchstens 100 Tische haben.' }))
 
     fireEvent.click(screen.getByRole('button', { name: 'Tisch hinzufügen' }))
 

@@ -2,20 +2,19 @@
 
 import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTournamentById } from "@/hooks/queries/tournaments";
 
 /** Old links /tournaments/{id} lead to the address /t/{slug}. */
-export default function LegacyTournamentRedirect({ params }: { params: Promise<{ id: string }> }) {
+export default function LegacyTournamentRedirect({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = use(params);
   const router = useRouter();
+  const { data: tournament, isError } = useTournamentById(id);
 
   useEffect(() => {
-    api.tournaments
-      .get(id)
-      .then((t) => router.replace(`/t/${t.slug}`))
-      .catch(() => router.replace("/tournaments"));
-  }, [id, router]);
+    if (tournament) router.replace(`/t/${tournament.slug}`);
+    else if (isError) router.replace("/tournaments");
+  }, [tournament, isError, router]);
 
   return (
     <div className="mx-auto max-w-4xl px-4 pt-6">

@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChevronDown, MapPin, Play, Square, TriangleAlert } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MatchRow } from "@/components/match-row";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { useNow } from "@/hooks/use-now";
-import { api } from "@/lib/api";
+import { useSetMatchStarted } from "@/hooks/queries/matches";
 import { allMatchSlots, buildBracketLayout, type MatchSlot } from "@/lib/bracket-layout";
 import { minutesSince, sinceLabel } from "@/lib/minutes";
 import { cn } from "@/lib/utils";
@@ -18,53 +17,44 @@ import type { Bracket, Match, Team, TournamentTable } from "@/types";
 export const NOT_STARTED_WARNING_MINUTES = 5;
 
 interface TablesBoardProps {
+  tournamentId: string;
   bracket: Bracket;
   tables: TournamentTable[];
   teamsMap: Record<string, Team>;
   highlightTeamId?: string | null;
   /** Referees, managers and admins: start a match and open its result. */
   onResult?: (match: Match) => void;
-  onChanged: () => void | Promise<void>;
 }
 
 function TableCard({
+  tournamentId,
   table,
   slot,
   next,
   teamsMap,
   highlightTeamId,
   onResult,
-  onChanged,
   now,
 }: Readonly<{
+  tournamentId: string;
   table: TournamentTable;
   slot: MatchSlot | undefined;
   next: MatchSlot | undefined;
   teamsMap: Record<string, Team>;
   highlightTeamId?: string | null;
   onResult?: (match: Match) => void;
-  onChanged: () => void | Promise<void>;
   now: Date;
 }>) {
-  const [starting, setStarting] = useState(false);
+  const setStartedMutation = useSetMatchStarted(tournamentId);
+  const starting = setStartedMutation.isPending;
   const match = slot?.match;
   const since = match?.status === "live" ? match.started_at : match?.on_table_at;
   const late =
     match?.status === "ready" && !!match.on_table_at && minutesSince(match.on_table_at, now) >= NOT_STARTED_WARNING_MINUTES;
 
   /** Start the match at the table, or take the start back (a slip happens under time pressure). */
-  const setStarted = async (started: boolean) => {
-    if (!match) return;
-    setStarting(true);
-    try {
-      await (started ? api.matches.start(match.id) : api.matches.undoStart(match.id));
-      toast.success(started ? `Spiel ${slot?.number} an ${table.name} gestartet` : `Start an ${table.name} zurückgenommen`);
-      await onChanged();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Das hat nicht geklappt. Versuch es noch einmal.");
-    } finally {
-      setStarting(false);
-    }
+  const setStarted = (started: boolean) => {
+    if (match) setStartedMutation.mutate({ match: { id: match.id, table_name: table.name }, started });
   };
 
   return (
@@ -131,7 +121,7 @@ function TableCard({
  * tables, and the queue for the next free one. Organizers start matches and enter results right here, without
  * looking for the match in the bracket.
  */
-export function TablesBoard({ bracket, tables, teamsMap, highlightTeamId, onResult, onChanged }: Readonly<TablesBoardProps>) {
+export function TablesBoard({ tournamentId, bracket, tables, teamsMap, highlightTeamId, onResult }: Readonly<TablesBoardProps>) {
   const now = useNow();
   const slots = useMemo(() => allMatchSlots(buildBracketLayout(bracket)), [bracket]);
   const atTable = (table: TournamentTable) =>
@@ -158,13 +148,13 @@ export function TablesBoard({ bracket, tables, teamsMap, highlightTeamId, onResu
         {tables.map((table) => (
           <TableCard
             key={table.id}
+            tournamentId={tournamentId}
             table={table}
             slot={atTable(table)}
             next={nextAt(table)}
             teamsMap={teamsMap}
             highlightTeamId={highlightTeamId}
             onResult={onResult}
-            onChanged={onChanged}
             now={now}
           />
         ))}

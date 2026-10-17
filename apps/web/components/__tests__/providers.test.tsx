@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { QueryProvider } from '../query-provider';
 import { ThemeProvider } from '../theme-provider';
-import { UserProvider, useCurrentUser } from '../user-provider';
-import { api, NetworkError } from '@/lib/api';
+import { useCurrentUser } from '@/hooks/queries/user';
+import { testQueryClient } from '@/lib/test-fixtures/render';
+import { api, ApiError, NetworkError } from '@/lib/api';
 import type { User } from '@/types';
 
 vi.mock('@/lib/api', async (importOriginal) => ({
@@ -25,27 +26,34 @@ function Probe() {
   );
 }
 
-describe('UserProvider', () => {
+const renderProbe = () =>
+  render(
+    <QueryClientProvider client={testQueryClient()}>
+      <Probe />
+    </QueryClientProvider>,
+  );
+
+describe('useCurrentUser', () => {
   beforeEach(() => {
     me.mockReset();
   });
 
   it('is anonymous for a visitor without a session, who is asked as a guest (no redirect to the login)', async () => {
-    me.mockRejectedValue(new Error('Not authenticated'));
-    render(<UserProvider><Probe /></UserProvider>);
+    me.mockRejectedValue(new ApiError(401, { detail: 'Not authenticated' }));
+    renderProbe();
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
     expect(me).toHaveBeenCalledWith({ guest: true });
   });
 
   it('loads the current user when logged in', async () => {
     me.mockResolvedValue(aUser);
-    render(<UserProvider><Probe /></UserProvider>);
+    renderProbe();
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
   });
 
-  it('falls back to anonymous when loading fails and can reload', async () => {
-    me.mockRejectedValueOnce(new Error('boom'));
-    render(<UserProvider><Probe /></UserProvider>);
+  it('can load again', async () => {
+    me.mockRejectedValueOnce(new ApiError(401, {}));
+    renderProbe();
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('anonymous'));
 
     me.mockResolvedValue(aUser);
@@ -54,29 +62,24 @@ describe('UserProvider', () => {
   });
 
   it('keeps the user it knows when the network fails, and asks again when it is back', async () => {
-    me.mockResolvedValueOnce(aUser)
-    render(<UserProvider><Probe /></UserProvider>)
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'))
+    me.mockResolvedValueOnce(aUser);
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada'));
 
-    me.mockRejectedValueOnce(new NetworkError())
-    screen.getByText('reload').click()
-    await waitFor(() => expect(me).toHaveBeenCalledTimes(2))
-    expect(screen.getByTestId('state')).toHaveTextContent('Ada')
-
-    me.mockResolvedValue({ ...aUser, name: 'Ada Neu' })
-    window.dispatchEvent(new Event('online'))
-    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada Neu'))
-  })
-
-  it('exposes a loading default context without provider', () => {
-    render(<Probe />);
-    expect(screen.getByTestId('state')).toHaveTextContent('loading');
+    me.mockRejectedValueOnce(new NetworkError());
     screen.getByText('reload').click();
+    await waitFor(() => expect(me).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('state')).toHaveTextContent('Ada');
+
+    me.mockResolvedValue({ ...aUser, name: 'Ada Neu' });
+    window.dispatchEvent(new Event('offline'));
+    window.dispatchEvent(new Event('online'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('Ada Neu'));
   });
 });
 
 describe('QueryProvider', () => {
-  it('provides a query client with a one minute stale time', () => {
+  it('provides the query client of the app with a one minute stale time', () => {
     function Reader() {
       const staleTime = useQueryClient().getDefaultOptions().queries?.staleTime;
       return <p>stale:{String(staleTime)}</p>;

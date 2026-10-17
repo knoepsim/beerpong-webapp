@@ -12,7 +12,7 @@ vi.mock('next/link', () => ({
     <a href={href} className={className}>{children}</a>
   ),
 }));
-vi.mock('../user-provider', () => ({ useCurrentUser: () => useCurrentUser() }));
+vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }));
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <button>{children}</button>,

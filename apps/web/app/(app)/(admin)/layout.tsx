@@ -1,6 +1,6 @@
 "use client";
 
-import { useCurrentUser } from "@/components/user-provider";
+import { useCurrentUser } from "@/hooks/queries/user";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '@/lib/test-fixtures/render';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
 import { api, ApiError } from '@/lib/api';
+import { queryKeys } from '@/lib/query-keys';
 import { JoinPolicy, TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
 import type { Tournament, TournamentUserRole, User } from '@/types';
 
@@ -122,8 +123,6 @@ const roles: TournamentUserRole[] = [
   { id: 'r3', tournament_id: 't1', user_id: 'u3', role: TournamentRoleType.MANAGER, assigned_at: '' },
 ];
 
-const onReload = vi.fn();
-
 function setup(
   userRole: TournamentRoleType | null,
   overrides: Partial<Tournament> = {},
@@ -133,7 +132,6 @@ function setup(
       tournament={{ ...tournament, ...overrides }}
       roles={roles}
       userRole={userRole}
-      onReload={onReload}
     />,
   );
 }
@@ -145,7 +143,6 @@ const nameInput = () => screen.getByDisplayValue('Summer Cup');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  onReload.mockResolvedValue(undefined);
   mocked.tables.mockResolvedValue([{ id: 'x1', name: 'Tisch 1', position: 1 }]);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
 });
@@ -243,16 +240,17 @@ describe('editing the tournament: each card saves its own fields', () => {
     expect(saveOf('Link & Zugang')).toBeEnabled();
   });
 
-  it('saves the general fields and reloads', async () => {
+  it('saves the general fields and marks the tournament stale', async () => {
     mocked.update.mockResolvedValue(tournament);
-    setup(TournamentRoleType.ADMIN);
+    const { client } = setup(TournamentRoleType.ADMIN);
+    const invalidate = vi.spyOn(client, 'invalidateQueries');
     fireEvent.change(nameInput(), { target: { value: 'Winter Cup' } });
     fireEvent.change(screen.getByDisplayValue('Garden'), { target: { value: '' } });
     fireEvent.click(saveOf('Allgemein'));
 
-    await waitFor(() => expect(onReload).toHaveBeenCalled());
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Gespeichert.'));
     expect(mocked.update).toHaveBeenCalledWith('t1', { name: 'Winter Cup', location: undefined, description: 'Rules' });
-    expect(toast.success).toHaveBeenCalledWith('Gespeichert');
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.tournamentLookups }));
   });
 
   it('saves the schedule with the converted values', async () => {
@@ -373,8 +371,9 @@ describe('editing the tournament: each card saves its own fields', () => {
     fireEvent.click(saveOf('Allgemein'));
 
     expect(await screen.findByText('Wird gespeichert…')).toBeDisabled();
-    reject(new Error('Das hat nicht geklappt.'));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Das hat nicht geklappt.'));
+    reject(new ApiError(500, { detail: 'Der Server hat gerade ein Problem.' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Der Server hat gerade ein Problem.'));
+    expect(saveOf('Allgemein')).toHaveTextContent('Allgemein speichern'); // the change is kept to try again
   });
 
   it('previews the description as markdown', () => {
@@ -464,7 +463,7 @@ describe('role management', () => {
     setup(TournamentRoleType.ADMIN);
     fireEvent.change(searchInput(), { target: { value: 'ze' } });
     fireEvent.click(searchButton());
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Fehler bei der Suche'));
+    expect(await screen.findByText('Die Suche hat nicht geklappt. Versuch es noch einmal.')).toBeInTheDocument();
   });
 
   it('assigns the chosen role to the chosen user', async () => {
@@ -483,9 +482,8 @@ describe('role management', () => {
     fireEvent.click(assign);
 
     await waitFor(() => expect(mocked.assign).toHaveBeenCalledWith('t1', 'u9', 'manager'));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle erfolgreich zugewiesen!'));
-    expect(onReload).toHaveBeenCalled();
-    expect(screen.queryByText('Zed Zimmer')).not.toBeInTheDocument(); // search reset
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle zugewiesen.'));
+    await waitFor(() => expect(screen.queryByText('Zed Zimmer')).not.toBeInTheDocument()); // search reset
   });
 
   it('assigns the default referee role and offers only the allowed roles', async () => {
@@ -505,8 +503,8 @@ describe('role management', () => {
   });
 
   it.each([
-    [new Error('Schon vergeben'), 'Schon vergeben'],
-    ['boom', 'Fehler'],
+    [new ApiError(409, { detail: 'Schon vergeben' }), 'Schon vergeben'],
+    ['boom', 'Das hat nicht geklappt. Versuch es noch einmal.'],
   ])('reports assignment failures (%s)', async (error, message) => {
     mocked.search.mockResolvedValue([alice]);
     mocked.assign.mockRejectedValue(error);
@@ -532,7 +530,6 @@ describe('role management', () => {
 
     await waitFor(() => expect(mocked.revoke).toHaveBeenCalledWith('t1', 'r2'));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Rolle entzogen.'));
-    expect(onReload).toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
   });
 
@@ -545,14 +542,15 @@ describe('role management', () => {
   });
 
   it.each([
-    [new Error('Nicht erlaubt'), 'Nicht erlaubt'],
-    ['boom', 'Das hat nicht geklappt. Versuch es noch einmal.'],
-  ])('shows a failed revoke in the dialog (%s)', async (error, message) => {
+    [new ApiError(403, { detail: 'Nicht erlaubt' }), 'Nicht erlaubt'],
+    [new Error('boom'), 'Das hat nicht geklappt. Versuch es noch einmal.'],
+  ])('reports a failed revoke once and keeps the dialog open (%s)', async (error, message) => {
     mocked.revoke.mockRejectedValue(error);
     setup(TournamentRoleType.ADMIN);
     fireEvent.click(revokeButtons()[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Rolle entziehen' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message));
+    expect(toast.error).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('alertdialog')).toBeInTheDocument(); // stays open to try again or cancel
   });
 });
@@ -579,11 +577,12 @@ describe('deleting the tournament', () => {
   });
 
   it('keeps the dialog open with the reason when deleting fails', async () => {
-    mocked.remove.mockRejectedValue(new Error('Das Turnier läuft noch.'));
+    mocked.remove.mockRejectedValue(new ApiError(409, { detail: 'Das Turnier läuft noch.' }));
     open();
     fireEvent.click(screen.getByRole('button', { name: 'Turnier löschen' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Das Turnier läuft noch.');
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Das Turnier läuft noch.'));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
   });
 });

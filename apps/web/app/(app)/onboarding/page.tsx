@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { useCreateTeam } from "@/hooks/queries/teams";
+import { useCurrentUser, useUpdateMe } from "@/hooks/queries/user";
+import { errorMessage } from "@/lib/errors";
 import { getRedirectParam } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,12 +37,14 @@ const teamSchema = z.object({
 });
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const [step, setStep] = useState<"profile" | "team">("profile");
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
+  const { user, isLoading } = useCurrentUser();
+  const updateMe = useUpdateMe();
+  const createTeam = useCreateTeam();
+  const isSaving = updateMe.isPending || createTeam.isPending;
+  const failure = step === "profile" ? updateMe.error : createTeam.error;
+  const apiError = failure ? errorMessage(failure) : null;
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema as any),
@@ -53,67 +56,38 @@ export default function OnboardingPage() {
     defaultValues: { teamName: "" },
   });
 
+  // a complete profile needs no onboarding; otherwise the form starts with what is there (a name that is only the
+  // phone number is no name)
+  const profileComplete = !!user?.name && !user.name.startsWith("+49") && !!user.email;
   useEffect(() => {
-    // Check if the user needs onboarding
-    api.users.me()
-      .then(user => {
-        let defaultName = "";
-        let defaultEmail = "";
-        
-        if (user.name && !user.name.startsWith("+49") && user.email) {
-          window.location.href = "/tournaments";
-          return;
-        }
-
-        if (user.name && !user.name.startsWith("+49")) {
-          defaultName = user.name;
-        }
-        if (user.email) {
-          defaultEmail = user.email;
-        }
-        
-        profileForm.reset({ name: defaultName, email: defaultEmail });
-        setIsLoading(false);
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
-  }, [profileForm]);
-
-  const onProfileSubmit = async (values: z.infer<typeof profileSchema>) => {
-    setIsSaving(true);
-    setApiError(null);
-    try {
-      await api.users.updateMe({ name: values.name.trim(), email: values.email.trim() });
-      
-      const redirectUrl = getRedirectParam();
-      
-      if (redirectUrl) {
-        window.location.href = redirectUrl;
-      } else {
-        setStep("team");
-      }
-    } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : "Fehler beim Speichern");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const onTeamSubmit = async (values: z.infer<typeof teamSchema>) => {
-    setIsSaving(true);
-    setApiError(null);
-    try {
-      await api.teams.create(values.teamName.trim());
+    if (!user) return;
+    if (profileComplete) {
       window.location.href = "/tournaments";
-    } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : "Fehler beim Erstellen des Teams");
-    } finally {
-      setIsSaving(false);
+      return;
     }
-  };
+    profileForm.reset({ name: user.name.startsWith("+49") ? "" : user.name, email: user.email ?? "" });
+  }, [user, profileComplete, profileForm]);
 
-  if (isLoading) {
+  const onProfileSubmit = (values: z.infer<typeof profileSchema>) =>
+    updateMe.mutate(
+      { name: values.name.trim(), email: values.email.trim() },
+      {
+        onSuccess: () => {
+          const redirectUrl = getRedirectParam();
+          if (redirectUrl) window.location.href = redirectUrl;
+          else setStep("team");
+        },
+      },
+    );
+
+  const onTeamSubmit = (values: z.infer<typeof teamSchema>) =>
+    createTeam.mutate(values.teamName.trim(), {
+      onSuccess: () => {
+        window.location.href = "/tournaments";
+      },
+    });
+
+  if (isLoading || profileComplete) {
     return <div className="flex min-h-screen items-center justify-center p-4 text-muted-foreground animate-pulse">Lade…</div>;
   }
 
