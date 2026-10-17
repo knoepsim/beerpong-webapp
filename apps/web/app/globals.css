@@ -158,6 +158,25 @@
   html.dark {
     color-scheme: dark;
   }
+  /* everything that does something shows the hand (Tailwind v4 no longer does it for buttons); disabled does not */
+  :is(
+      button,
+      summary,
+      select,
+      label[for],
+      [role="button"],
+      [role="tab"],
+      [role="menuitem"],
+      [role="menuitemradio"],
+      [role="menuitemcheckbox"],
+      [role="option"],
+      [role="switch"],
+      [role="checkbox"],
+      [role="radio"],
+      [role="combobox"]
+    ):not(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground;
   }
