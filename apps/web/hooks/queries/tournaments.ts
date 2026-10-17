@@ -112,8 +112,7 @@ export function useDeleteTournament(id: string) {
 
 export function useJoinTournament(id: string) {
   return useMutation({
-    mutationFn: ({ teamId, inviteToken }: { teamId: string; inviteToken?: string | null }) =>
-      api.tournaments.join(id, teamId, inviteToken),
+    mutationFn: (teamId: string) => api.tournaments.join(id, teamId),
     meta: {
       inlineError: true,
       // a stranger becomes a participant: the tournament itself is visible now

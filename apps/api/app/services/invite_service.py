@@ -112,19 +112,6 @@ class InviteService:
             raise NotFoundError("Einladungslink")
         invite.deleted_at = datetime.now(UTC)
 
-    async def find(self, tournament_id: UUID, token: str | None) -> TournamentInvite | None:
-        if not token:
-            return None
-        return (
-            await self.db.execute(
-                select(TournamentInvite).where(
-                    TournamentInvite.tournament_id == tournament_id,
-                    TournamentInvite.token == token,
-                    TournamentInvite.deleted_at.is_(None),
-                )
-            )
-        ).scalar_one_or_none()
-
     async def find_by_token(self, token: str) -> tuple[TournamentInvite, Tournament]:
         """A working link and its tournament. Unknown links, deleted links and deleted tournaments answer the same."""
         row = (

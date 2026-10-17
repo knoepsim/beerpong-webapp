@@ -29,11 +29,9 @@ class Ctx:
     async def invites(self, tid: str) -> list[dict]:
         return (await self.client.get(f"/tournaments/{tid}/invites", headers=self.admin)).json()
 
-    async def join(self, tid: str, team: int, token: str | None = None):
+    async def join(self, tid: str, team: int):
         return await self.client.post(
-            f"/tournaments/{tid}/join",
-            json={"team_id": self.team_ids[team], **({"invite_token": token} if token else {})},
-            headers=self.players[team * 2],
+            f"/tournaments/{tid}/join", json={"team_id": self.team_ids[team]}, headers=self.players[team * 2]
         )
 
 
@@ -69,16 +67,20 @@ async def test_anybody_may_join_an_open_tournament_even_a_private_one(ctx: Ctx):
 
 
 @pytest.mark.asyncio
-async def test_an_invite_only_tournament_needs_a_valid_link_of_its_own_tournament(ctx: Ctx):
+async def test_an_invite_only_tournament_needs_an_invitation_to_it(ctx: Ctx):
     tournament = await ctx.create(join_policy="invite_only")
     other = await ctx.create(join_policy="invite_only")
     link = (await ctx.invites(tournament["id"]))[0]["token"]
     other_link = (await ctx.invites(other["id"]))[0]["token"]
 
-    for token in (None, "nope123", other_link):
-        resp = await ctx.join(tournament["id"], 0, token)
-        assert (resp.status_code, resp.json()["error_code"]) == (403, "INVITE_REQUIRED")
-    assert (await ctx.join(tournament["id"], 0, link)).status_code == 201
+    resp = await ctx.join(tournament["id"], 0)
+    assert (resp.status_code, resp.json()["error_code"]) == (403, "INVITE_REQUIRED")
+    # an invitation to another tournament does not count
+    await ctx.client.post(f"/invites/{other_link}/accept", headers=ctx.players[0])
+    assert (await ctx.join(tournament["id"], 0)).status_code == 403
+
+    await ctx.client.post(f"/invites/{link}/accept", headers=ctx.players[0])
+    assert (await ctx.join(tournament["id"], 0)).status_code == 201
 
 
 @pytest.mark.asyncio

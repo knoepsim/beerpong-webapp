@@ -255,10 +255,10 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/tournaments/${id}`, { method: "DELETE" }),
-    join: (tournamentId: string, teamId: string, inviteToken?: string | null) =>
+    join: (tournamentId: string, teamId: string) =>
       request<void>(`/tournaments/${tournamentId}/join`, {
         method: "POST",
-        body: JSON.stringify({ team_id: teamId, invite_token: inviteToken }),
+        body: JSON.stringify({ team_id: teamId }),
       }),
     leave: (tournamentId: string) =>
       request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),

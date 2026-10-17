@@ -255,9 +255,7 @@ async def join_tournament(
     current_user: Annotated[User, Depends(get_current_user)],
     db: DbSession,
 ):
-    return await TournamentService(db).join_tournament(
-        tournament_id, body.team_id, body.invite_token, user_id=current_user.id
-    )
+    return await TournamentService(db).join_tournament(tournament_id, body.team_id, current_user.id)
 
 
 @router.delete(
