@@ -4,9 +4,10 @@
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:is(.dark *));
 
-@theme {
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+/* inline: the fonts of next/font (variables on <html>) are used directly, no variable refers to itself */
+@theme inline {
+  --font-sans: var(--font-text);
+  --font-heading: var(--font-display);
 }
 
 :root {
@@ -150,5 +151,10 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
   }
 }

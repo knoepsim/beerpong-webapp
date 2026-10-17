@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
+// text and data: compact for long team names, with tabular figures for scores, times and match numbers
+// (`tabular-nums`). DM Sans was considered: it has no tabular figures, numbers in lists would jump.
+const text = Inter({
+  variable: "--font-text",
+  subsets: ["latin", "latin-ext"],
+});
+// headings: geometric, with energy in the bold weights
+const heading = Plus_Jakarta_Sans({
+  variable: "--font-display",
+  subsets: ["latin", "latin-ext"],
 });
 
 export const metadata: Metadata = {
@@ -23,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" suppressHydrationWarning className={`${inter.variable} h-full`}>
+    <html lang="de" suppressHydrationWarning className={`${text.variable} ${heading.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
         <QueryProvider>
           <ThemeProvider
