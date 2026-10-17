@@ -49,12 +49,16 @@ describe('TournamentCard', () => {
     expect(screen.getByText('Jan')).toBeInTheDocument()
   })
 
-  it('names the state while the tournament is being prepared', () => {
-    const { rerender } = card()
+  it('names the state while the tournament is being prepared, for organizers only', () => {
+    const { rerender } = card({ role: TournamentRoleType.MANAGER })
     expect(screen.getByText('Anmeldung offen')).toBeInTheDocument()
 
-    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }) }} />)
+    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), role: TournamentRoleType.ADMIN }} />)
     expect(screen.getByText('Check-in läuft')).toBeInTheDocument()
+
+    // a player gets their own status instead of the state of the tournament
+    rerender(<TournamentCard item={{ tournament: tournament({ phase: 'checkin' }), team: { id: 'x', name: 'A' } as Team }} />)
+    expect(screen.queryByText('Check-in läuft')).not.toBeInTheDocument()
   })
 
   it('does not repeat the state of running and finished tournaments, the group heading says it', () => {

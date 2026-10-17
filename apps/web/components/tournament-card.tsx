@@ -47,8 +47,9 @@ const TONE: Record<StatusTone, { pill: string; icon: string }> = {
 };
 
 /**
- * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in):
- * "running" and "finished" are already said by the heading of the group the card is in.
+ * The state is only worth a badge while the tournament is being prepared (registration open or closed, check-in), and
+ * only for organizers: a player gets their own status instead ("Jetzt einchecken", "Eingecheckt"). "running" and
+ * "finished" are already said by the heading of the group the card is in.
  */
 const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !== "finished";
 
@@ -95,7 +96,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
               {status.text}
             </Badge>
           )}
-          {isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
+          {role && isPreparing(t.phase) && <Badge variant="outline">{phaseLabel(t.phase)}</Badge>}
           {team && (
             <Badge variant="secondary" className="max-w-full">
               <Users aria-hidden="true" />
