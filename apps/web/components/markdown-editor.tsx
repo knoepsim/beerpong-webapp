@@ -116,9 +116,9 @@ function Toolbar() {
   const editor = useEditor<BasicExtension>();
   return (
     <div role="toolbar" aria-label="Formatierung" className="flex flex-wrap items-center gap-1 border-b p-1.5">
-      {groups.map((group, i) => (
-        <div key={i} className="flex items-center gap-1">
-          {i > 0 && <Separator orientation="vertical" className="mx-0.5 h-6" />}
+      {groups.map((group) => (
+        <div key={group[0].label} className="flex items-center gap-1">
+          {group !== groups[0] && <Separator orientation="vertical" className="mx-0.5 h-6" />}
           {group.map((tool) => (
             <Toggle
               key={tool.label}

@@ -2,7 +2,6 @@ import { Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { TournamentTeam } from "@/types";
 
 interface TeamListProps {
