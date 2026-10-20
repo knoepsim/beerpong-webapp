@@ -21,6 +21,7 @@ class TournamentMode(str, enum.Enum):
     """How the teams meet. Only the modes that are implemented; the app shows the coming ones as not available."""
 
     SINGLE_ELIMINATION = "single_elimination"
+    ROUND_ROBIN = "round_robin"
 
 
 class TournamentVisibility(str, enum.Enum):

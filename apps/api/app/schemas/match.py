@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.models.tournament import TournamentMode
+
 
 class MatchStatus(str, enum.Enum):
     """Derived from the teams, the station, the start and the current result, not stored."""
@@ -45,9 +47,27 @@ class MatchResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class StandingResponse(BaseModel):
+    """A row of the table of a tournament where everybody plays everybody."""
+    team_id: UUID
+    rank: int
+    played: int
+    won: int
+    drawn: int
+    lost: int
+    score_for: int
+    score_against: int
+    points: int
+
+
 class BracketResponse(BaseModel):
-    """Complete bracket tree for a tournament."""
+    """All matches of a tournament: a tree (knock-out) or match days (everybody against everybody)."""
     tournament_id: UUID
+    mode: TournamentMode
+    # knock-out: rounds of the tree; everybody against everybody: match days
     total_rounds: int
-    champion_team_id: UUID | None = None  # winner of the final, once it has a result
+    # once it is decided: the winner of the final, or the first of the table when all is played
+    champion_team_id: UUID | None = None
     matches: list[MatchResponse]
+    # the table, only where everybody plays everybody
+    standings: list[StandingResponse] | None = None

@@ -134,3 +134,16 @@ def test_nothing_is_certain_while_both_feeders_play_or_the_missing_one_has_no_st
     assert certain_next_stations(both_open, ["T1", "T2", "T3"], now=10) == {}
     not_at_a_station = semis_and_final(playing=False, station=None, ready=False, ready_at=None)
     assert certain_next_stations(not_at_a_station, ["T1", "T2", "T3"], now=10) == {}
+
+
+def test_a_team_plays_one_match_at_a_time():
+    # everybody against everybody: all matches are ready at once, but a team cannot be at two stations
+    matches = [
+        PlanMatch(id="ab", round=1, position=0, ready=True, ready_at=0, teams=("a", "b")),
+        PlanMatch(id="cd", round=1, position=1, ready=True, ready_at=0, teams=("c", "d")),
+        PlanMatch(id="ac", round=2, position=0, ready=True, ready_at=0, teams=("a", "c")),
+        PlanMatch(id="bd", round=2, position=1, ready=True, ready_at=0, teams=("b", "d")),
+    ]
+    result = plan(matches, ["s1", "s2", "s3", "s4"])
+    assert set(result.playing) == {"ab", "cd"}
+    assert result.queue == ["ac", "bd"]

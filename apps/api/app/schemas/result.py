@@ -8,7 +8,8 @@ from app.models.result import ResultType
 
 class ResultCreate(BaseModel):
     """Request body for reporting a match result."""
-    winner_team_id: UUID
+    # None for a draw (only where the game and the mode have draws, see app/games.py)
+    winner_team_id: UUID | None = None
     # the score of team a and team b of the match; the game decides what is possible (app/games.py)
     score_a: int = Field(ge=0)
     score_b: int = Field(ge=0)

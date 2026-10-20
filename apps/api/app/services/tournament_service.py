@@ -266,6 +266,7 @@ class TournamentService:
 
     async def _my_progress(self, tournament: Tournament, team_id: UUID) -> dict:
         """The next match of a team in a started tournament, or its place once it is out or has won."""
+        from app.schemas.match import MatchStatus
         from app.services.bracket_service import BracketService  # imported here: the bracket uses this service
 
         bracket = await BracketService(self.db).get_bracket(tournament.id)
@@ -274,10 +275,15 @@ class TournamentService:
         )
         if bracket.champion_team_id == team_id:
             return {"place": 1}
-        lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
-        if lost is not None:
-            return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
-        return {"next_match": next((m for m in mine if m.winner_team_id is None), None)}
+        if bracket.standings is not None:
+            # everybody against everybody: the rank once all is played, before that the next match
+            if tournament.finished_at:
+                return {"place": next((row.rank for row in bracket.standings if row.team_id == team_id), None)}
+        else:
+            lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
+            if lost is not None:
+                return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
+        return {"next_match": next((m for m in mine if m.status != MatchStatus.FINISHED), None)}
 
     async def join_tournament(self, tournament_id: UUID, team_id: UUID, user_id: UUID) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""

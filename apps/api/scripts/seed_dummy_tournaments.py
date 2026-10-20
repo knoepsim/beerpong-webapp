@@ -179,6 +179,7 @@ async def create_tournament(
     owner_phone: str | None = None,
     name: str | None = None,
     game: Game = Game.BEERPONG,
+    mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION,
 ) -> dict:
     """Create (or replace) a dummy tournament. With `played` it is started and that share of its matches is played;
     without (`None`) it stays in the registration phase, or in the check-in phase if `state` is "checkin" / "both"."""
@@ -186,7 +187,9 @@ async def create_tournament(
     if owner is None:
         raise SystemExit(f"Besitzer {owner_phone or default_owner()} existiert nicht. Erst in der App anmelden oder --owner angeben.")
 
-    name = name or tournament_name(teams, played, state) + ("" if game == Game.BEERPONG else f" ({GAME_NAMES[game]})")
+    extra = [GAME_NAMES[game]] if game != Game.BEERPONG else []
+    extra += ["jeder gegen jeden"] if mode == TournamentMode.ROUND_ROBIN else []
+    name = name or tournament_name(teams, played, state) + (f" ({', '.join(extra)})" if extra else "")
     if not name.startswith(TOURNAMENT_PREFIX):
         name = TOURNAMENT_PREFIX + name  # keeps every dummy tournament findable by `delete`
     await delete_dummy_tournaments(db, name)
@@ -201,7 +204,7 @@ async def create_tournament(
             **_schedule(state),
             station_count=stations,
             game=game,
-            mode=TournamentMode.SINGLE_ELIMINATION,
+            mode=mode,
             visibility=TournamentVisibility.PUBLIC,
         ),
         owner.id,
@@ -265,6 +268,7 @@ async def main() -> None:
     create.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
     create.add_argument("--name", help="tournament name (default: scheme)")
     create.add_argument("--game", choices=[g.value for g in Game], default=Game.BEERPONG.value, help="what is played")
+    create.add_argument("--mode", choices=[m.value for m in TournamentMode], default=TournamentMode.SINGLE_ELIMINATION.value)
 
     seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, both open, running, finished)")
     seed.add_argument("--teams", type=int, default=28)
@@ -299,6 +303,7 @@ async def main() -> None:
                 owner_phone=args.owner,
                 name=args.name,
                 game=Game(args.game),
+                mode=TournamentMode(args.mode),
             )
             await db.commit()
             print(f"{info['name']}: {info['matches']} Matches, {info['rounds']} Runden, {info['played']} gespielt")

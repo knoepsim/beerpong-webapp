@@ -36,6 +36,9 @@ class GameRules:
     station: StationTerms
     # the modes a tournament of this game can have
     modes: tuple[TournamentMode, ...]
+    # whether a match can end even (only where the mode does not need a winner of every match)
+    draws: bool = False
+    max_score: int = 99
 
 
 def _beerpong(winner: int, loser: int) -> str | None:
@@ -60,13 +63,14 @@ GAMES: dict[Game, GameRules] = {
         label="Bierpong",
         score=_beerpong,
         station=StationTerms(singular="Tisch", plural="Tische", accusative="einen Tisch", none="keinen Tisch"),
-        modes=(TournamentMode.SINGLE_ELIMINATION,),
+        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN),
     ),
     Game.FOOTBALL: GameRules(
         label="Fußball",
         score=_football,
         station=StationTerms(singular="Platz", plural="Plätze", accusative="einen Platz", none="keinen Platz"),
-        modes=(TournamentMode.SINGLE_ELIMINATION,),
+        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN),
+        draws=True,
     ),
 }
 
@@ -76,6 +80,19 @@ def check_score(game: Game, winner_score: int, loser_score: int) -> None:
     problem = GAMES[game].score(winner_score, loser_score)
     if problem:
         raise InvalidScoreError(problem)
+
+
+# the modes in which a match may end even: everybody against everybody counts points, a knock-out needs a winner
+DRAW_MODES = (TournamentMode.ROUND_ROBIN,)
+
+
+def check_draw(game: Game, mode: TournamentMode, score: int) -> None:
+    """Raise if this game or mode has no draws (or the score is not possible)."""
+    rules = GAMES[game]
+    if not rules.draws or mode not in DRAW_MODES:
+        raise InvalidScoreError("Ein Unentschieden gibt es hier nicht: Wähle den Sieger.")
+    if not 0 <= score <= rules.max_score:
+        raise InvalidScoreError("So viele Tore sind nicht möglich.")
 
 
 def stations_of(game: Game) -> StationTerms:

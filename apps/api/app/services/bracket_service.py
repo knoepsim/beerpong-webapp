@@ -4,10 +4,10 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.games import check_score, stations_of
+from app.games import check_draw, check_score, stations_of
 from app.core.exceptions import (
     InvalidWinnerError,
     MatchNotAtStationError,
@@ -18,9 +18,11 @@ from app.core.exceptions import (
 )
 from app.models.match import Match
 from app.models.result import Result, ResultType
-from app.schemas.match import BracketResponse, MatchResponse, MatchStatus
+from app.schemas.match import BracketResponse, MatchResponse, MatchStatus, StandingResponse
 from app.schemas.result import ResultCreate
+from app.models.tournament import TournamentMode, TournamentTeam
 from app.services.bracket_layout import round_one_pairings
+from app.services.round_robin import Played, match_days, standings
 from app.models.station import Station
 from app.services.revision import bump
 from app.services.station_planner import PlanMatch, assign_free_stations, certain_next_stations, plan
@@ -31,6 +33,27 @@ from app.core.database import DbSession
 class BracketService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def generate(self, tournament_id: UUID, team_ids: list[UUID], mode: TournamentMode) -> list[Match]:
+        """The matches of a tournament at its start, as its mode wants them."""
+        if mode == TournamentMode.ROUND_ROBIN:
+            return await self.generate_round_robin(tournament_id, team_ids)
+        return await self.generate_bracket(tournament_id, team_ids)
+
+    async def generate_round_robin(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
+        """Everybody against everybody once, match day by match day (see round_robin.match_days); the order of the
+        teams is drawn, so who meets whom when is left to chance."""
+        shuffled = list(team_ids)
+        # Für das Mischen der Teams reicht diese Zufallsverteilung aus und birgt kein Sicherheitsrisiko
+        secrets.SystemRandom().shuffle(shuffled)  # NOSONAR
+        matches = [
+            Match(tournament_id=tournament_id, round=day, position=position, team_a_id=a, team_b_id=b)
+            for day, pairs in enumerate(match_days(shuffled), start=1)
+            for position, (a, b) in enumerate(pairs)
+        ]
+        self.db.add_all(matches)
+        await self.db.flush()
+        return matches
 
     async def generate_bracket(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
         """Draw a single-elimination bracket for the given teams.
@@ -151,7 +174,8 @@ class BracketService:
         Single place for all result rules:
         - the tournament must be running
         - CREATED needs a ready match without active result, MODIFIED/DELETED need an active one
-        - the winner must be one of the match's two teams, and the score possible in the game with that winner
+        - the winner must be one of the match's two teams, and the score possible in the game with that winner;
+          no winner is a draw, where the game and the mode have draws
         - the next match must not be decided yet
         """
         # Lock the tournament, then the match and its successor (always in this order): concurrent reports cannot
@@ -173,11 +197,16 @@ class BracketService:
         if result_type != ResultType.DELETED:
             if match.team_a_id is None or match.team_b_id is None:
                 raise MatchNotReadyError()
-            if winner_team_id not in (match.team_a_id, match.team_b_id):
-                raise InvalidWinnerError()
             score_a, score_b = score or (0, 0)
-            winner_score, loser_score = (score_a, score_b) if winner_team_id == match.team_a_id else (score_b, score_a)
-            check_score(tournament.game, winner_score, loser_score)
+            if winner_team_id is None:
+                if score_a != score_b:
+                    raise InvalidWinnerError()
+                check_draw(tournament.game, tournament.mode, score_a)
+            else:
+                if winner_team_id not in (match.team_a_id, match.team_b_id):
+                    raise InvalidWinnerError()
+                winner_score, loser_score = (score_a, score_b) if winner_team_id == match.team_a_id else (score_b, score_a)
+                check_score(tournament.game, winner_score, loser_score)
 
         if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
             raise ResultConflictError(
@@ -194,11 +223,19 @@ class BracketService:
         )
         self.db.add(entry)
 
-        if match.next_match_id is None:
-            # the final: its result decides whether the tournament is over
-            tournament.finished_at = None if result_type == ResultType.DELETED else datetime.now(UTC)
-        else:
+        if match.next_match_id is not None:
             await self._advance_team(match.next_match_id, match.next_match_slot, winner_team_id)
+        await self.db.flush()
+        # over when every match has a result: in a knock-out that is the final, everybody against everybody the last
+        # match day; a result taken back opens it again (a correction does not change the moment it ended)
+        decided = await self._current_results(
+            list((await self.db.execute(select(Match.id).where(Match.tournament_id == tournament.id))).scalars())
+        )
+        total = (await self.db.execute(select(func.count()).select_from(Match).where(Match.tournament_id == tournament.id))).scalar_one()
+        if len(decided) < total:
+            tournament.finished_at = None
+        elif tournament.finished_at is None:
+            tournament.finished_at = datetime.now(UTC)
 
         await self.db.flush()
         await self.assign_stations(tournament.id)
@@ -237,6 +274,7 @@ class BracketService:
                 finished_at=_timestamp(results[m.id].created_at) if m.id in results else None,
                 station=m.station_id,
                 playing=m.on_station_at is not None,
+                teams=tuple(t for t in (m.team_a_id, m.team_b_id) if t is not None),
             )
             for m in matches
         ]
@@ -343,14 +381,52 @@ class BracketService:
             )
             for m in matches
         ]
-        final = next((r for r in responses if r.round == total_rounds), None)
+        tournament = await TournamentService(self.db).get_tournament(tournament_id)
+        if tournament.mode == TournamentMode.ROUND_ROBIN:
+            table = await self.standings(tournament_id, matches, results)
+            # the first of the table once everything is played (a shared first place has no single winner)
+            leaders = [row for row in table if row.rank == 1]
+            champion = leaders[0].team_id if tournament.finished_at and len(leaders) == 1 else None
+        else:
+            table = None
+            final = next((r for r in responses if r.round == total_rounds), None)
+            champion = final.winner_team_id if final else None
 
         return BracketResponse(
             tournament_id=tournament_id,
+            mode=tournament.mode,
             total_rounds=total_rounds,
-            champion_team_id=final.winner_team_id if final else None,
+            champion_team_id=champion,
             matches=responses,
+            standings=table,
         )
+
+    async def standings(
+        self, tournament_id: UUID, matches: list[Match], results: dict[UUID, Result]
+    ) -> list[StandingResponse]:
+        """The table of everybody against everybody: every team that plays, also before its first result."""
+        team_ids = list(
+            (await self.db.execute(select(TournamentTeam.team_id).where(TournamentTeam.tournament_id == tournament_id))).scalars()
+        )
+        played = [
+            Played(m.team_a_id, m.team_b_id, r.score_a or 0, r.score_b or 0, r.winner_team_id)
+            for m in matches
+            if (r := results.get(m.id)) is not None and m.team_a_id is not None and m.team_b_id is not None
+        ]
+        return [
+            StandingResponse(
+                team_id=row.team_id,
+                rank=row.rank,
+                played=row.played,
+                won=row.won,
+                drawn=row.drawn,
+                lost=row.lost,
+                score_for=row.score_for,
+                score_against=row.score_against,
+                points=row.points,
+            )
+            for row in standings(team_ids, played)
+        ]
 
     @staticmethod
     def _to_response(match: Match, current: Result | None) -> MatchResponse:

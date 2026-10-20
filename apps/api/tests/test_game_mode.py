@@ -39,7 +39,7 @@ async def test_game_and_mode_are_stored_and_returned(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_a_mode_that_is_not_there_yet_is_refused(async_client: AsyncClient):
     admin = await _admin(async_client)
-    body = {**PLAYS, "mode": "round_robin", "name": "Cup", "start_time": FUTURE}
+    body = {**PLAYS, "mode": "groups_knockout", "name": "Cup", "start_time": FUTURE}
     assert (await async_client.post("/tournaments", json=body, headers=admin)).status_code == 422
 
 

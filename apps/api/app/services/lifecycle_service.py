@@ -74,7 +74,7 @@ class LifecycleService:
             entry.team_name = names[entry.team_id]
 
         bracket = BracketService(self.db)
-        await bracket.generate_bracket(tournament_id, [e.team_id for e in playing])
+        await bracket.generate(tournament_id, [e.team_id for e in playing], tournament.mode)
         tournament.started_at = datetime.now(UTC)
         await self.db.flush()
         await bracket.assign_stations(tournament_id)

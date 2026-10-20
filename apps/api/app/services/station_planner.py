@@ -41,6 +41,8 @@ class PlanMatch:
     finished_at: float | None = None
     station: StationId | None = None  # the station it is played at (playing) or was played at (finished, reopened)
     playing: bool = False
+    # its teams: a team plays one match at a time (everybody against everybody has all matches ready at once)
+    teams: tuple[Hashable, ...] = ()
 
 
 SortKey = Callable[[PlanMatch], tuple]
@@ -99,14 +101,16 @@ def assign_free_stations(
     matches = [replace(m, playing=False) if m.playing and m.station not in stations else m for m in matches]
     by_id = {m.id: m for m in matches}
     playing = {m.id: m.station for m in matches if m.playing and not m.finished}
+    busy = {team for m in matches if m.id in playing for team in m.teams}
     free = [t for t in stations if t not in playing.values()]
     for match in waiting_matches(matches, window, key):
         if not free:
             break
-        if match.id in playing:
+        if match.id in playing or busy.intersection(match.teams):
             continue
         station = _preferred_station(match, by_id, free)
         playing[match.id] = station
+        busy.update(match.teams)
         free.remove(station)
     return playing
 
