@@ -6,3 +6,5 @@ onlyBuiltDependencies:
 overrides:
   # pulled in with 6.x by @tailwindcss/typography (Dependabot alert)
   postcss-selector-parser@<7.1.6: ^7.1.6
+  # 10.1.0 (via prosekit -> shiki) is younger than the release-age policy of CI; drop this once it is a day old
+  "@shikijs/vscode-textmate": 10.0.2
