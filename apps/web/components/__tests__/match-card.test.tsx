@@ -55,7 +55,7 @@ describe('MatchCard', () => {
   });
 
   it('shows the score like a scoreboard: cups left next to each team, winner bold, loser crossed out', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 3 })} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'b', score_a: 0, score_b: 3 })} teamsMap={teamsMap} />);
     expect(screen.getByText('Bravo').className).toContain('font-semibold');
     expect(screen.getByText('Alpha').className).toContain('line-through'); // not only by color
     expect(screen.getByText('Bravo').parentElement).toHaveTextContent(/Bravo3$/);
@@ -75,9 +75,9 @@ describe('MatchCard', () => {
   });
 
   it('describes the whole match for screen readers', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2 })} teamsMap={teamsMap} />);
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', score_a: 2, score_b: 0 })} teamsMap={teamsMap} />);
     expect(
-      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig' }),
+      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, Ergebnis 2:0' }),
     ).toBeInTheDocument();
   });
 

@@ -18,7 +18,8 @@ export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round"
   created_at: "",
   status: "waiting",
   winner_team_id: null,
-  cups_left: null,
+  score_a: null,
+  score_b: null,
   ...overrides,
 });
 

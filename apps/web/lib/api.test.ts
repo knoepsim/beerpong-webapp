@@ -265,8 +265,8 @@ describe('api endpoints', () => {
     ['roles.assign', () => api.roles.assign('x', 'u1', 'manager'), 'POST', '/tournaments/x/roles', { user_id: 'u1', role: 'manager' }],
     ['roles.revoke', () => api.roles.revoke('x', 'r1'), 'DELETE', '/tournaments/x/roles/r1', undefined],
     ['results.list', () => api.results.list('m1'), 'GET', '/matches/m1/results', undefined],
-    ['results.create', () => api.results.create('m1', 't1', 3), 'POST', '/matches/m1/results', { winner_team_id: 't1', cups_left: 3 }],
-    ['results.modify', () => api.results.modify('m1', 't1', 2), 'PATCH', '/matches/m1/results', { winner_team_id: 't1', cups_left: 2 }],
+    ['results.create', () => api.results.create('m1', { winnerTeamId: 't1', scoreA: 3, scoreB: 0 }), 'POST', '/matches/m1/results', { winner_team_id: 't1', score_a: 3, score_b: 0 }],
+    ['results.modify', () => api.results.modify('m1', { winnerTeamId: 't1', scoreA: 0, scoreB: 2 }), 'PATCH', '/matches/m1/results', { winner_team_id: 't1', score_a: 0, score_b: 2 }],
     ['results.delete', () => api.results.delete('m1'), 'DELETE', '/matches/m1/results', undefined],
   ];
 

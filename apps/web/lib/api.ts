@@ -14,6 +14,7 @@ import type {
   User,
   PublicUser,
   Result,
+  ReportedResult,
   MyTournamentsResponse,
   TournamentTeam,
   Invitation,
@@ -143,6 +144,9 @@ export async function request<T>(endpoint: string, options: FetchOptions = {}): 
 }
 
 // ── Typed API methods ─────────────────────────────────
+
+const resultBody = ({ winnerTeamId, scoreA, scoreB }: ReportedResult) =>
+  JSON.stringify({ winner_team_id: winnerTeamId, score_a: scoreA, score_b: scoreB });
 
 export const api = {
   auth: {
@@ -320,16 +324,10 @@ export const api = {
 
   results: {
     list: (matchId: string) => request<Result[]>(`/matches/${matchId}/results`),
-    create: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
-      request<Result>(`/matches/${matchId}/results`, {
-        method: "POST",
-        body: JSON.stringify({ winner_team_id: winnerTeamId, cups_left: cupsLeft }),
-      }),
-    modify: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
-      request<Result>(`/matches/${matchId}/results`, {
-        method: "PATCH",
-        body: JSON.stringify({ winner_team_id: winnerTeamId, cups_left: cupsLeft }),
-      }),
+    create: (matchId: string, result: ReportedResult) =>
+      request<Result>(`/matches/${matchId}/results`, { method: "POST", body: resultBody(result) }),
+    modify: (matchId: string, result: ReportedResult) =>
+      request<Result>(`/matches/${matchId}/results`, { method: "PATCH", body: resultBody(result) }),
     delete: (matchId: string) =>
       request<Result>(`/matches/${matchId}/results`, { method: "DELETE" }),
   },

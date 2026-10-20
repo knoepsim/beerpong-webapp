@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { successMessage } from "@/lib/query-client";
 import { queryKeys, tournamentKeys } from "@/lib/query-keys";
-import { ResultType, type Match, type Result } from "@/types";
+import { ResultType, type Match, type ReportedResult, type Result } from "@/types";
 
 /** The history of the results of a match, oldest first. */
 export function useMatchResults(matchId: string | null | undefined, { enabled = true }: { enabled?: boolean } = {}) {
@@ -43,8 +43,8 @@ export function useSetMatchStarted(tournamentId: string) {
 /** Report a result or change it (`existing`); without cups the winner had all of them left. */
 export function useSaveResult(tournamentId: string, matchId: string) {
   return useMutation({
-    mutationFn: ({ winnerTeamId, cupsLeft, existing }: { winnerTeamId: string; cupsLeft: number; existing: boolean }) =>
-      existing ? api.results.modify(matchId, winnerTeamId, cupsLeft) : api.results.create(matchId, winnerTeamId, cupsLeft),
+    mutationFn: ({ existing, ...result }: ReportedResult & { existing: boolean }) =>
+      existing ? api.results.modify(matchId, result) : api.results.create(matchId, result),
     meta: {
       inlineError: true,
       invalidates: tournamentKeys(tournamentId, ["bracket"]),

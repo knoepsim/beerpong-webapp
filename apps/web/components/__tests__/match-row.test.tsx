@@ -30,7 +30,7 @@ describe('MatchRow', () => {
   })
 
   it('shows every piece of information once: winner bold, loser dimmed and crossed out, the score, no table', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', score_a: 0, score_b: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
 
     const winner = screen.getByText('Bravo')
     const loser = screen.getByText('Alpha')
@@ -66,9 +66,9 @@ describe('MatchRow', () => {
   })
 
   it('describes the match for screen readers', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2 })} teamsMap={teamsMap} />)
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'a', score_a: 2, score_b: 0 })} teamsMap={teamsMap} />)
     expect(
-      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig' }),
+      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, Ergebnis 2:0' }),
     ).toBeInTheDocument()
   })
 

@@ -25,15 +25,12 @@ export interface SideInfo {
   isChampion: boolean;
   /** Played and lost: shown as disabled. */
   isLoser: boolean;
-  /** Cups the team had left at the end (the winner its cups, the loser none); null before the result. */
+  /** Its score at the end (what it counts is up to the game); null before the result. */
   score: number | null;
 }
 
 const teamName = (teamsMap: Record<string, Team>, id: string | null) =>
   id === null ? null : teamsMap[id]?.name || "Unbekannt";
-
-/** Cups left at the end: the winner its cups, the loser none. */
-const scoreOf = (isWinner: boolean, cupsLeft: number) => (isWinner ? cupsLeft : 0);
 
 const placeholderFor = (source: number | null) => (source === null ? "Offen" : `Sieger Spiel ${source}`);
 
@@ -54,10 +51,15 @@ export function describeSides(
       isWinner,
       isChampion: id !== null && id === championTeamId,
       isLoser: finished && id !== null && !isWinner,
-      score: finished && match.cups_left != null && id !== null ? scoreOf(isWinner, match.cups_left) : null,
+      score: finished && id !== null ? (side === "a" ? match.score_a : match.score_b) : null,
     };
   };
   return [build("a", match.team_a_id, sources.a), build("b", match.team_b_id, sources.b)];
+}
+
+/** The score as it is said for every game: "3:0" (team a first); null without one. */
+export function scoreText(match: Pick<Match, "score_a" | "score_b">): string | null {
+  return match.score_a != null && match.score_b != null ? `${match.score_a}:${match.score_b}` : null;
 }
 
 /** Both teams are known and there is no result yet: queued, at its table or live. */
@@ -67,7 +69,7 @@ export function isOpen(match: Match): boolean {
 
 /**
  * The status as short as it stays clear next to its icon: "Wartet" (for a team, the rows name the matches it comes
- * from), "Platz 2" (in the queue for a table), "Bereit", "Live", or the cups the winner had left.
+ * from), "Platz 2" (in the queue for a table), "Bereit", "Live", or the score ("3:0").
  */
 export function statusLabel(match: Match): string {
   switch (match.status) {
@@ -80,7 +82,7 @@ export function statusLabel(match: Match): string {
     case "live":
       return "Live";
     default:
-      return match.cups_left != null ? `${match.cups_left} Becher` : "Beendet";
+      return scoreText(match) ?? "Beendet";
   }
 }
 
@@ -137,7 +139,7 @@ export function sideTone(side: SideInfo, isMine: boolean, tinted = true): string
   );
 }
 
-/** One sentence for screen readers: number, teams with their colors, state and what it waits for, winner, cups. */
+/** One sentence for screen readers: number, teams with their colors, state and what it waits for, winner, score. */
 export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teamsMap: Record<string, Team>): string {
   const { match, number } = slot;
   const finished = match.status === "finished";
@@ -147,7 +149,7 @@ export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teams
     statusText(match),
     tableOf(match),
     finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
-    finished && match.cups_left != null ? `${match.cups_left} Becher übrig` : null,
+    finished && scoreText(match) ? `Ergebnis ${scoreText(match)}` : null,
   ]
     .filter(Boolean)
     .join(", ");

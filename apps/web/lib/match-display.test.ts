@@ -52,8 +52,8 @@ describe('statusLabel', () => {
     expect(statusLabel(slot({ status: 'queued', queue_position: 2 }).match)).toBe('Platz 2')
     expect(statusLabel(slot().match)).toBe('Bereit')
     expect(statusLabel(slot({ status: 'live' }).match)).toBe('Live')
-    expect(statusLabel(slot({ status: 'finished', cups_left: 3 }).match)).toBe('3 Becher')
-    expect(statusLabel(slot({ status: 'finished', cups_left: null }).match)).toBe('Beendet')
+    expect(statusLabel(slot({ status: 'finished', score_a: 3, score_b: 0 }).match)).toBe('3:0')
+    expect(statusLabel(slot({ status: 'finished' }).match)).toBe('Beendet')
     expect(statusText(slot({ status: 'waiting' }).match)).toBe('Wartet auf Team')
     expect(statusText(slot({ status: 'queued', queue_position: 2 }).match)).toBe('Wartet auf Tisch, Platz 2 in der Warteschlange')
     expect(statusText(slot({ status: 'finished' }).match)).toBeNull()
@@ -76,9 +76,9 @@ describe('matchSummary', () => {
   })
 
   it('describes a finished match with winner and cups', () => {
-    const s = slot({ status: 'finished', winner_team_id: 'b', cups_left: 2 })
+    const s = slot({ status: 'finished', winner_team_id: 'b', score_a: 0, score_b: 2 })
     expect(matchSummary(s, describeSides(s, teamsMap), teamsMap)).toBe(
-      'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Bravo, 2 Becher übrig',
+      'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Bravo, Ergebnis 0:2',
     )
   })
 })

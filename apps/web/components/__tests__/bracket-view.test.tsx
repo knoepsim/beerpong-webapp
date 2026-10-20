@@ -4,7 +4,7 @@ import { BracketView } from '../bracket-view';
 import { fiveTeamBracket, fiveTeams, makeMatch } from '@/lib/test-fixtures/bracket';
 import type { Bracket } from '@/types';
 
-const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: cups });
+const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, score_a: cups, score_b: 0 });
 
 describe('BracketView', () => {
   it('draws every round as a column with its name', () => {

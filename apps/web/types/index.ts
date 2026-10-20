@@ -67,6 +67,7 @@ export interface TeamInviteDetails {
 /** What is played; it decides how a result is entered (see lib/games). */
 export enum Game {
   BEERPONG = "beerpong",
+  FOOTBALL = "football",
 }
 
 /** How the teams meet. Only the modes the API has; the coming ones live in lib/modes. */
@@ -266,8 +267,9 @@ export interface Match {
   created_at: string;
   status: MatchStatus;
   winner_team_id: string | null;
-  /** cups the winner had left */
-  cups_left: number | null;
+  /** The score of each team (what it counts is up to the game: cups left, goals); null before the result. */
+  score_a: number | null;
+  score_b: number | null;
 }
 
 export interface Bracket {
@@ -290,10 +292,19 @@ export interface Result {
   match_id: string;
   type: ResultType;
   winner_team_id: string | null;
-  cups_left: number | null;
+  /** null for a deletion */
+  score_a: number | null;
+  score_b: number | null;
   reported_by_user_id: string;
   reported_by_username?: string;
   created_at: string;
+}
+
+/** A result as it is reported: the winner and the score of both teams of the match. */
+export interface ReportedResult {
+  winnerTeamId: string;
+  scoreA: number;
+  scoreB: number;
 }
 
 // ── Roles ─────────────────────────────────────────────

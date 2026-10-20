@@ -3,18 +3,16 @@
 import { useState } from "react";
 import { currentResult, useDeleteResult, useMatchResults, useSaveResult, useSetMatchStarted } from "@/hooks/queries/matches";
 import { errorMessage } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import { LoadError } from "@/components/load-error";
 import { Spinner } from "@/components/ui/spinner";
-import type { Game, Match, Result } from "@/types";
+import type { Game, Match, ReportedResult, Result } from "@/types";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { formatWhen } from "@/lib/format-when";
-import { GAMES, type GameDefinition } from "@/components/games";
+import { GAMES, sameResult, type GameDefinition, type TeamBasic } from "@/components/games";
+import { scoreText } from "@/lib/match-display";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -23,11 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-interface TeamBasic {
-  id: string;
-  name: string;
-}
 
 interface MatchResultDialogProps {
   tournamentId: string;
@@ -162,15 +155,10 @@ function ResultForm({
   const setStarted = useSetMatchStarted(tournamentId);
   const save = useSaveResult(tournamentId, match.id);
   const remove = useDeleteResult(tournamentId, match.id);
-  const { score } = game;
-  // tapping the winner puts the cursor into its score field (on a phone the number pad opens right away);
-  // opening an existing result does not
-  const [winnerTapped, setWinnerTapped] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [winnerId, setWinnerId] = useState<string | null>(existingResult?.winner_team_id ?? null);
-  // the score as typed; empty counts as the fallback (the placeholder)
-  const [scoreText, setScoreText] = useState<string>(existingResult?.cups_left ? String(existingResult.cups_left) : "");
-  const scoreValue = scoreText.trim() ? Number.parseInt(scoreText, 10) : score.fallback;
+  const saved = toReported(existingResult);
+  // what the game's input gives: null while it is not complete
+  const [entry, setEntry] = useState<ReportedResult | null>(saved);
   const isStarting = setStarted.isPending;
   const isSubmitting = save.isPending;
   const isDeleting = remove.isPending;
@@ -178,21 +166,15 @@ function ResultForm({
   const error = failed ? errorMessage(failed) : null;
 
   const handleSubmit = () => {
-    if (!winnerId) return;
-    save.mutate({ winnerTeamId: winnerId, cupsLeft: scoreValue, existing: !!existingResult }, { onSuccess: onDone });
+    if (!entry) return;
+    save.mutate({ ...entry, existing: !!existingResult }, { onSuccess: onDone });
   };
 
   const changeStart = (start: boolean) => setStarted.mutate({ match, started: start }, { onSuccess: onDone });
 
   const handleDelete = () => remove.mutate(undefined, { onSuccess: onDone });
 
-  let winnerSide: "a" | "b" | null = null;
-  if (winnerId === teamA.id) winnerSide = "a";
-  else if (winnerId === teamB.id) winnerSide = "b";
-
-  const hasChanges = !existingResult ||
-    existingResult.winner_team_id !== winnerId ||
-    (existingResult.cups_left ?? score.fallback) !== scoreValue;
+  const hasChanges = !sameResult(entry, saved);
 
   const savedWinner = existingResult?.winner_team_id === teamA.id ? teamA.name : teamB.name;
   const deleteConsequence = nextMatchId
@@ -202,21 +184,14 @@ function ResultForm({
   let submitLabel = existingResult ? "Ergebnis ändern" : "Ergebnis speichern";
   if (isSubmitting) submitLabel = "Wird gespeichert…";
 
-  // the score is optional: empty means the fallback (the placeholder)
-  const isValid = winnerId !== null;
-
-  const chooseWinner = (teamId: string) => {
-    if (nextMatchHasResult) return;
-    setWinnerId(teamId);
-    setWinnerTapped(true);
-  };
+  const isValid = entry !== null;
 
   return (
     <div>
       {/* Start at the table: only for a match at its table; a live one can take the start back */}
       <StartControls match={match} isStarting={isStarting} onChange={changeStart} />
 
-      {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} format={score.format} />}
+      {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} />}
 
       {/* Lock warning */}
       {nextMatchHasResult && existingResult && (
@@ -228,33 +203,7 @@ function ResultForm({
         </div>
       )}
 
-      <div className="flex justify-center">
-        <game.Board winner={winnerSide} score={scoreValue} max={score.max} />
-      </div>
-
-      {/* Team selection cards */}
-      <div className="space-y-3">
-        <Label className="text-base">Wer hat gewonnen?</Label>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { team: teamA, side: "a" as const },
-            { team: teamB, side: "b" as const },
-          ].map(({ team, side }) => (
-            <WinnerCard
-              key={team.id}
-              team={team}
-              side={side}
-              isWinner={winnerId === team.id}
-              locked={nextMatchHasResult}
-              focusScore={winnerTapped}
-              score={score}
-              scoreText={scoreText}
-              onChoose={() => chooseWinner(team.id)}
-              onScoreChange={setScoreText}
-            />
-          ))}
-        </div>
-      </div>
+      <game.ResultInput teamA={teamA} teamB={teamB} initial={saved} locked={nextMatchHasResult} onChange={setEntry} />
 
       {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
@@ -348,12 +297,7 @@ function StartControls({
 }
 
 /** Who reported what and when, closed until asked for. */
-function ResultHistory({
-  results,
-  teamA,
-  teamB,
-  format,
-}: Readonly<{ results: Result[]; teamA: TeamBasic; teamB: TeamBasic; format: (score: number) => string }>) {
+function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; teamA: TeamBasic; teamB: TeamBasic }>) {
   const [open, setOpen] = useState(false);
   const nameOf = (id: string | null) => [teamA, teamB].find((team) => team.id === id)?.name ?? "Unbekannt";
   return (
@@ -383,7 +327,7 @@ function ResultHistory({
                 ) : (
                   <span>
                     {r.type === ResultType.CREATED ? "Gemeldet" : "Geändert"}: {nameOf(r.winner_team_id)}
-                    {r.cups_left ? ` (${format(r.cups_left)})` : ""}
+                    {scoreText(r) ? ` (${scoreText(r)})` : ""}
                   </span>
                 )}
               </div>
@@ -395,84 +339,8 @@ function ResultHistory({
   );
 }
 
-const SIDES = {
-  a: {
-    card: "border-red-500 bg-red-500/5 ring-1 ring-red-500",
-    dot: "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]",
-    idleDot: "bg-red-500/50",
-    label: "text-red-600 dark:text-red-400",
-    input: "border-red-500/30 focus-visible:ring-red-500",
-  },
-  b: {
-    card: "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500",
-    dot: "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]",
-    idleDot: "bg-blue-500/50",
-    label: "text-blue-600 dark:text-blue-400",
-    input: "border-blue-500/30 focus-visible:ring-blue-500",
-  },
-};
-
-/** A team to tap as the winner; the winner gets the field for its score. */
-function WinnerCard({
-  team,
-  side,
-  isWinner,
-  locked,
-  focusScore,
-  score,
-  scoreText,
-  onChoose,
-  onScoreChange,
-}: Readonly<{
-  team: TeamBasic;
-  side: keyof typeof SIDES;
-  isWinner: boolean;
-  locked: boolean;
-  focusScore: boolean;
-  score: GameDefinition["score"];
-  scoreText: string;
-  onChoose: () => void;
-  onScoreChange: (text: string) => void;
-}>) {
-  const tone = SIDES[side];
-  const inputId = `score_${side}`;
-  return (
-    <button
-      type="button"
-      className={cn(
-        "relative border-2 rounded-xl p-4 flex flex-col items-center justify-start transition-all min-h-[140px]",
-        isWinner ? tone.card : "border-border bg-card hover:bg-accent/50",
-        locked && "opacity-50 cursor-not-allowed",
-      )}
-      onClick={onChoose}
-      disabled={locked}
-    >
-      <div className="flex flex-col items-center gap-2 w-full">
-        <div className={cn("w-4 h-4 rounded-full", isWinner ? tone.dot : tone.idleDot)} />
-        <span className="font-semibold text-center leading-tight">{team.name}</span>
-      </div>
-      {isWinner && (
-        <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-          <Label htmlFor={inputId} className={cn("text-xs font-medium", tone.label)}>{score.label}</Label>
-          <Input
-            id={inputId}
-            autoFocus={focusScore}
-            onFocus={(e) => e.target.select()}
-            type="number"
-            min={score.min}
-            max={score.max}
-            placeholder={String(score.fallback)}
-            value={scoreText}
-            onChange={(e) => {
-              const val = e.target.value;
-              const value = Number.parseInt(val, 10);
-              if (val === "" || (value >= score.min && value <= score.max)) onScoreChange(val);
-            }}
-            className={cn("mt-1.5 text-center text-lg h-10 bg-background", tone.input)}
-            disabled={locked}
-          />
-        </div>
-      )}
-    </button>
-  );
+/** A saved result as the inputs take it; null without one (or for a deletion). */
+function toReported(result: Result | null | undefined): ReportedResult | null {
+  if (!result?.winner_team_id || result.score_a == null || result.score_b == null) return null;
+  return { winnerTeamId: result.winner_team_id, scoreA: result.score_a, scoreB: result.score_b };
 }

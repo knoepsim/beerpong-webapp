@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MatchList } from '../match-list'
 import { fiveTeamBracket, fiveTeams } from '@/lib/test-fixtures/bracket'
 
-const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: cups })
+const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, score_a: cups, score_b: 0 })
 
 describe('MatchList', () => {
   it('lists every match grouped by round, byes are not matches', () => {
@@ -18,7 +18,7 @@ describe('MatchList', () => {
 
   it('shows results, the table of playable matches and the open sources', () => {
     render(<MatchList bracket={fiveTeamBracket({ m1: finished('t4', 6) })} teamsMap={fiveTeams} />)
-    expect(screen.getByRole('article', { name: /6 Becher übrig/ })).toBeInTheDocument()
+    expect(screen.getByRole('article', { name: /Ergebnis 6:0/ })).toBeInTheDocument()
     expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1) // only match 3 is ready
     expect(screen.getByText('Sieger Spiel 2')).toBeInTheDocument()
   })

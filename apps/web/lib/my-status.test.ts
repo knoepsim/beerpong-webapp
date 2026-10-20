@@ -6,7 +6,7 @@ import { makeTournament as tournament, makeTournamentTeam as team } from './test
 import type { Bracket, Match } from '@/types'
 
 const NOW = new Date('2099-07-01T12:00:00Z')
-const finished = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 3 })
+const finished = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, score_a: 3, score_b: 0 })
 
 function inBracket(bracket: Bracket, teamId: string, now = NOW) {
   const slots = allMatchSlots(buildBracketLayout(bracket))
