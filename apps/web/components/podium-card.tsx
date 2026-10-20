@@ -1,4 +1,5 @@
 import { Medal, Trophy } from "lucide-react";
+import { Celebration } from "@/components/celebration";
 import { Card, CardContent } from "@/components/ui/card";
 import { podium } from "@/lib/podium";
 import type { Bracket, Team } from "@/types";
@@ -15,6 +16,7 @@ export function PodiumCard({ bracket, teamsMap }: Readonly<{ bracket: Bracket; t
 
   return (
     <Card className="border-amber-500/40 bg-amber-500/5">
+      <Celebration id={bracket.tournament_id} />
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
           <Trophy className="size-12 shrink-0 text-amber-500" aria-hidden="true" />

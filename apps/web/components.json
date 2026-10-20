@@ -22,6 +22,8 @@
     "hooks": "@/hooks"
   },
   "registries": {
-    "@reui": "https://reui.io/r/{style}/{name}.json"
+    "@reui": "https://reui.io/r/{style}/{name}.json",
+    "@magicui": "https://magicui.design/r/{name}",
+    "@prosekit": "https://prosekit.dev/r/{name}.json"
   }
 }

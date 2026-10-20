@@ -14,7 +14,6 @@ import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +34,7 @@ import {
 import { Plus, Trophy } from "lucide-react";
 import { AccessFields } from "@/components/access-fields";
 import { EmptyNote } from "@/components/empty-note";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { z } from "zod";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -251,10 +251,13 @@ export default function TournamentsPage() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Beschreibung (Markdown unterstützt)</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise…" className="min-h-24" {...field} />
-                      </FormControl>
+                      <FormLabel>Beschreibung</FormLabel>
+                      <MarkdownEditor
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        aria-label="Beschreibung"
+                        placeholder="Turnier-Regeln, Zeitplan, Preise…"
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

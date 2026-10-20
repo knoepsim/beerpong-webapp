@@ -8,7 +8,7 @@ import { RadioCards } from "@/components/radio-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { useAssignRole, useRevokeRole } from "@/hooks/queries/tournaments";
 import { assignableRoles, mayRevoke, ROLE_INFO, strongestRole } from "@/lib/roles";
 import { TournamentRoleType, type PublicUser, type TournamentUserRole } from "@/types";
@@ -32,7 +32,7 @@ function RoleChoice({
   );
 }
 
-/** Choose the role, find the person, give it: the sheet stays open for the next one. */
+/** Choose the role, find the person, give it: the drawer stays open for the next one. */
 function AssignRole({
   tournamentId,
   roles,
@@ -80,7 +80,7 @@ function AssignRole({
 }
 
 /**
- * Who helps to run the tournament: the people with a role (strongest first) and "Rolle vergeben" in a sheet from
+ * Who helps to run the tournament: the people with a role (strongest first) and "Rolle vergeben" in a drawer from
  * below. Admins give and take every role, managers only referees (the same rules as the API).
  */
 export function RoleManager({
@@ -136,21 +136,24 @@ export function RoleManager({
       </ItemGroup>
 
       {choices.length > 0 && (
-        <Sheet>
-          <SheetTrigger render={<Button variant="outline" className="h-11 w-full" />}>
+        <Drawer showSwipeHandle>
+          <DrawerTrigger render={<Button variant="outline" className="h-11 w-full" />}>
             <UserPlus aria-hidden="true" />
             Rolle vergeben
-          </SheetTrigger>
-          <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl sm:mx-auto sm:max-w-lg">
-            <SheetHeader>
-              <SheetTitle>Rolle vergeben</SheetTitle>
-              <SheetDescription>Wer eine Rolle hat, hilft beim Turnier; mitspielen ist davon unabhängig.</SheetDescription>
-            </SheetHeader>
+          </DrawerTrigger>
+          <DrawerContent className="sm:mx-auto sm:max-w-lg">
+            {/* the content scrolls, the drawer itself is swiped */}
+            <div className="overflow-y-auto">
+            <DrawerHeader>
+              <DrawerTitle>Rolle vergeben</DrawerTitle>
+              <DrawerDescription>Wer eine Rolle hat, hilft beim Turnier; mitspielen ist davon unabhängig.</DrawerDescription>
+            </DrawerHeader>
             <div className="px-4 pb-6">
               <AssignRole tournamentId={tournamentId} roles={roles} choices={choices} />
             </div>
-          </SheetContent>
-        </Sheet>
+          </div>
+</DrawerContent>
+        </Drawer>
       )}
     </div>
   );

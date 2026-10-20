@@ -8,6 +8,7 @@ import type { Tournament, TournamentCreateRequest, TournamentUserRole } from "@/
 import { AccessFields } from "@/components/access-fields";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RoleManager } from "@/components/role-manager";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -18,9 +19,6 @@ import { Trash2, ShieldAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Markdown } from "@/components/markdown";
 
 /** A group of settings with its own save button right below its fields (what belongs together is saved together). */
 function SettingsCard({
@@ -157,30 +155,13 @@ export function TournamentSettings({
             <Input id="settings-location" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Beschreibung (Markdown unterstützt)</Label>
-            <Tabs defaultValue="edit" className="w-full">
-              <TabsList className="mb-2">
-                <TabsTrigger value="edit">Bearbeiten</TabsTrigger>
-                <TabsTrigger value="preview">Vorschau</TabsTrigger>
-              </TabsList>
-              <TabsContent value="edit">
-                <Textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  rows={5}
-                  placeholder="Turnier-Regeln, Zeitplan, Preise…"
-                />
-              </TabsContent>
-              <TabsContent value="preview">
-                <div className="p-4 bg-muted/30 border rounded-md min-h-[120px]">
-                  {editDescription ? (
-                    <Markdown>{editDescription}</Markdown>
-                  ) : (
-                    <span className="text-muted-foreground italic">Keine Beschreibung…</span>
-                  )}
-                </div>
-              </TabsContent>
-            </Tabs>
+            <Label>Beschreibung</Label>
+            <MarkdownEditor
+              value={editDescription}
+              onChange={setEditDescription}
+              aria-label="Beschreibung"
+              placeholder="Turnier-Regeln, Zeitplan, Preise…"
+            />
           </div>
         </SettingsCard>
       )}
