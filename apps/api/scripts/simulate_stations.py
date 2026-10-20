@@ -1,13 +1,13 @@
-"""Simulates tournaments to choose and check the table planning (app/services/table_planner.py).
+"""Simulates tournaments to choose and check the station planning (app/services/station_planner.py).
 
-The simulation drives the planner the server uses: matches take a random time, a table becomes free when its match
+The simulation drives the planner the server uses: matches take a random time, a station becomes free when its match
 ends, the next teams need a moment to get there, and the planner decides who plays next and where. It compares the
 rule the server uses with the alternatives that were considered.
 
 Usage (from apps/api):
-    uv run python -m scripts.simulate_tables
-    uv run python -m scripts.simulate_tables --teams 40 --tables 3 5 7 --trials 300
-    uv run python -m scripts.simulate_tables --stress     # 3 % of the matches take five times as long
+    uv run python -m scripts.simulate_stations
+    uv run python -m scripts.simulate_stations --teams 40 --stations 3 5 7 --trials 300
+    uv run python -m scripts.simulate_stations --stress     # 3 % of the matches take five times as long
 """
 import argparse
 import math
@@ -17,10 +17,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
 from app.services.bracket_layout import round_one_pairings
-from app.services.table_planner import (
+from app.services.station_planner import (
     DEFAULT_WINDOW,
     PlanMatch,
-    assign_free_tables,
+    assign_free_stations,
     first_come_first_served,
     plan,
 )
@@ -29,7 +29,7 @@ MEDIAN_MINUTES = 12.0  # a typical beer pong match
 SPREAD = 0.35  # lognormal sigma: most matches take 7-20 minutes
 LONG_SHARE = 0.10  # some take much longer (overtime, slow players)
 LONG_FACTOR = 1.7
-WALK_MINUTES = 1.5  # from "the table is free" to "the next match starts"
+WALK_MINUTES = 1.5  # from "the station is free" to "the next match starts"
 
 
 def match_minutes(rng: random.Random, stress: bool) -> float:
@@ -86,13 +86,13 @@ Decide = Callable[[list[PlanMatch], list[str], dict], dict]
 def server_rule(window: int | None, key=None) -> Decide:
     """The planner of the server (optionally with another window or another order)."""
 
-    def decide(matches, tables, _memory):
-        return assign_free_tables(matches, tables, window, key or first_come_first_served)
+    def decide(matches, stations, _memory):
+        return assign_free_stations(matches, stations, window, key or first_come_first_served)
 
     return decide
 
 
-def opponent_waits_first(matches, tables, _memory):
+def opponent_waits_first(matches, stations, _memory):
     """Alternative: first the match whose winner somebody already waits for (a bye team, the other semi-final)."""
     by_id = {m.id: m for m in matches}
     parents = {f: m for m in matches for f in m.feeders}
@@ -104,27 +104,27 @@ def opponent_waits_first(matches, tables, _memory):
         )
         return (not waits, *first_come_first_served(match))
 
-    return assign_free_tables(matches, tables, DEFAULT_WINDOW, key)
+    return assign_free_stations(matches, stations, DEFAULT_WINDOW, key)
 
 
-def fixed_tables(matches, tables, memory):
-    """Alternative: a match gets its table fixed as soon as it is ready and only plays there."""
+def fixed_stations(matches, stations, memory):
+    """Alternative: a match gets its station fixed as soon as it is ready and only plays there."""
     reserved: dict = memory.setdefault("reserved", {})
-    load = {t: 0 for t in tables}
-    for mid, table in reserved.items():
-        load[table] += 1
+    load = {t: 0 for t in stations}
+    for mid, station in reserved.items():
+        load[station] += 1
     for match in sorted((m for m in matches if m.ready and not m.finished), key=first_come_first_served):
         if match.id not in reserved:
-            table = min(tables, key=lambda t: load[t])
-            reserved[match.id] = table
-            load[table] += 1
-    playing = {m.id: m.table for m in matches if m.playing and not m.finished}
-    for table in tables:
-        if table in playing.values():
+            station = min(stations, key=lambda t: load[t])
+            reserved[match.id] = station
+            load[station] += 1
+    playing = {m.id: m.station for m in matches if m.playing and not m.finished}
+    for station in stations:
+        if station in playing.values():
             continue
-        queue = [m for m in matches if reserved.get(m.id) == table and m.ready and not m.finished and not m.playing]
+        queue = [m for m in matches if reserved.get(m.id) == station and m.ready and not m.finished and not m.playing]
         if queue:
-            playing[min(queue, key=first_come_first_served).id] = table
+            playing[min(queue, key=first_come_first_served).id] = station
     for mid in [m for m, t in reserved.items() if by_finished(matches, m)]:
         del reserved[mid]
     return playing
@@ -140,7 +140,7 @@ RULES: dict[str, Decide] = {
     "Runde für Runde": server_rule(0),
     "Fenster 1": server_rule(1),
     "Wartende zuerst": opponent_waits_first,
-    "Tisch fest": fixed_tables,
+    "Tisch fest": fixed_stations,
 }
 
 
@@ -151,20 +151,20 @@ RULES: dict[str, Decide] = {
 class RunResult:
     duration: float
     waits: list[float]  # between two matches of a team
-    table_waits: list[float]  # part of it: both teams ready, but no (allowed) table
+    station_waits: list[float]  # part of it: both teams ready, but no (allowed) station
     first_match: float  # until the last team plays its first match
     final_wait: float  # the first finalist waits for the second
     utilization: float
     queue_right: list[bool] = field(default_factory=list)  # place in the queue when it joined = what happened
 
 
-def run(num_teams: int, num_tables: int, decide: Decide, rng: random.Random, stress: bool, queues: bool) -> RunResult:
+def run(num_teams: int, num_stations: int, decide: Decide, rng: random.Random, stress: bool, queues: bool) -> RunResult:
     matches = build_bracket(num_teams)
-    tables = [f"T{i}" for i in range(1, num_tables + 1)]
+    stations = [f"T{i}" for i in range(1, num_stations + 1)]
     memory: dict = {}
     clock, events, played = 0.0, [], 0.0
     last_finish: dict[int, float] = {}
-    waits, table_waits, first_starts = [], [], []
+    waits, station_waits, first_starts = [], [], []
     final_wait = 0.0
     started: list[str] = []
     joined: dict[str, tuple[int, int]] = {}  # match -> (place in queue, matches started before)
@@ -174,22 +174,22 @@ def run(num_teams: int, num_tables: int, decide: Decide, rng: random.Random, str
 
     def note_queue() -> None:
         if queues:
-            for place, mid in enumerate(plan(snapshot(), tables).queue, start=1):
+            for place, mid in enumerate(plan(snapshot(), stations).queue, start=1):
                 joined.setdefault(mid, (place, len(started)))
 
     def start_matches() -> None:
         nonlocal played
-        for mid, table in decide(snapshot(), tables, memory).items():
+        for mid, station in decide(snapshot(), stations, memory).items():
             match = matches[mid]
             if match.plan.playing:
                 continue
-            match.plan = replace(match.plan, playing=True, table=table)
+            match.plan = replace(match.plan, playing=True, station=station)
             begin = clock + WALK_MINUTES
             started.append(mid)
             for team in match.teams:
                 if team in last_finish:
                     waits.append(begin - last_finish[team])
-                    table_waits.append(begin - (match.plan.ready_at or 0.0))
+                    station_waits.append(begin - (match.plan.ready_at or 0.0))
                 else:
                     first_starts.append(begin)
             minutes = match_minutes(rng, stress)
@@ -218,10 +218,10 @@ def run(num_teams: int, num_tables: int, decide: Decide, rng: random.Random, str
     return RunResult(
         duration=clock,
         waits=waits,
-        table_waits=table_waits,
+        station_waits=station_waits,
         first_match=max(first_starts, default=0.0),
         final_wait=final_wait,
-        utilization=played / (num_tables * clock) if clock else 0.0,
+        utilization=played / (num_stations * clock) if clock else 0.0,
         queue_right=[started.index(mid) - before + 1 == place for mid, (place, before) in joined.items()],
     )
 
@@ -231,23 +231,23 @@ def p90(values: list[float]) -> float:
     return ordered[min(len(ordered) - 1, int(0.9 * len(ordered)))] if ordered else 0.0
 
 
-def compare(teams, tables, trials, seed, stress, queues) -> None:
+def compare(teams, stations, trials, seed, stress, queues) -> None:
     columns = f"{'Teams':>5} {'Tische':>6} {'Regel':<16} {'Dauer':>5} {'Ø Warten':>8} {'p90':>4} {'max':>4} " \
               f"{'Ø Tisch':>7} {'1.Spiel':>7} {'Finale':>6} {'Auslast.':>8}" + (f" {'Platz✓':>7}" if queues else "")
     print(columns)
     print("-" * len(columns))
     for num_teams in teams:
-        for num_tables in tables:
+        for num_stations in stations:
             for name, decide in RULES.items():
                 rng = random.Random(seed)  # the same match lengths for every rule
-                results = [run(num_teams, num_tables, decide, rng, stress, queues) for _ in range(trials)]
+                results = [run(num_teams, num_stations, decide, rng, stress, queues) for _ in range(trials)]
                 waits = [w for r in results for w in r.waits]
-                table_waits = [w for r in results for w in r.table_waits]
+                station_waits = [w for r in results for w in r.station_waits]
                 right = [x for r in results for x in r.queue_right]
                 line = (
-                    f"{num_teams:>5} {num_tables:>6} {name:<16} {statistics.median(r.duration for r in results):>5.0f} "
+                    f"{num_teams:>5} {num_stations:>6} {name:<16} {statistics.median(r.duration for r in results):>5.0f} "
                     f"{statistics.mean(waits):>8.1f} {p90(waits):>4.0f} "
-                    f"{statistics.median(max(r.waits) for r in results):>4.0f} {statistics.mean(table_waits):>7.1f} "
+                    f"{statistics.median(max(r.waits) for r in results):>4.0f} {statistics.mean(station_waits):>7.1f} "
                     f"{statistics.median(r.first_match for r in results):>7.0f} "
                     f"{statistics.median(r.final_wait for r in results):>6.0f} "
                     f"{statistics.mean(r.utilization for r in results):>8.0%}"
@@ -261,7 +261,7 @@ def compare(teams, tables, trials, seed, stress, queues) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--teams", type=int, nargs="*", default=[16, 28, 40, 64])
-    parser.add_argument("--tables", type=int, nargs="*", default=[3, 5, 7, 12])
+    parser.add_argument("--stations", type=int, nargs="*", default=[3, 5, 7, 12])
     parser.add_argument("--trials", type=int, default=200)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--stress", action="store_true", help="3 %% of the matches take five times as long")
@@ -270,7 +270,7 @@ def main() -> None:
     print("Minuten. Warten: Ende des eigenen Spiels bis zum nächsten. Ø Tisch: der Teil davon, in dem beide Teams")
     print("bereit waren. 1.Spiel: bis das letzte Team sein erstes Spiel beginnt. Finale: der erste Finalist wartet.")
     print("Platz✓: der Platz in der Warteschlange beim Einreihen stimmt.\n")
-    compare(args.teams, args.tables, args.trials, args.seed, args.stress, args.queues)
+    compare(args.teams, args.stations, args.trials, args.seed, args.stress, args.queues)
 
 
 if __name__ == "__main__":

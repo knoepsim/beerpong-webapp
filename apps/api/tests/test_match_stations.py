@@ -1,4 +1,4 @@
-"""Matches get tables: after the draw, after every result and when tables change."""
+"""Matches get stations: after the draw, after every result and when stations change."""
 from unittest.mock import patch
 
 import pytest
@@ -38,17 +38,17 @@ class Ctx:
         )
         assert resp.status_code == 201, resp.text
 
-    async def tables(self) -> list[dict]:
-        return (await self.client.get(f"/tournaments/{self.tid}/tables", headers=self.admin)).json()
+    async def stations(self) -> list[dict]:
+        return (await self.client.get(f"/tournaments/{self.tid}/stations", headers=self.admin)).json()
 
 
-async def _tournament(client: AsyncClient, teams: int, tables: int) -> Ctx:
+async def _tournament(client: AsyncClient, teams: int, stations: int) -> Ctx:
     with patch("app.services.auth_service.generate_sms_code", return_value="123456"):
         admin = await _login(client, 0)
         players = [await _login(client, i) for i in range(1, 2 * teams + 1)]
     tid = (
         await client.post(
-            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, "table_count": tables}, headers=admin
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, "station_count": stations}, headers=admin
         )
     ).json()["id"]
     for i in range(teams):
@@ -62,116 +62,116 @@ async def _tournament(client: AsyncClient, teams: int, tables: int) -> Ctx:
 
 
 @pytest_asyncio.fixture
-async def eight_teams_two_tables(async_client: AsyncClient) -> Ctx:
+async def eight_teams_two_stations(async_client: AsyncClient) -> Ctx:
     return await _tournament(async_client, 8, 2)
 
 
 @pytest.mark.asyncio
-async def test_after_the_draw_the_first_matches_are_at_the_tables_and_the_rest_queue(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_after_the_draw_the_first_matches_are_at_the_stations_and_the_rest_queue(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = await ctx.round(1)
 
-    assert [(x["table_name"], x["queue_position"]) for x in first] == [
+    assert [(x["station_name"], x["queue_position"]) for x in first] == [
         ("Tisch 1", None), ("Tisch 2", None), (None, 1), (None, 2),
     ]
-    assert all(x["table_name"] is None and x["queue_position"] is None for x in await ctx.round(2))
+    assert all(x["station_name"] is None and x["queue_position"] is None for x in await ctx.round(2))
 
 
 @pytest.mark.asyncio
-async def test_a_result_frees_the_table_for_the_next_match_in_the_queue(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_result_frees_the_station_for_the_next_match_in_the_queue(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = await ctx.round(1)
 
     await ctx.win(first[1])  # the match at Tisch 2 ends
 
     after = await ctx.round(1)
-    assert after[1]["table_name"] == "Tisch 2"  # a finished match keeps the table it was played at
-    assert (after[2]["table_name"], after[2]["queue_position"]) == ("Tisch 2", None)
-    assert (after[3]["table_name"], after[3]["queue_position"]) == (None, 1)
+    assert after[1]["station_name"] == "Tisch 2"  # a finished match keeps the station it was played at
+    assert (after[2]["station_name"], after[2]["queue_position"]) == ("Tisch 2", None)
+    assert (after[3]["station_name"], after[3]["queue_position"]) == (None, 1)
 
 
 @pytest.mark.asyncio
-async def test_the_winner_stays_at_the_table_where_the_second_semi_feeder_ended(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_the_winner_stays_at_the_station_where_the_second_semi_feeder_ended(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = await ctx.round(1)
     await ctx.win(first[0])  # Tisch 1 -> match 3 goes there
     await ctx.win(first[1])  # Tisch 2 -> match 4 goes there; round 2 match 1 (fed by 1 and 2) is ready now
 
     second = await ctx.round(2)
-    # both tables are busy (matches 3 and 4): the ready round-two match queues
-    assert (second[0]["table_name"], second[0]["queue_position"]) == (None, 1)
+    # both stations are busy (matches 3 and 4): the ready round-two match queues
+    assert (second[0]["station_name"], second[0]["queue_position"]) == (None, 1)
 
     third, fourth = (await ctx.round(1))[2:]
     await ctx.win(fourth)  # Tisch 2 is free: the waiting round-two match takes it (first come, first served)
-    assert (await ctx.round(2))[0]["table_name"] == "Tisch 2"
+    assert (await ctx.round(2))[0]["station_name"] == "Tisch 2"
     await ctx.win(third)  # Tisch 1 is free: the second round-two match is ready and its winner stays at Tisch 1
-    assert (await ctx.round(2))[1]["table_name"] == "Tisch 1"
+    assert (await ctx.round(2))[1]["station_name"] == "Tisch 1"
 
 
 @pytest.mark.asyncio
-async def test_matches_of_two_rounds_are_played_at_the_same_time(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_matches_of_two_rounds_are_played_at_the_same_time(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = await ctx.round(1)
     await ctx.win(first[0])
     await ctx.win(first[1])
     third = (await ctx.round(1))[2]
     await ctx.win(third)  # match 4 still runs at Tisch 2, the round-two match takes Tisch 1
 
-    playing = [(x["round"], x["table_name"]) for x in await ctx.bracket() if x["status"] == "ready" and x["table_name"]]
+    playing = [(x["round"], x["station_name"]) for x in await ctx.bracket() if x["status"] == "ready" and x["station_name"]]
     assert sorted(playing) == [(1, "Tisch 2"), (2, "Tisch 1")]
 
 
 @pytest.mark.asyncio
-async def test_a_new_table_takes_the_next_match_of_the_queue(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_new_station_takes_the_next_match_of_the_queue(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
 
-    resp = await ctx.client.post(f"/tournaments/{ctx.tid}/tables", json={}, headers=ctx.admin)
+    resp = await ctx.client.post(f"/tournaments/{ctx.tid}/stations", json={}, headers=ctx.admin)
 
     assert resp.status_code == 201
     first = await ctx.round(1)
-    assert [(x["table_name"], x["queue_position"]) for x in first] == [
+    assert [(x["station_name"], x["queue_position"]) for x in first] == [
         ("Tisch 1", None), ("Tisch 2", None), ("Tisch 3", None), (None, 1),
     ]
 
 
 @pytest.mark.asyncio
-async def test_a_deleted_table_sends_its_match_back_to_the_queue_first_in_line(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
-    table_two = (await ctx.tables())[1]
+async def test_a_deleted_station_sends_its_match_back_to_the_queue_first_in_line(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
+    station_two = (await ctx.stations())[1]
 
-    assert (await ctx.client.delete(f"/tournaments/{ctx.tid}/tables/{table_two['id']}", headers=ctx.admin)).status_code == 204
+    assert (await ctx.client.delete(f"/tournaments/{ctx.tid}/stations/{station_two['id']}", headers=ctx.admin)).status_code == 204
 
     first = await ctx.round(1)
-    assert first[0]["table_name"] == "Tisch 1"
-    assert [(x["table_name"], x["queue_position"]) for x in first[1:]] == [(None, 1), (None, 2), (None, 3)]
+    assert first[0]["station_name"] == "Tisch 1"
+    assert [(x["station_name"], x["queue_position"]) for x in first[1:]] == [(None, 1), (None, 2), (None, 3)]
 
 
 @pytest.mark.asyncio
-async def test_taking_a_result_back_brings_the_match_back_and_takes_the_next_one_off_its_table(
-    eight_teams_two_tables: Ctx,
+async def test_taking_a_result_back_brings_the_match_back_and_takes_the_next_one_off_its_station(
+    eight_teams_two_stations: Ctx,
 ):
-    ctx = eight_teams_two_tables
+    ctx = eight_teams_two_stations
     first = await ctx.round(1)
     await ctx.win(first[0])
     await ctx.win(first[1])
     await ctx.win((await ctx.round(1))[3])  # Tisch 2 free -> round-two match 1 plays there
 
-    assert (await ctx.round(2))[0]["table_name"] == "Tisch 2"
+    assert (await ctx.round(2))[0]["station_name"] == "Tisch 2"
     resp = await ctx.client.delete(f"/matches/{first[1]['id']}/results", headers=ctx.admin)
     assert resp.status_code == 200
 
     reopened = await ctx.by_id(first[1]["id"])
-    # the round-two match lost a team and its table; the reopened match gets its old table back
-    assert (reopened["status"], reopened["table_name"]) == ("ready", "Tisch 2")
+    # the round-two match lost a team and its station; the reopened match gets its old station back
+    assert (reopened["status"], reopened["station_name"]) == ("ready", "Tisch 2")
     second = (await ctx.round(2))[0]
-    assert (second["status"], second["table_name"], second["queue_position"]) == ("waiting", None, None)
+    assert (second["status"], second["station_name"], second["queue_position"]) == ("waiting", None, None)
 
 
 @pytest.mark.asyncio
-async def test_with_more_tables_than_matches_everybody_plays_at_once(async_client: AsyncClient):
+async def test_with_more_stations_than_matches_everybody_plays_at_once(async_client: AsyncClient):
     ctx = await _tournament(async_client, 4, 5)
     first = await ctx.round(1)
-    assert [x["table_name"] for x in first] == ["Tisch 1", "Tisch 2"]
+    assert [x["station_name"] for x in first] == ["Tisch 1", "Tisch 2"]
     assert all(x["queue_position"] is None for x in first)
 
 
@@ -179,21 +179,21 @@ async def test_with_more_tables_than_matches_everybody_plays_at_once(async_clien
 
 
 @pytest.mark.asyncio
-async def test_the_status_tells_who_waits_for_what(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_the_status_tells_who_waits_for_what(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
 
     assert [x["status"] for x in await ctx.round(1)] == ["ready", "ready", "queued", "queued"]
     assert {x["status"] for x in await ctx.round(2)} == {"waiting"}
 
 
 @pytest.mark.asyncio
-async def test_a_match_at_its_table_can_be_started_and_the_start_taken_back(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_match_at_its_station_can_be_started_and_the_start_taken_back(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = (await ctx.round(1))[0]
 
     assert (await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)).status_code == 204
     live = await ctx.by_id(first["id"])
-    assert (live["status"], live["table_name"]) == ("live", "Tisch 1")
+    assert (live["status"], live["station_name"]) == ("live", "Tisch 1")
     assert live["started_at"] is not None
 
     assert (await ctx.client.delete(f"/matches/{first['id']}/start", headers=ctx.admin)).status_code == 204
@@ -202,8 +202,8 @@ async def test_a_match_at_its_table_can_be_started_and_the_start_taken_back(eigh
 
 
 @pytest.mark.asyncio
-async def test_a_match_without_a_table_cannot_start(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_match_without_a_station_cannot_start(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     queued = (await ctx.round(1))[2]
 
     resp = await ctx.client.post(f"/matches/{queued['id']}/start", headers=ctx.admin)
@@ -213,19 +213,19 @@ async def test_a_match_without_a_table_cannot_start(eight_teams_two_tables: Ctx)
 
 
 @pytest.mark.asyncio
-async def test_a_result_can_be_reported_without_a_start_also_for_a_queued_match(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_result_can_be_reported_without_a_start_also_for_a_queued_match(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     queued = (await ctx.round(1))[2]
 
     await ctx.win(queued)
 
     statuses = [x["status"] for x in await ctx.round(1)]
-    assert statuses == ["ready", "ready", "finished", "queued"]  # the tables stay with the matches at them
+    assert statuses == ["ready", "ready", "finished", "queued"]  # the stations stay with the matches at them
 
 
 @pytest.mark.asyncio
-async def test_a_live_match_ends_with_its_result_and_frees_the_table(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_live_match_ends_with_its_result_and_frees_the_station(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = (await ctx.round(1))[0]
     await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)
 
@@ -234,27 +234,27 @@ async def test_a_live_match_ends_with_its_result_and_frees_the_table(eight_teams
     done = await ctx.by_id(first["id"])
     assert (done["status"], done["started_at"]) == ("finished", None)
     third = (await ctx.round(1))[2]
-    assert (third["status"], third["table_name"]) == ("ready", "Tisch 1")
+    assert (third["status"], third["station_name"]) == ("ready", "Tisch 1")
     resp = await ctx.client.post(f"/matches/{first['id']}/start", headers=ctx.admin)
     assert resp.status_code == 409  # a finished match does not start again
 
 
 @pytest.mark.asyncio
-async def test_a_live_match_whose_table_is_deleted_waits_again(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_a_live_match_whose_station_is_deleted_waits_again(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     second = (await ctx.round(1))[1]
     await ctx.client.post(f"/matches/{second['id']}/start", headers=ctx.admin)
-    table_two = (await ctx.tables())[1]
+    station_two = (await ctx.stations())[1]
 
-    await ctx.client.delete(f"/tournaments/{ctx.tid}/tables/{table_two['id']}", headers=ctx.admin)
+    await ctx.client.delete(f"/tournaments/{ctx.tid}/stations/{station_two['id']}", headers=ctx.admin)
 
     back = await ctx.by_id(second["id"])
     assert (back["status"], back["started_at"], back["queue_position"]) == ("queued", None, 1)
 
 
 @pytest.mark.asyncio
-async def test_only_the_organization_starts_matches(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_only_the_organization_starts_matches(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     first = (await ctx.round(1))[0]
     with patch("app.services.auth_service.generate_sms_code", return_value="123456"):
         outsider = await _login(ctx.client, 90)
@@ -264,45 +264,45 @@ async def test_only_the_organization_starts_matches(eight_teams_two_tables: Ctx)
     assert resp.status_code == 403
 
 
-# -- certain table of a match still waiting for a team ---------------------------------------------------------------
+# -- certain station of a match still waiting for a team ---------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_towards_the_end_a_waiting_match_knows_its_table(async_client: AsyncClient):
-    ctx = await _tournament(async_client, 4, 3)  # two semi-finals and the final: a table for every match
+async def test_towards_the_end_a_waiting_match_knows_its_station(async_client: AsyncClient):
+    ctx = await _tournament(async_client, 4, 3)  # two semi-finals and the final: a station for every match
     semi_one, semi_two = await ctx.round(1)
 
     await ctx.win(semi_one)
 
     final = (await ctx.round(2))[0]
-    assert (final["status"], final["upcoming_table_name"], final["table_name"]) == ("waiting", "Tisch 2", None)
+    assert (final["status"], final["upcoming_station_name"], final["station_name"]) == ("waiting", "Tisch 2", None)
     await ctx.win(semi_two)
     final = (await ctx.round(2))[0]
-    assert (final["status"], final["table_name"], final["upcoming_table_name"]) == ("ready", "Tisch 2", None)
+    assert (final["status"], final["station_name"], final["upcoming_station_name"]) == ("ready", "Tisch 2", None)
 
 
 @pytest.mark.asyncio
-async def test_while_matches_queue_a_waiting_match_has_no_certain_table(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_while_matches_queue_a_waiting_match_has_no_certain_station(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     await ctx.win((await ctx.round(1))[0])
 
-    assert all(x["upcoming_table_name"] is None for x in await ctx.bracket())
+    assert all(x["upcoming_station_name"] is None for x in await ctx.bracket())
 
 
 @pytest.mark.asyncio
-async def test_a_match_at_its_table_says_since_when(eight_teams_two_tables: Ctx):
-    first, _, third, _ = await eight_teams_two_tables.round(1)
-    assert first["on_table_at"] is not None
-    assert third["on_table_at"] is None  # in the queue
+async def test_a_match_at_its_station_says_since_when(eight_teams_two_stations: Ctx):
+    first, _, third, _ = await eight_teams_two_stations.round(1)
+    assert first["on_station_at"] is not None
+    assert third["on_station_at"] is None  # in the queue
 
 
 @pytest.mark.asyncio
-async def test_renaming_a_table_is_shown_live(eight_teams_two_tables: Ctx):
-    ctx = eight_teams_two_tables
+async def test_renaming_a_station_is_shown_live(eight_teams_two_stations: Ctx):
+    ctx = eight_teams_two_stations
     before = (await ctx.client.get(f"/tournaments/{ctx.tid}", headers=ctx.admin)).json()["revision"]
-    table = (await ctx.tables())[0]
+    station = (await ctx.stations())[0]
 
-    await ctx.client.patch(f"/tournaments/{ctx.tid}/tables/{table['id']}", json={"name": "Terrasse"}, headers=ctx.admin)
+    await ctx.client.patch(f"/tournaments/{ctx.tid}/stations/{station['id']}", json={"name": "Terrasse"}, headers=ctx.admin)
 
     assert (await ctx.client.get(f"/tournaments/{ctx.tid}", headers=ctx.admin)).json()["revision"] > before
-    assert (await ctx.round(1))[0]["table_name"] == "Terrasse"
+    assert (await ctx.round(1))[0]["station_name"] == "Terrasse"

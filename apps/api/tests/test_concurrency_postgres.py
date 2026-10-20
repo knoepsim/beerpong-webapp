@@ -2,7 +2,7 @@
 
 Skipped unless TEST_POSTGRES_URL points to an empty scratch database, e.g.
     TEST_POSTGRES_URL=postgresql+asyncpg://beerpong:beerpong_dev@localhost:5432/beerpong_test uv run pytest
-All tables of that database are dropped and recreated.
+All stations of that database are dropped and recreated.
 """
 import asyncio
 import os
@@ -159,12 +159,12 @@ async def test_match_result_cannot_be_reported_twice_concurrently(client: AsyncC
 
 
 @pytest.mark.asyncio
-async def test_two_results_at_the_same_time_do_not_give_one_table_to_two_matches(client: AsyncClient, monkeypatch):
+async def test_two_results_at_the_same_time_do_not_give_one_station_to_two_matches(client: AsyncClient, monkeypatch):
     admin, *players = [await login(client, i) for i in range(17)]
     tid = (
         await client.post(
             "/tournaments",
-            json={**PLAYS, "name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public", "table_count": 2},
+            json={**PLAYS, "name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public", "station_count": 2},
             headers=admin,
         )
     ).json()["id"]
@@ -173,7 +173,7 @@ async def test_two_results_at_the_same_time_do_not_give_one_table_to_two_matches
         await client.post(f"/tournaments/{tid}/join", json={"team_id": team_id}, headers=players[2 * i])
     assert (await client.post(f"/tournaments/{tid}/start", headers=admin)).status_code == 200
     matches = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"]
-    playing = [x for x in matches if x["round"] == 1 and x["table_name"]]
+    playing = [x for x in matches if x["round"] == 1 and x["station_name"]]
     rendezvous(monkeypatch, BracketService, "_plan_input")
 
     result = await statuses(
@@ -185,5 +185,5 @@ async def test_two_results_at_the_same_time_do_not_give_one_table_to_two_matches
 
     assert result == [201, 201]
     matches = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"]
-    at_tables = [x["table_name"] for x in matches if x["status"] == "ready" and x["table_name"]]
-    assert sorted(at_tables) == ["Tisch 1", "Tisch 2"]
+    at_stations = [x["station_name"] for x in matches if x["status"] == "ready" and x["station_name"]]
+    assert sorted(at_stations) == ["Tisch 1", "Tisch 2"]

@@ -77,7 +77,7 @@ class LifecycleService:
         await bracket.generate_bracket(tournament_id, [e.team_id for e in playing])
         tournament.started_at = datetime.now(UTC)
         await self.db.flush()
-        await bracket.assign_tables(tournament_id)
+        await bracket.assign_stations(tournament_id)
         await bump(self.db, tournament_id, "tournament", "teams", "bracket")
 
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])

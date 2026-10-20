@@ -27,13 +27,13 @@ class Match(Base):
         UUID(as_uuid=True), ForeignKey("matches.id"), nullable=True
     )
     next_match_slot: Mapped[str | None] = mapped_column(String(1), nullable=True)  # "a" or "b"
-    # the table it is played at (or was played at): decided by the table planner when the match gets a table
-    table_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tournament_tables.id", ondelete="SET NULL"), nullable=True
+    # the station it is played at (or was played at): decided by the station planner when the match gets a station
+    station_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("stations.id", ondelete="SET NULL"), nullable=True
     )
-    # when both teams became known (the queue for the tables goes by it) and since when it is at its table
+    # when both teams became known (the queue for the stations goes by it) and since when it is at its station
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    on_table_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # when the match was started at its table (live); only while it is at a table
+    on_station_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # when the match was started at its station (live); only while it is at a station
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

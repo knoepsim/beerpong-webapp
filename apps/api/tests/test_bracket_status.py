@@ -15,7 +15,7 @@ from main import app
 from tests.helpers import generate_started_tournament, won
 
 USER = uuid.uuid4()
-# both teams known, no result: at a table or waiting for one (depends on the tables of the test tournament)
+# both teams known, no result: at a station or waiting for one (depends on the stations of the test tournament)
 PLAYABLE = (MatchStatus.QUEUED, MatchStatus.READY)
 
 

@@ -27,7 +27,7 @@ from app.models.result import Result
 from app.models.team import Team, TeamMember
 from app.models.tournament import Game, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentUserRole
-from app.models.tournament_table import TournamentTable
+from app.models.station import Station
 from app.models.user import User
 from app.schemas.result import ResultCreate
 from app.schemas.tournament import TournamentCreate
@@ -115,7 +115,7 @@ async def delete_dummy_tournaments(db: AsyncSession, name: str | None = None) ->
     await db.execute(delete(Result).where(Result.match_id.in_(match_ids)))
     await db.execute(update(Match).where(Match.tournament_id.in_(ids)).values(next_match_id=None))
     await db.execute(delete(Match).where(Match.tournament_id.in_(ids)))
-    await db.execute(delete(TournamentTable).where(TournamentTable.tournament_id.in_(ids)))
+    await db.execute(delete(Station).where(Station.tournament_id.in_(ids)))
     await db.execute(delete(TournamentTeam).where(TournamentTeam.tournament_id.in_(ids)))
     await db.execute(delete(TournamentUserRole).where(TournamentUserRole.tournament_id.in_(ids)))
     await db.execute(delete(Tournament).where(Tournament.id.in_(ids)))
@@ -173,7 +173,7 @@ async def create_tournament(
     db: AsyncSession,
     *,
     teams: int = 28,
-    tables: int = 8,
+    stations: int = 8,
     played: float | None = 0.0,
     state: str | None = None,
     owner_phone: str | None = None,
@@ -199,7 +199,7 @@ async def create_tournament(
             description=f"Testturnier mit {teams} Dummy-Teams, erzeugt mit scripts/seed_dummy_tournaments.py.",
             start_time=datetime.now(UTC) + timedelta(hours=4 if state == "registration" else 1),
             **_schedule(state),
-            table_count=tables,
+            station_count=stations,
             game=game,
             mode=TournamentMode.SINGLE_ELIMINATION,
             visibility=TournamentVisibility.PUBLIC,
@@ -259,7 +259,7 @@ async def main() -> None:
 
     create = sub.add_parser("create", help="create (or replace) a dummy tournament")
     create.add_argument("--teams", type=int, default=28)
-    create.add_argument("--tables", type=int, default=8, help="number of tables (default 8)")
+    create.add_argument("--stations", type=int, default=8, help="number of stations (default 8)")
     create.add_argument("--state", choices=list(STATES), default="fresh")
     create.add_argument("--played", type=float, help="share of matches played (0.0 - 1.0), overrides --state")
     create.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
@@ -293,7 +293,7 @@ async def main() -> None:
             info = await create_tournament(
                 db,
                 teams=args.teams,
-                tables=args.tables,
+                stations=args.stations,
                 played=played,
                 state=None if args.played is not None else args.state,
                 owner_phone=args.owner,

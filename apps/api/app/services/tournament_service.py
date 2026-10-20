@@ -5,7 +5,9 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, func, select
 
+from app.games import GAMES, stations_of
 from app.core.exceptions import (
+    InvalidModeError,
     NotFoundError,
     PlayerAlreadyInTournamentError,
     CheckinDisabledError,
@@ -19,7 +21,7 @@ from app.core.exceptions import (
 )
 from app.core.slug import MAX_LENGTH, normalize_slug, random_slug, slugify
 from app.models.team import Team, TeamMember
-from app.models.tournament import JoinPolicy, Tournament, TournamentTeam, TournamentVisibility
+from app.models.tournament import Game, JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
 from app.schemas.team import TeamResponse
@@ -28,7 +30,7 @@ from app.services.invitation_service import InvitationService
 from app.services.invite_service import InviteService
 from app.services.revision import bump
 from app.services.schedule import validate_schedule
-from app.services.table_service import TableService
+from app.services.station_service import StationService
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
@@ -60,20 +62,27 @@ def _same(a, b) -> bool:
     return a == b
 
 
+def _check_mode(game: Game, mode: TournamentMode) -> None:
+    """Every game has its modes (app/games.py)."""
+    if mode not in GAMES[game].modes:
+        raise InvalidModeError(GAMES[game].label)
+
+
 class TournamentService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
     async def create_tournament(self, data: TournamentCreate, creator_id: UUID) -> Tournament:
         """Create a new tournament and assign the creator as Admin."""
+        _check_mode(data.game, data.mode)
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = self._normalize_automation(data.model_dump())
-        table_count = obj_in.pop("table_count")
+        station_count = obj_in.pop("station_count")
         obj_in["slug"] = await self._unique_slug(slugify(data.name))
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
-        await TableService(self.db).create_default_tables(tournament.id, table_count)
+        await StationService(self.db).create_default_stations(tournament.id, station_count, stations_of(tournament.game))
 
         # Assign Admin role to the creator
         admin_role = TournamentUserRole(
@@ -180,6 +189,11 @@ class TournamentService:
             key in update_data and not _same(update_data[key], getattr(tournament, key)) for key in BEFORE_START_ONLY
         ):
             raise TournamentAlreadyStartedError()
+
+        game = update_data.get("game") or tournament.game
+        _check_mode(game, update_data.get("mode") or tournament.mode)
+        if game != tournament.game:
+            await StationService(self.db).rename_defaults(tournament.id, stations_of(tournament.game), stations_of(game))
 
         if "slug" in update_data:
             slug = normalize_slug(update_data["slug"]) if update_data["slug"] is not None else tournament.slug

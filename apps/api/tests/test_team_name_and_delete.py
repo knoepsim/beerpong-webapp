@@ -124,7 +124,7 @@ async def test_my_tournaments_carry_the_next_match_and_at_the_end_the_place(ctx:
     await ctx.start()
     running = await _mine(ctx, 0)
     assert running["next_match"]["status"] == "ready"
-    assert running["next_match"]["table_name"] == "Tisch 1"
+    assert running["next_match"]["station_name"] == "Tisch 1"
 
     await ctx.finish()  # team a of the final wins
     final = (await ctx.client.get(f"/tournaments/{ctx.tid}/bracket", headers=ctx.admin)).json()["matches"][0]

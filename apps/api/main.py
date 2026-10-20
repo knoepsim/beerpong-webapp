@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
-from app.routers import admin, auth, events, invitations, invites, matches, results, roles, tables, teams, tournaments, users
+from app.routers import admin, auth, events, invitations, invites, matches, results, roles, stations, teams, tournaments, users
 
 app = FastAPI(
     title="Turnierplattform API",
@@ -30,7 +30,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(teams.router)
 app.include_router(tournaments.router)
-app.include_router(tables.router)
+app.include_router(stations.router)
 app.include_router(events.router)
 app.include_router(roles.router)
 app.include_router(invites.router)
