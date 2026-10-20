@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.tournament import JoinPolicy, TournamentMode, TournamentPhase, TournamentVisibility
+from app.models.tournament import Game, JoinPolicy, TournamentMode, TournamentPhase, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType
 from app.schemas.match import MatchResponse
 from app.schemas.team import TeamResponse
@@ -21,7 +21,9 @@ class TournamentCreate(BaseModel):
     checkin_start_time: datetime | None = None
     checkin_auto_open: bool = False
     table_count: int = Field(default=1, ge=1, le=100)
-    mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION
+    # no default: what is played and how is a decision of the organizer
+    game: Game
+    mode: TournamentMode
     visibility: TournamentVisibility = TournamentVisibility.PUBLIC
     join_policy: JoinPolicy = JoinPolicy.OPEN
 
@@ -38,6 +40,8 @@ class TournamentUpdate(BaseModel):
     checkin_enabled: bool | None = None
     checkin_start_time: datetime | None = None
     checkin_auto_open: bool | None = None
+    game: Game | None = None
+    mode: TournamentMode | None = None
     visibility: TournamentVisibility | None = None
     join_policy: JoinPolicy | None = None
 
@@ -61,6 +65,7 @@ class TournamentResponse(BaseModel):
     phase: TournamentPhase
     registration_open: bool
     checkin_open: bool
+    game: Game
     mode: TournamentMode
     visibility: TournamentVisibility
     join_policy: JoinPolicy

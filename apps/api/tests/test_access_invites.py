@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -21,7 +22,7 @@ class Ctx:
 
     async def create(self, **body) -> dict:
         resp = await self.client.post(
-            "/tournaments", json={"name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
         )
         assert resp.status_code == 201, resp.text
         return resp.json()

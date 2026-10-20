@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -47,7 +48,7 @@ async def _tournament(client: AsyncClient, teams: int, tables: int) -> Ctx:
         players = [await _login(client, i) for i in range(1, 2 * teams + 1)]
     tid = (
         await client.post(
-            "/tournaments", json={"name": "Cup", "start_time": FUTURE, "table_count": tables}, headers=admin
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, "table_count": tables}, headers=admin
         )
     ).json()["id"]
     for i in range(teams):

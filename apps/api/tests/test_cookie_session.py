@@ -7,6 +7,7 @@ from httpx import AsyncClient
 
 from app.core.config import settings
 from app.core.security import ACCESS_COOKIE, CSRF_HEADER, REFRESH_COOKIE
+from tests.helpers import PLAYS
 
 PHONE = "+4915600000001"
 JSON_HEADER = {CSRF_HEADER: "fetch"}
@@ -176,7 +177,7 @@ async def test_the_live_stream_knows_the_user_from_the_cookie(browser: AsyncClie
     monkeypatch.setattr("app.routers.events.async_session", TestingSessionLocal)
     created = await browser.post(
         "/tournaments",
-        json={"name": "Cup", "start_time": "2099-12-31T20:00:00Z", "visibility": "private", "join_policy": "invite_only"},
+        json={**PLAYS, "name": "Cup", "start_time": "2099-12-31T20:00:00Z", "visibility": "private", "join_policy": "invite_only"},
         headers=JSON_HEADER,
     )
     tid = created.json()["id"]

@@ -2,6 +2,7 @@ import pytest
 import asyncio
 from httpx import AsyncClient
 from unittest.mock import patch
+from tests.helpers import PLAYS
 
 @pytest.mark.asyncio
 async def test_full_tournament_lifecycle(async_client: AsyncClient):
@@ -68,7 +69,7 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
         # 3. Create Tournament
         resp = await async_client.post(
             "/tournaments",
-            json={"name": "Grand Championship", "table_count": 2, "location": "Berlin", "start_time": "2026-12-31T20:00:00Z"},
+            json={**PLAYS, "name": "Grand Championship", "table_count": 2, "location": "Berlin", "start_time": "2026-12-31T20:00:00Z"},
             headers=auth_header(0) # User 1 creates it
         )
         assert resp.status_code == 201

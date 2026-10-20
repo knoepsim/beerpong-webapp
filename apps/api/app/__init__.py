@@ -1,1 +1,1 @@
-"""Bierpong API application package."""
+"""Turnierplattform API application package."""

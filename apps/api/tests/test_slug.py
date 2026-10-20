@@ -7,6 +7,7 @@ from httpx import AsyncClient
 
 from app.core.exceptions import InvalidSlugError
 from app.core.slug import normalize_slug, random_slug, slugify
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -56,7 +57,7 @@ async def organizer(async_client: AsyncClient) -> dict:
 
 async def _create(client: AsyncClient, headers: dict, name: str) -> dict:
     resp = await client.post(
-        "/tournaments", json={"name": name, "start_time": FUTURE, "visibility": "public"}, headers=headers
+        "/tournaments", json={**PLAYS, "name": name, "start_time": FUTURE, "visibility": "public"}, headers=headers
     )
     assert resp.status_code == 201, resp.text
     return resp.json()

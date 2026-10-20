@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from tests.helpers import PLAYS
 
 
 async def _login(client: AsyncClient, phone: str) -> dict:
@@ -22,7 +23,7 @@ async def ctx(async_client: AsyncClient):
     tid = (
         await async_client.post(
             "/tournaments",
-            json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
+            json={**PLAYS, "name": "Cup", "start_time": "2026-12-31T20:00:00Z", "visibility": "public"},
             headers=h["admin"],
         )
     ).json()["id"]

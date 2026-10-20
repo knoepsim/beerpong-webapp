@@ -10,7 +10,15 @@ from app.core.database import Base
 from app.core.slug import random_slug
 
 
+class Game(str, enum.Enum):
+    """What is played. It decides how a result is entered (for beer pong: the cups that are left)."""
+
+    BEERPONG = "beerpong"
+
+
 class TournamentMode(str, enum.Enum):
+    """How the teams meet. Only the modes that are implemented; the app shows the coming ones as not available."""
+
     SINGLE_ELIMINATION = "single_elimination"
 
 
@@ -70,6 +78,7 @@ class Tournament(Base):
     checkin_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_auto_open: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    game: Mapped[Game] = mapped_column(Enum(Game), nullable=False)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
     join_policy: Mapped[JoinPolicy] = mapped_column(

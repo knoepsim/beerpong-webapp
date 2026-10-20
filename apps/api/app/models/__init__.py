@@ -6,7 +6,7 @@ from app.models.result import Result, ResultType
 from app.models.sms_verification import SmsVerification
 from app.models.team import Team, TeamMember
 from app.models.team_invite import TeamInvite
-from app.models.tournament import JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
+from app.models.tournament import Game, JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_invitation import InvitationStatus, TournamentInvitation
 from app.models.tournament_invite import TournamentInvite
 from app.models.tournament_table import TournamentTable
@@ -27,6 +27,7 @@ __all__ = [
     "Tournament",
     "TournamentInvitation",
     "TournamentInvite",
+    "Game",
     "TournamentMode",
     "TournamentTable",
     "TournamentTeam",

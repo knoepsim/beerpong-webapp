@@ -4,6 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -50,7 +51,7 @@ async def ctx(async_client: AsyncClient) -> Ctx:
     with patch("app.services.auth_service.generate_sms_code", return_value="123456"):
         admin = await _login(async_client, 0)
         players = [await _login(async_client, i) for i in range(1, 5)]
-    tid = (await async_client.post("/tournaments", json={"name": "Cup", "start_time": FUTURE}, headers=admin)).json()["id"]
+    tid = (await async_client.post("/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE}, headers=admin)).json()["id"]
     team_ids = []
     for i, name in enumerate(["Alpha", "Bravo"]):
         creator, joiner = players[2 * i], players[2 * i + 1]
