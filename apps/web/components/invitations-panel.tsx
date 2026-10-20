@@ -5,6 +5,7 @@ import { InvitationRow } from "@/components/invitation-status";
 import { InvitePerson } from "@/components/invite-person";
 import { InviteLinks } from "@/components/invite-links";
 import { Button } from "@/components/ui/button";
+import { ItemGroup } from "@/components/ui/item";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,7 +41,7 @@ export function InvitationsPanel({
             />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul className="divide-y border-t px-3">
+            <ItemGroup className="gap-0 divide-y border-t px-3">
               {pending.map((invitation) => (
                 <InvitationRow
                   key={invitation.id}
@@ -49,7 +50,7 @@ export function InvitationsPanel({
                   detail={originOf(invitation, links)}
                 />
               ))}
-            </ul>
+            </ItemGroup>
           </CollapsibleContent>
         </Collapsible>
       )}

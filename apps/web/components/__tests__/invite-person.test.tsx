@@ -62,7 +62,7 @@ describe('InvitePerson', () => {
     expect(api.users.search).not.toHaveBeenCalled() // not on every key
     fireEvent.click(screen.getByRole('button', { name: 'Suchen' }))
 
-    const results = (await screen.findByText('Ada Becher')).closest('ul')!
+    const results = (await screen.findByText('Ada Becher')).closest<HTMLElement>('[role=list]')!
     expect(within(results).getByText('Dabei')).toBeInTheDocument() // Adrian plays already
     expect(within(results).getByText('Offen')).toBeInTheDocument() // Adam is invited
     expect(within(results).getByRole('button', { name: 'Cem Ball erneut einladen' })).toBeInTheDocument() // Cem declined

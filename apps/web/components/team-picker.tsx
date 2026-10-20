@@ -2,49 +2,38 @@
 
 import { useState } from "react";
 import { UserPlus } from "lucide-react";
+import { RadioCards } from "@/components/radio-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCreateTeam, useMyTeams } from "@/hooks/queries/teams";
 import { useTeamInviteLink } from "@/hooks/use-team-invite-link";
 import { errorMessage } from "@/lib/errors";
-import { cn } from "@/lib/utils";
 import type { Team } from "@/types";
 
 const membersText = (team: Team) => team.members.map((m) => m.name).join(" · ");
 
-/** The teams to choose from, as cards to tap (one team: a radio group). */
+/** The teams to choose from, as cards (one team), with who plays in each and whether one is missing. */
 function TeamChoice({ teams, value, onChange }: Readonly<{ teams: Team[]; value: string; onChange: (id: string) => void }>) {
   return (
-    <fieldset className="space-y-2">
-      <legend className="mb-2 font-medium">Mit welchem Team?</legend>
-      <RadioGroup value={value} onValueChange={(id) => onChange(id as string)}>
-        {teams.map((team) => (
-          <Label
-            key={team.id}
-            htmlFor={`team-${team.id}`}
-            className={cn(
-              "flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border p-3 font-normal has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-              value === team.id && "border-primary ring-1 ring-primary",
-            )}
-          >
-            <RadioGroupItem id={`team-${team.id}`} value={team.id} />
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium">{team.name}</span>
-              <span className="block truncate text-xs text-muted-foreground">{membersText(team)}</span>
-            </span>
-            {!team.is_complete && (
-              <Badge variant="warning">
-                {team.members.length} von {team.max_size}
-              </Badge>
-            )}
-          </Label>
-        ))}
-      </RadioGroup>
-    </fieldset>
+    <RadioCards
+      legend="Mit welchem Team?"
+      name="team"
+      value={value}
+      onChange={onChange}
+      options={teams.map((team) => ({
+        value: team.id,
+        title: team.name,
+        description: membersText(team),
+        aside: !team.is_complete && (
+          <Badge variant="warning">
+            {team.members.length} von {team.max_size}
+          </Badge>
+        ),
+      }))}
+    />
   );
 }
 

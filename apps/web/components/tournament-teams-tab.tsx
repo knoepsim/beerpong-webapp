@@ -3,6 +3,8 @@
 import { CheckinSummary } from "@/components/checkin-summary";
 import { TournamentTeamList } from "@/components/tournament-team-list";
 import { InvitationsPanel } from "@/components/invitations-panel";
+import { EmptyNote } from "@/components/empty-note";
+import { Users } from "lucide-react";
 import { formatWhen } from "@/lib/format-when";
 import type { Tournament, TournamentTeam } from "@/types";
 
@@ -39,7 +41,7 @@ export function TournamentTeamsTab({
         <p className="text-sm text-muted-foreground">Der Check-in beginnt {formatWhen(tournament.checkin_start_time!)}.</p>
       )}
       {teams.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">Noch keine Teams angemeldet.</p>
+        <EmptyNote icon={Users} title="Noch keine Teams angemeldet" />
       ) : (
         <TournamentTeamList
           teams={teams}

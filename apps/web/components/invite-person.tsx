@@ -3,6 +3,7 @@
 import { InvitationRow, InvitationStatusPill } from "@/components/invitation-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ItemGroup } from "@/components/ui/item";
 import { PersonSearch } from "@/components/person-search";
 import { useInvitePerson, useTournamentInvitations } from "@/hooks/queries/invitations";
 import type { PublicUser, TournamentInvitation } from "@/types";
@@ -73,11 +74,11 @@ export function InvitePerson({
           <h3 id="direct-invitations" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Direkt eingeladen · {direct.length}
           </h3>
-          <ul className="divide-y">
+          <ItemGroup className="gap-0 divide-y">
             {direct.map((invitation) => (
               <InvitationRow key={invitation.id} tournamentId={tournamentId} invitation={invitation} />
             ))}
-          </ul>
+          </ItemGroup>
         </section>
       )}
     </div>

@@ -20,6 +20,8 @@ import type {
   TournamentInvitation,
 } from "@/types";
 
+const SERVER_PROBLEM = "Der Server hat gerade ein Problem. Versuch es gleich noch einmal.";
+
 export class ApiError extends Error {
   constructor(public status: number, public data: Record<string, unknown>) {
     let msg = "Ein Fehler ist aufgetreten";
@@ -130,7 +132,8 @@ export async function request<T>(endpoint: string, options: FetchOptions = {}): 
     try {
       errorData = await res.json();
     } catch {
-      errorData = { detail: res.statusText };
+      // no answer of the API (a crash, a proxy): the status text is English and technical, say it in our words
+      errorData = { detail: res.status >= 500 ? SERVER_PROBLEM : "Ein Fehler ist aufgetreten. Versuch es noch einmal." };
     }
     throw new ApiError(res.status, errorData);
   }

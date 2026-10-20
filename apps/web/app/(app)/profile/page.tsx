@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { errorMessage } from "@/lib/errors";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { logout } from "@/lib/auth";
 import { useCurrentUser, useRequestPhoneChange, useUpdateMe, useVerifyPhoneChange } from "@/hooks/queries/user";
 import { useTheme } from "next-themes";
@@ -222,60 +224,40 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Erscheinungsbild</CardTitle>
-          <CardDescription>Passe das Theme der App an deine Vorlieben an.</CardDescription>
+          <CardDescription>Hell, dunkel oder wie dein Gerät eingestellt ist.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <Label>Theme</Label>
-            {mounted ? (
-              <div className="flex bg-muted p-1 rounded-lg w-fit">
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "light"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sun className="h-4 w-4" />
-                  Hell
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "dark"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Moon className="h-4 w-4" />
-                  Dunkel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("system")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "system"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Monitor className="h-4 w-4" />
-                  System
-                </button>
-              </div>
-            ) : (
-              <Skeleton className="h-9 w-[280px] rounded-lg" />
-            )}
-          </div>
+          {mounted ? (
+            <ToggleGroup
+              aria-label="Erscheinungsbild"
+              variant="outline"
+              spacing={0}
+              value={[theme ?? "system"]}
+              onValueChange={(value) => value[0] && setTheme(value[0])}
+            >
+              <ToggleGroupItem value="light">
+                <Sun data-icon="inline-start" aria-hidden="true" />
+                Hell
+              </ToggleGroupItem>
+              <ToggleGroupItem value="dark">
+                <Moon data-icon="inline-start" aria-hidden="true" />
+                Dunkel
+              </ToggleGroupItem>
+              <ToggleGroupItem value="system">
+                <Monitor data-icon="inline-start" aria-hidden="true" />
+                System
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : (
+            <Skeleton className="h-9 w-[280px] rounded-lg" />
+          )}
         </CardContent>
       </Card>
 
-      <div className="flex justify-center pt-8 border-t">
+      <Separator />
+      <div className="flex justify-center">
         <Button variant="ghost" className="text-muted-foreground" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut data-icon="inline-start" aria-hidden="true" />
           Abmelden
         </Button>
       </div>
@@ -290,21 +272,17 @@ export default function ProfilePage() {
                 : (
                   <span className="flex items-center gap-1 flex-wrap">
                     Wir haben einen 6-stelligen Code an +49 {currentPhone} gesendet.
-                    <span 
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => { resetPhoneErrors(); setPhoneStep(1); }} 
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          resetPhoneErrors();
-                          setPhoneStep(1);
-                        }
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0"
+                      onClick={() => {
+                        resetPhoneErrors();
+                        setPhoneStep(1);
                       }}
-                      className="text-primary hover:underline font-medium cursor-pointer rounded-sm outline-hidden focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
-                      Ändern?
-                    </span>
+                      Nummer ändern
+                    </Button>
                   </span>
                 )}
             </DialogDescription>

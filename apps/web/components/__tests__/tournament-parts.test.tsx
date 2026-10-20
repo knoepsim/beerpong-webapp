@@ -89,7 +89,7 @@ describe('TournamentTeamsTab', () => {
 
   it('says that nobody registered yet', () => {
     render(<TournamentTeamsTab {...handlers} tournament={makeTournament()} teams={[]} />)
-    expect(screen.getByText('Noch keine Teams angemeldet.')).toBeInTheDocument()
+    expect(screen.getByText('Noch keine Teams angemeldet')).toBeInTheDocument()
   })
 
   it('says when the check-in begins while it is not open yet', () => {

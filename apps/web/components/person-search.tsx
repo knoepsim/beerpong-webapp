@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { useUserSearch } from "@/hooks/queries/user";
 import { errorMessage } from "@/lib/errors";
 import type { PublicUser } from "@/types";
@@ -71,14 +72,16 @@ export function PersonSearch({
       )}
       {search.isSuccess && search.data.length === 0 && <p className="text-sm text-muted-foreground">{notFound}</p>}
       {search.data && search.data.length > 0 && (
-        <ul className="rounded-lg bg-muted/50 px-3">
+        <ItemGroup className="gap-1">
           {search.data.map((person) => (
-            <li key={person.id} className="flex min-h-11 items-center gap-2 py-1">
-              <span className="min-w-0 flex-1 truncate">{person.name}</span>
-              {renderAction(person)}
-            </li>
+            <Item key={person.id} role="listitem" variant="muted" size="sm">
+              <ItemContent className="min-w-0">
+                <ItemTitle className="truncate">{person.name}</ItemTitle>
+              </ItemContent>
+              <ItemActions>{renderAction(person)}</ItemActions>
+            </Item>
           ))}
-        </ul>
+        </ItemGroup>
       )}
     </div>
   );

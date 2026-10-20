@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Calendar, Mail, MapPin, Users } from "lucide-react";
 import { Markdown } from "@/components/markdown";
+import { Button } from "@/components/ui/button";
 import { formatWhen } from "@/lib/format-when";
 import { cn } from "@/lib/utils";
 import type { TournamentPreview } from "@/types";
@@ -75,14 +76,14 @@ export function TournamentPreviewCard({
               <Markdown className="text-sm text-muted-foreground">{preview.description}</Markdown>
             </div>
             {long && (
-              <button
-                type="button"
+              <Button
+                variant="link"
+                className="h-auto p-0"
                 onClick={() => setShowAll(!showAll)}
-                className="mt-1 text-sm font-medium text-primary hover:underline"
                 aria-expanded={showAll}
               >
                 {showAll ? "Weniger" : "Mehr"}
-              </button>
+              </Button>
             )}
           </div>
         )}

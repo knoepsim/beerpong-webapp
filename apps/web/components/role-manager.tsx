@@ -4,48 +4,31 @@ import { useState } from "react";
 import { UserMinus, UserPlus } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PersonSearch } from "@/components/person-search";
+import { RadioCards } from "@/components/radio-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAssignRole, useRevokeRole } from "@/hooks/queries/tournaments";
 import { assignableRoles, mayRevoke, ROLE_INFO, strongestRole } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 import { TournamentRoleType, type PublicUser, type TournamentUserRole } from "@/types";
 
 const RANK = [TournamentRoleType.ADMIN, TournamentRoleType.MANAGER, TournamentRoleType.REFEREE];
 
-/** The roles to choose from, as cards with what each may do (three options are seen at once, no dropdown). */
+/** The roles to choose from, as cards with what each may do (all options seen at once, no dropdown). */
 function RoleChoice({
   choices,
   value,
   onChange,
 }: Readonly<{ choices: TournamentRoleType[]; value: TournamentRoleType; onChange: (role: TournamentRoleType) => void }>) {
   return (
-    <fieldset className="space-y-2">
-      <legend className="mb-2 text-sm font-medium">Rolle</legend>
-      {choices.map((role) => (
-        <label
-          key={role}
-          className={cn(
-            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-            value === role && "border-primary ring-1 ring-primary",
-          )}
-        >
-          <input
-            type="radio"
-            name="role-choice"
-            value={role}
-            checked={value === role}
-            onChange={() => onChange(role)}
-            className="mt-1 size-4 accent-primary"
-          />
-          <span>
-            <span className="block font-medium">{ROLE_INFO[role].label}</span>
-            <span className="block text-sm text-muted-foreground">{ROLE_INFO[role].description}</span>
-          </span>
-        </label>
-      ))}
-    </fieldset>
+    <RadioCards
+      legend="Rolle"
+      name="role"
+      value={value}
+      onChange={onChange}
+      options={choices.map((role) => ({ value: role, title: ROLE_INFO[role].label, description: ROLE_INFO[role].description }))}
+    />
   );
 }
 
@@ -124,31 +107,33 @@ export function RoleManager({
   };
 
   return (
-    <div className="space-y-4">
-      <ul className="divide-y rounded-lg border">
+    <div className="flex flex-col gap-4">
+      <ItemGroup className="gap-0 divide-y rounded-lg border">
         {sorted.map((role) => {
           const name = role.user_name || "Unbekannt";
           return (
-            <li key={role.id} className="flex min-h-12 items-center gap-2 px-3 py-1.5">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{name}</span>
-                <span className="block text-xs text-muted-foreground">{ROLE_INFO[role.role].label}</span>
-              </span>
+            <Item key={role.id} role="listitem">
+              <ItemContent className="min-w-0">
+                <ItemTitle className="truncate">{name}</ItemTitle>
+                <ItemDescription>{ROLE_INFO[role.role].label}</ItemDescription>
+              </ItemContent>
               {mayRevoke(userRole, role.role) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => handleRevoke(role)}
-                  aria-label={`${name}: Rolle ${ROLE_INFO[role.role].label} entziehen`}
-                >
-                  <UserMinus aria-hidden="true" />
-                </Button>
+                <ItemActions>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleRevoke(role)}
+                    aria-label={`${name}: Rolle ${ROLE_INFO[role.role].label} entziehen`}
+                  >
+                    <UserMinus aria-hidden="true" />
+                  </Button>
+                </ItemActions>
               )}
-            </li>
+            </Item>
           );
         })}
-      </ul>
+      </ItemGroup>
 
       {choices.length > 0 && (
         <Sheet>

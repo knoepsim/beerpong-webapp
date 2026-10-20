@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CheckCircle2, Lock } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { TeamPicker } from "@/components/team-picker";
 import { useAcceptInvitation, useDeclineInvitation, useReopenInvitation } from "@/hooks/queries/invitations";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ function PendingAnswer({ invitation }: Readonly<{ invitation: Invitation }>) {
       .catch(() => undefined); // the toast of the mutation says why
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <TeamPicker
         isJoining={accept.isPending}
         error={accept.error}
@@ -45,16 +46,15 @@ function PendingAnswer({ invitation }: Readonly<{ invitation: Invitation }>) {
       />
 
       {/* far from the primary action */}
-      <div className="border-t pt-3 text-center">
-        <Button
-          variant="ghost"
-          className="text-destructive hover:text-destructive"
-          onClick={handleDecline}
-          disabled={decline.isPending}
-        >
-          Einladung ablehnen
-        </Button>
-      </div>
+      <Separator />
+      <Button
+        variant="ghost"
+        className="self-center text-destructive hover:text-destructive"
+        onClick={handleDecline}
+        disabled={decline.isPending}
+      >
+        Einladung ablehnen
+      </Button>
     </div>
   );
 }

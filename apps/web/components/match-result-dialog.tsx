@@ -279,7 +279,8 @@ function ResultForm({
 
       {/* deleting is far from the primary action and asks first, naming what happens */}
       {existingResult && !nextMatchHasResult && (
-        <div className="mt-6 border-t pt-3">
+        <div className="mt-6 flex flex-col gap-3">
+          <Separator />
           {confirmDelete ? (
             <div className="space-y-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
               <p className="font-medium">Ergebnis löschen?</p>

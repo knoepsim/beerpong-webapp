@@ -6,6 +6,7 @@ import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournamen
 import { errorMessage } from "@/lib/errors";
 import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { InvitationItem } from "@/components/invitation-item";
 import { useMyInvitations } from "@/hooks/queries/invitations";
 import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/form";
 import { Plus, Trophy } from "lucide-react";
 import { AccessFields } from "@/components/access-fields";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyNote } from "@/components/empty-note";
 import { z } from "zod";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -164,16 +165,17 @@ export default function TournamentsPage() {
           </div>
         )}
         {groups && !hasTournaments && invitations.length === 0 && (
-          <EmptyState
+          <EmptyNote
             icon={Trophy}
             title="Noch keine Turniere"
-            description="Du bist noch keinem Turnier beigetreten."
+            description="Über einen Einladungslink oder eine Turnieradresse kommst du ins erste Turnier. Oder erstelle selbst eins."
           />
         )}
       </div>
 
       {/* Create Tournament Button */}
-      <div className="pt-4 border-t border-border flex justify-center">
+      <Separator />
+      <div className="flex justify-center">
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {

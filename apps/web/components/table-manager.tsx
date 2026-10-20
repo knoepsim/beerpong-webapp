@@ -142,15 +142,16 @@ export function TableManager({ tournamentId }: Readonly<{ tournamentId: string }
           </li>
         ))}
         <li className="flex">
-          <button
-            type="button"
+          {/* a card like the tables, the place where the next one appears */}
+          <Button
+            variant="outline"
             onClick={() => add.mutate()}
             disabled={add.isPending}
-            className="flex min-h-[5.5rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="h-auto min-h-[5.5rem] w-full flex-col gap-1 rounded-xl border-dashed text-muted-foreground hover:border-primary hover:text-primary"
           >
-            <Plus className="size-5" aria-hidden="true" />
+            <Plus aria-hidden="true" />
             Tisch hinzufügen
-          </button>
+          </Button>
         </li>
       </ul>
       {tables.length === 1 && <p className="text-sm text-muted-foreground">Ein Turnier braucht mindestens einen Tisch.</p>}
