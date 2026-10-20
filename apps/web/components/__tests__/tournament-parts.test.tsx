@@ -82,6 +82,12 @@ describe('TournamentControlCard', () => {
     expect(screen.getByText('Ergebnisse können im Spielplan eingetragen werden.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Turnier starten' })).not.toBeInTheDocument()
   })
+
+  it('is gone once the tournament is finished', () => {
+    const tournament = makeTournament({ started_at: '2026-01-01T18:00:00Z', finished_at: '2026-01-01T22:00:00Z' })
+    const { container } = render(<TournamentControlCard {...props} tournament={tournament} teams={[]} />)
+    expect(container).toBeEmptyDOMElement()
+  })
 })
 
 describe('TournamentTeamsTab', () => {
@@ -89,7 +95,7 @@ describe('TournamentTeamsTab', () => {
 
   it('says that nobody registered yet', () => {
     render(<TournamentTeamsTab {...handlers} tournament={makeTournament()} teams={[]} />)
-    expect(screen.getByText('Noch keine Teams angemeldet.')).toBeInTheDocument()
+    expect(screen.getByText('Noch keine Teams angemeldet')).toBeInTheDocument()
   })
 
   it('says when the check-in begins while it is not open yet', () => {

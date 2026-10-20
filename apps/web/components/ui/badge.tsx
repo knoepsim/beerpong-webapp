@@ -19,6 +19,11 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // project additions, like the Alert: tinted states with the theme colors, the text stays readable (AA)
+        error: "border-destructive/50 bg-destructive/10 text-foreground",
+        warning: "border-warning/50 bg-warning/10 text-foreground",
+        success: "border-success/50 bg-success/10 text-foreground",
+        info: "border-primary/40 bg-primary/10 text-foreground",
       },
     },
     defaultVariants: {
@@ -49,4 +54,7 @@ function Badge({
   })
 }
 
-export { Badge, badgeVariants }
+/** The look of a badge: the variants above. */
+type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>
+
+export { Badge, badgeVariants, type BadgeVariant }

@@ -26,6 +26,7 @@ import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
 import { Markdown } from "@/components/markdown";
 import { LoadError } from "@/components/load-error";
+import { EmptyNote } from "@/components/empty-note";
 import { ApiError } from "@/lib/api";
 import { highestRole } from "@/lib/roles";
 import { tabFromParam, tabQuery, type TournamentTab } from "@/lib/tournament-tabs";
@@ -104,7 +105,7 @@ export default function TournamentDetailPage({
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] p-4 text-center space-y-4">
         <ShieldAlert className="size-16 text-muted-foreground" aria-hidden="true" />
-        <h2 className="text-2xl font-bold">Kein Zugriff</h2>
+        <h1 className="text-2xl font-bold">Kein Zugriff</h1>
         <p className="text-muted-foreground max-w-md">
           {error.message || "Du hast keinen Zugriff auf dieses Turnier oder es existiert nicht."}
         </p>
@@ -218,11 +219,11 @@ export default function TournamentDetailPage({
           {bracket ? (
             <Schedule bracket={bracket} teamsMap={teamsMap} highlightTeamId={myTeam?.id} onMatchClick={openResult} />
           ) : (
-            <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground border rounded-lg bg-card/50">
-              <Trophy className="size-12 mb-4 opacity-50" aria-hidden="true" />
-              <p className="font-medium text-lg text-foreground">Der Spielplan wird beim Start ausgelost.</p>
-              <p className="mt-2 text-sm">Sobald das Turnier gestartet ist, findest du hier den Turnierbaum.</p>
-            </div>
+            <EmptyNote
+              icon={Trophy}
+              title="Der Spielplan wird beim Start ausgelost"
+              description="Sobald das Turnier gestartet ist, findest du hier den Turnierbaum."
+            />
           )}
         </TabsContent>
 

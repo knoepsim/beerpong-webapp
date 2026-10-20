@@ -63,7 +63,7 @@ describe('RoleManager', () => {
     render(<RoleManager tournamentId="t1" roles={roles} userRole={TournamentRoleType.ADMIN} />)
     await search('re')
     fireEvent.click(screen.getByRole('radio', { name: /^Manager/ }))
-    const row = (await screen.findByRole('button', { name: 'Ref Reese als Manager hinzufügen' })).closest('li')!
+    const row = (await screen.findByRole('button', { name: 'Ref Reese als Manager hinzufügen' })).closest<HTMLElement>('[data-slot=item]')!
     expect(within(row).getByText('Schiedsrichter')).toBeInTheDocument()
   })
 

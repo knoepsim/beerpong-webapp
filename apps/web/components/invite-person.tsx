@@ -1,7 +1,9 @@
 "use client";
 
 import { InvitationRow, InvitationStatusPill } from "@/components/invitation-status";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ItemGroup } from "@/components/ui/item";
 import { PersonSearch } from "@/components/person-search";
 import { useInvitePerson, useTournamentInvitations } from "@/hooks/queries/invitations";
 import type { PublicUser, TournamentInvitation } from "@/types";
@@ -21,7 +23,7 @@ function InviteAction({
   inviting: boolean;
 }>) {
   if (plays) {
-    return <span className="rounded-full border border-success/50 bg-success/10 px-2 py-0.5 text-xs font-medium">Dabei</span>;
+    return <Badge variant="success">Dabei</Badge>;
   }
   if (invitation?.status === "pending" || invitation?.status === "accepted") {
     return <InvitationStatusPill invitation={invitation} />;
@@ -72,11 +74,11 @@ export function InvitePerson({
           <h3 id="direct-invitations" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Direkt eingeladen · {direct.length}
           </h3>
-          <ul className="divide-y">
+          <ItemGroup className="gap-0 divide-y">
             {direct.map((invitation) => (
               <InvitationRow key={invitation.id} tournamentId={tournamentId} invitation={invitation} />
             ))}
-          </ul>
+          </ItemGroup>
         </section>
       )}
     </div>

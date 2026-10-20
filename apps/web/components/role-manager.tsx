@@ -4,51 +4,35 @@ import { useState } from "react";
 import { UserMinus, UserPlus } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PersonSearch } from "@/components/person-search";
+import { RadioCards } from "@/components/radio-cards";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { useAssignRole, useRevokeRole } from "@/hooks/queries/tournaments";
 import { assignableRoles, mayRevoke, ROLE_INFO, strongestRole } from "@/lib/roles";
-import { cn } from "@/lib/utils";
 import { TournamentRoleType, type PublicUser, type TournamentUserRole } from "@/types";
 
 const RANK = [TournamentRoleType.ADMIN, TournamentRoleType.MANAGER, TournamentRoleType.REFEREE];
 
-/** The roles to choose from, as cards with what each may do (three options are seen at once, no dropdown). */
+/** The roles to choose from, as cards with what each may do (all options seen at once, no dropdown). */
 function RoleChoice({
   choices,
   value,
   onChange,
 }: Readonly<{ choices: TournamentRoleType[]; value: TournamentRoleType; onChange: (role: TournamentRoleType) => void }>) {
   return (
-    <fieldset className="space-y-2">
-      <legend className="mb-2 text-sm font-medium">Rolle</legend>
-      {choices.map((role) => (
-        <label
-          key={role}
-          className={cn(
-            "flex cursor-pointer items-start gap-3 rounded-lg border p-3 has-[:focus-visible]:ring-3 has-[:focus-visible]:ring-ring/50",
-            value === role && "border-primary ring-1 ring-primary",
-          )}
-        >
-          <input
-            type="radio"
-            name="role-choice"
-            value={role}
-            checked={value === role}
-            onChange={() => onChange(role)}
-            className="mt-1 size-4 accent-primary"
-          />
-          <span>
-            <span className="block font-medium">{ROLE_INFO[role].label}</span>
-            <span className="block text-sm text-muted-foreground">{ROLE_INFO[role].description}</span>
-          </span>
-        </label>
-      ))}
-    </fieldset>
+    <RadioCards
+      legend="Rolle"
+      name="role"
+      value={value}
+      onChange={onChange}
+      options={choices.map((role) => ({ value: role, title: ROLE_INFO[role].label, description: ROLE_INFO[role].description }))}
+    />
   );
 }
 
-/** Choose the role, find the person, give it: the sheet stays open for the next one. */
+/** Choose the role, find the person, give it: the drawer stays open for the next one. */
 function AssignRole({
   tournamentId,
   roles,
@@ -61,7 +45,7 @@ function AssignRole({
   const action = (person: PublicUser) => {
     const held = roles.filter((r) => r.user_id === person.id).map((r) => r.role);
     if (held.includes(role)) {
-      return <span className="rounded-full border bg-muted px-2 py-0.5 text-xs font-medium">Ist {label}</span>;
+      return <Badge variant="secondary">Ist {label}</Badge>;
     }
     const current = strongestRole(held);
     return (
@@ -96,7 +80,7 @@ function AssignRole({
 }
 
 /**
- * Who helps to run the tournament: the people with a role (strongest first) and "Rolle vergeben" in a sheet from
+ * Who helps to run the tournament: the people with a role (strongest first) and "Rolle vergeben" in a drawer from
  * below. Admins give and take every role, managers only referees (the same rules as the API).
  */
 export function RoleManager({
@@ -123,48 +107,53 @@ export function RoleManager({
   };
 
   return (
-    <div className="space-y-4">
-      <ul className="divide-y rounded-lg border">
+    <div className="flex flex-col gap-4">
+      <ItemGroup className="gap-0 divide-y rounded-lg border">
         {sorted.map((role) => {
           const name = role.user_name || "Unbekannt";
           return (
-            <li key={role.id} className="flex min-h-12 items-center gap-2 px-3 py-1.5">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{name}</span>
-                <span className="block text-xs text-muted-foreground">{ROLE_INFO[role.role].label}</span>
-              </span>
+            <Item key={role.id} role="listitem">
+              <ItemContent className="min-w-0">
+                <ItemTitle className="truncate">{name}</ItemTitle>
+                <ItemDescription>{ROLE_INFO[role.role].label}</ItemDescription>
+              </ItemContent>
               {mayRevoke(userRole, role.role) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  onClick={() => handleRevoke(role)}
-                  aria-label={`${name}: Rolle ${ROLE_INFO[role.role].label} entziehen`}
-                >
-                  <UserMinus aria-hidden="true" />
-                </Button>
+                <ItemActions>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-10 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleRevoke(role)}
+                    aria-label={`${name}: Rolle ${ROLE_INFO[role.role].label} entziehen`}
+                  >
+                    <UserMinus aria-hidden="true" />
+                  </Button>
+                </ItemActions>
               )}
-            </li>
+            </Item>
           );
         })}
-      </ul>
+      </ItemGroup>
 
       {choices.length > 0 && (
-        <Sheet>
-          <SheetTrigger render={<Button variant="outline" className="h-11 w-full" />}>
+        <Drawer showSwipeHandle>
+          <DrawerTrigger render={<Button variant="outline" className="h-11 w-full" />}>
             <UserPlus aria-hidden="true" />
             Rolle vergeben
-          </SheetTrigger>
-          <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl sm:mx-auto sm:max-w-lg">
-            <SheetHeader>
-              <SheetTitle>Rolle vergeben</SheetTitle>
-              <SheetDescription>Wer eine Rolle hat, hilft beim Turnier; mitspielen ist davon unabhängig.</SheetDescription>
-            </SheetHeader>
+          </DrawerTrigger>
+          <DrawerContent className="sm:mx-auto sm:max-w-lg">
+            {/* the content scrolls, the drawer itself is swiped */}
+            <div className="overflow-y-auto">
+            <DrawerHeader>
+              <DrawerTitle>Rolle vergeben</DrawerTitle>
+              <DrawerDescription>Wer eine Rolle hat, hilft beim Turnier; mitspielen ist davon unabhängig.</DrawerDescription>
+            </DrawerHeader>
             <div className="px-4 pb-6">
               <AssignRole tournamentId={tournamentId} roles={roles} choices={choices} />
             </div>
-          </SheetContent>
-        </Sheet>
+          </div>
+</DrawerContent>
+        </Drawer>
       )}
     </div>
   );

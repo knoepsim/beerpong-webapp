@@ -2,7 +2,7 @@
 
 import { use } from "react";
 import { InvitationAnswer, invitationFrom } from "@/components/invitation-answer";
-import { InvitationCard } from "@/components/invitation-card";
+import { TournamentPreviewCard } from "@/components/tournament-preview";
 import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useInvitation } from "@/hooks/queries/invitations";
@@ -27,9 +27,9 @@ export default function InvitationPage({ params }: Readonly<{ params: Promise<{ 
     );
   } else if (invitation) {
     content = (
-      <InvitationCard preview={invitation.tournament} from={invitationFrom(invitation)}>
+      <TournamentPreviewCard preview={invitation.tournament} invitation={{ from: invitationFrom(invitation) }}>
         <InvitationAnswer invitation={invitation} />
-      </InvitationCard>
+      </TournamentPreviewCard>
     );
   } else {
     content = <Skeleton className="h-80 w-full rounded-2xl" />;

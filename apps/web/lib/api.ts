@@ -20,11 +20,13 @@ import type {
   TournamentInvitation,
 } from "@/types";
 
+const SERVER_PROBLEM = "Der Server hat gerade ein Problem. Versuch es gleich noch einmal.";
+
 export class ApiError extends Error {
   constructor(public status: number, public data: Record<string, unknown>) {
     let msg = "Ein Fehler ist aufgetreten";
     if (Array.isArray(data?.detail)) {
-      msg = data.detail.map((e: any) => String(e.msg).replace(/^Value error, /, "")).join(", ");
+      msg = data.detail.map((e: { msg?: unknown }) => String(e.msg).replace(/^Value error, /, "")).join(", ");
     } else if (typeof data?.detail === "string") {
       msg = data.detail;
     }
@@ -130,7 +132,8 @@ export async function request<T>(endpoint: string, options: FetchOptions = {}): 
     try {
       errorData = await res.json();
     } catch {
-      errorData = { detail: res.statusText };
+      // no answer of the API (a crash, a proxy): the status text is English and technical, say it in our words
+      errorData = { detail: res.status >= 500 ? SERVER_PROBLEM : "Ein Fehler ist aufgetreten. Versuch es noch einmal." };
     }
     throw new ApiError(res.status, errorData);
   }
@@ -255,10 +258,10 @@ export const api = {
       }),
     delete: (id: string) =>
       request<void>(`/tournaments/${id}`, { method: "DELETE" }),
-    join: (tournamentId: string, teamId: string, inviteToken?: string | null) =>
+    join: (tournamentId: string, teamId: string) =>
       request<void>(`/tournaments/${tournamentId}/join`, {
         method: "POST",
-        body: JSON.stringify({ team_id: teamId, invite_token: inviteToken }),
+        body: JSON.stringify({ team_id: teamId }),
       }),
     leave: (tournamentId: string) =>
       request<void>(`/tournaments/${tournamentId}/leave`, { method: "DELETE" }),

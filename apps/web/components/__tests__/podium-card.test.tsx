@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { PodiumCard } from '../podium-card'
 import { fiveTeamBracket, fiveTeams } from '@/lib/test-fixtures/bracket'
+
+// the confetti has its own test (a canvas, which jsdom cannot draw)
+vi.mock('../celebration', () => ({ Celebration: () => null }))
 
 const won = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 2 })
 

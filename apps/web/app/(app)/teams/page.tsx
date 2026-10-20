@@ -26,7 +26,7 @@ import { TeamDeleteBlockers } from "@/components/delete-team-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Users } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyNote } from "@/components/empty-note";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function TeamsPage() {
@@ -135,10 +135,10 @@ export default function TeamsPage() {
         />
       )}
       {teamsQuery.isSuccess && teams.length === 0 && (
-        <EmptyState
+        <EmptyNote
           icon={Users}
-          title="Keine Teams vorhanden"
-          description="Gründe oben dein erstes Team und lade deinen Mitspieler ein."
+          title="Gründe dein erstes Team"
+          description="Gib oben einen Namen ein und lade danach deinen Mitspieler ein."
         />
       )}
       {teams.length > 0 && (

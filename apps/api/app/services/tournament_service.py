@@ -262,9 +262,7 @@ class TournamentService:
             return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
         return {"next_match": next((m for m in mine if m.winner_team_id is None), None)}
 
-    async def join_tournament(
-        self, tournament_id: UUID, team_id: UUID, invite_token: str | None = None, user_id: UUID | None = None
-    ) -> TournamentTeam:
+    async def join_tournament(self, tournament_id: UUID, team_id: UUID, user_id: UUID) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""
         tournament = await self.get_tournament(tournament_id, for_update=True)
         if tournament.is_started:
@@ -272,10 +270,9 @@ class TournamentService:
         if not tournament.registration_open:
             raise RegistrationClosedError()
 
-        # a link, or an open invitation of the person who joins (it came from a link or from the organization)
-        invite = await InviteService(self.db).find(tournament_id, invite_token)
-        invitation = await InvitationService(self.db).has_open(tournament_id, user_id) if user_id else None
-        if tournament.join_policy == JoinPolicy.INVITE_ONLY and invite is None and invitation is None:
+        # only with an invitation: an open one of the person who joins (from a link or from the organization)
+        invitation = await InvitationService(self.db).has_open(tournament_id, user_id)
+        if tournament.join_policy == JoinPolicy.INVITE_ONLY and invitation is None:
             raise InviteRequiredError()
 
         team = await TeamService(self.db).get_team(team_id)
@@ -298,8 +295,9 @@ class TournamentService:
             if existing.scalar_one_or_none() is not None:
                 raise PlayerAlreadyInTournamentError()
 
-        invite_id = invite.id if invite else (invitation.invite_id if invitation else None)
-        entry = TournamentTeam(tournament_id=tournament_id, team_id=team_id, invite_id=invite_id)
+        entry = TournamentTeam(
+            tournament_id=tournament_id, team_id=team_id, invite_id=invitation.invite_id if invitation else None
+        )
         self.db.add(entry)
         await InvitationService(self.db).team_joined(tournament_id, team_id, member_user_ids)
         await bump(self.db, tournament_id, "teams")

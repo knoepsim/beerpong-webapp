@@ -6,8 +6,10 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { InvitationRow } from "@/components/invitation-status";
 import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
+import { ItemGroup } from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
 import { useTournamentInvitations } from "@/hooks/queries/invitations";
 import { useCreateTournamentInvite, useDeleteTournamentInvite, useTournamentInvites } from "@/hooks/queries/tournaments";
@@ -76,6 +78,7 @@ function LinkRow({
           </CollapsibleTrigger>
           {!invite.deleted && (
             <>
+              <ButtonGroup aria-label={`${title} weitergeben`}>
               <Button
                 variant="outline"
                 size="icon"
@@ -94,6 +97,7 @@ function LinkRow({
               >
                 <Share2 aria-hidden="true" />
               </Button>
+              </ButtonGroup>
               <Button
                 variant="ghost"
                 size="icon"
@@ -110,11 +114,11 @@ function LinkRow({
           {invitations.length === 0 ? (
             <p className="ml-7 py-2 text-sm text-muted-foreground">Noch niemand hat den Link mit einem Konto geöffnet.</p>
           ) : (
-            <ul className="ml-3 border-l pl-4">
+            <ItemGroup className="ml-3 gap-0 border-l pl-4">
               {invitations.map((invitation) => (
                 <InvitationRow key={invitation.id} tournamentId={tournamentId} invitation={invitation} />
               ))}
-            </ul>
+            </ItemGroup>
           )}
         </CollapsibleContent>
       </Collapsible>

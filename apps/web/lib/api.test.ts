@@ -76,16 +76,22 @@ describe('request', () => {
     await expect(request('/x')).rejects.toMatchObject({ status: 400, message: 'Invalid input' });
   });
 
-  it('falls back to the status text when the error body is not JSON', async () => {
-    fetchMock.mockResolvedValue({
+  it('says an error without a body in German, never the English status text', async () => {
+    const noJson = (status: number, statusText: string) => ({
       ok: false,
-      status: 502,
-      statusText: 'Bad Gateway',
+      status,
+      statusText,
       json: async () => {
         throw new Error('no json');
       },
     });
-    await expect(request('/x')).rejects.toMatchObject({ status: 502, message: 'Bad Gateway' });
+    fetchMock.mockResolvedValueOnce(noJson(502, 'Bad Gateway'));
+    await expect(request('/x')).rejects.toMatchObject({
+      status: 502,
+      message: 'Der Server hat gerade ein Problem. Versuch es gleich noch einmal.',
+    });
+    fetchMock.mockResolvedValueOnce(noJson(418, "I'm a teapot"));
+    await expect(request('/x')).rejects.toMatchObject({ status: 418, message: 'Ein Fehler ist aufgetreten. Versuch es noch einmal.' });
   });
 
   it('returns an empty object for 204 No Content', async () => {
@@ -248,7 +254,7 @@ describe('api endpoints', () => {
     ['tournaments.create', () => api.tournaments.create(tournamentBody as never), 'POST', '/tournaments', tournamentBody],
     ['tournaments.update', () => api.tournaments.update('x', tournamentBody as never), 'PATCH', '/tournaments/x', tournamentBody],
     ['tournaments.delete', () => api.tournaments.delete('x'), 'DELETE', '/tournaments/x', undefined],
-    ['tournaments.join', () => api.tournaments.join('x', 't1', 'inv'), 'POST', '/tournaments/x/join', { team_id: 't1', invite_token: 'inv' }],
+    ['tournaments.join', () => api.tournaments.join('x', 't1'), 'POST', '/tournaments/x/join', { team_id: 't1' }],
     ['tournaments.leave', () => api.tournaments.leave('x'), 'DELETE', '/tournaments/x/leave', undefined],
     ['tournaments.removeTeam', () => api.tournaments.removeTeam('x', 't1'), 'DELETE', '/tournaments/x/teams/t1', undefined],
     ['tournaments.startTournament', () => api.tournaments.startTournament('x'), 'POST', '/tournaments/x/start', undefined],

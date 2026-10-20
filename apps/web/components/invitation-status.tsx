@@ -1,15 +1,16 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
 import { useWithdrawInvitation } from "@/hooks/queries/invitations";
-import { cn } from "@/lib/utils";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import type { TournamentInvitation } from "@/types";
 
-const TONE: Record<TournamentInvitation["status"], string> = {
-  pending: "border-primary/40 bg-primary/10",
-  accepted: "border-success/50 bg-success/10",
-  declined: "border-border bg-muted text-muted-foreground",
-  withdrawn: "border-border bg-muted text-muted-foreground",
-};
+const VARIANT = {
+  pending: "info",
+  accepted: "success",
+  declined: "secondary",
+  withdrawn: "secondary",
+} as const satisfies Record<TournamentInvitation["status"], BadgeVariant>;
 
 const statusText = (invitation: TournamentInvitation) => {
   switch (invitation.status) {
@@ -27,9 +28,9 @@ const statusText = (invitation: TournamentInvitation) => {
 /** How far an invitation is, as the organization sees it. */
 export function InvitationStatusPill({ invitation }: Readonly<{ invitation: TournamentInvitation }>) {
   return (
-    <span className={cn("shrink-0 truncate rounded-full border px-2 py-0.5 text-xs font-medium", TONE[invitation.status])}>
-      {statusText(invitation)}
-    </span>
+    <Badge variant={VARIANT[invitation.status]} className="max-w-40">
+      <span className="truncate">{statusText(invitation)}</span>
+    </Badge>
   );
 }
 
@@ -41,24 +42,28 @@ export function InvitationRow({
 }: Readonly<{ tournamentId: string; invitation: TournamentInvitation; detail?: string }>) {
   const withdraw = useWithdrawInvitation(tournamentId);
   return (
-    <li className="flex min-h-11 items-center gap-2 py-1.5">
-      <span className="min-w-0 flex-1 truncate">
-        {invitation.user_name}
-        {detail && <span className="text-sm text-muted-foreground"> · {detail}</span>}
-      </span>
-      <InvitationStatusPill invitation={invitation} />
-      {invitation.status === "pending" && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 shrink-0 text-muted-foreground"
-          onClick={() => withdraw.mutate(invitation)}
-          disabled={withdraw.isPending}
-          aria-label={`Einladung an ${invitation.user_name} entfernen`}
-        >
-          <X aria-hidden="true" />
-        </Button>
-      )}
-    </li>
+    <Item role="listitem" size="sm" className="px-0">
+      <ItemContent className="min-w-0">
+        <ItemTitle className="truncate">
+          {invitation.user_name}
+          {detail && <span className="font-normal text-muted-foreground"> · {detail}</span>}
+        </ItemTitle>
+      </ItemContent>
+      <ItemActions>
+        <InvitationStatusPill invitation={invitation} />
+        {invitation.status === "pending" && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-9 text-muted-foreground"
+            onClick={() => withdraw.mutate(invitation)}
+            disabled={withdraw.isPending}
+            aria-label={`Einladung an ${invitation.user_name} entfernen`}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        )}
+      </ItemActions>
+    </Item>
   );
 }

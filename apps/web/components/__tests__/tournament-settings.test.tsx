@@ -15,6 +15,12 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace }) }));
 vi.mock('sonner', () => ({ toast }));
 vi.mock('react-markdown', () => ({ default: ({ children }: { children: ReactNode }) => <div data-testid="markdown">{children}</div> }));
+// the editor (ProseMirror) has its own test; here a plain field stands in for it
+vi.mock('@/components/markdown-editor', () => ({
+  MarkdownEditor: ({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) => (
+    <textarea aria-label="Beschreibung" placeholder={placeholder} defaultValue={value} onChange={(e) => onChange(e.target.value)} />
+  ),
+}));
 vi.mock('remark-gfm', () => ({ default: () => {} }));
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
@@ -377,18 +383,9 @@ describe('editing the tournament: each card saves its own fields', () => {
     expect(saveOf('Allgemein')).toHaveTextContent('Allgemein speichern'); // the change is kept to try again
   });
 
-  it('previews the description as markdown', () => {
+  it('edits the description in the editor, starting with what is saved', () => {
     setup(TournamentRoleType.ADMIN);
-    fireEvent.click(screen.getByText('Vorschau'));
-    expect(screen.getByTestId('markdown')).toHaveTextContent('Rules');
-    fireEvent.click(screen.getByText('Bearbeiten'));
-    expect(screen.getByPlaceholderText(/Turnier-Regeln/)).toBeInTheDocument();
-  });
-
-  it('previews an empty description with a placeholder', () => {
-    setup(TournamentRoleType.ADMIN, { description: null });
-    fireEvent.click(screen.getByText('Vorschau'));
-    expect(screen.getByText('Keine Beschreibung…')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Turnier-Regeln/)).toHaveValue('Rules');
   });
 });
 

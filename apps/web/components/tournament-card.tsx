@@ -41,12 +41,12 @@ function DateTile({ iso, phase }: Readonly<{ iso: string; phase: TournamentPhase
 }
 
 /** Like the status card: tinted and bordered by urgency, the icon carries the color, the text stays readable. */
-const TONE: Record<StatusTone, { pill: string; icon: string }> = {
-  urgent: { pill: "border-destructive/50 bg-destructive/10", icon: "text-destructive" },
-  attention: { pill: "border-warning/50 bg-warning/10", icon: "text-warning" },
-  active: { pill: "border-primary/50 bg-primary/10", icon: "text-primary" },
-  relaxed: { pill: "", icon: "text-muted-foreground" },
-  done: { pill: "border-success/50 bg-success/10", icon: "text-success" },
+const TONE: Record<StatusTone, { variant: "error" | "warning" | "info" | "outline" | "success"; icon: string }> = {
+  urgent: { variant: "error", icon: "text-destructive" },
+  attention: { variant: "warning", icon: "text-warning" },
+  active: { variant: "info", icon: "text-primary" },
+  relaxed: { variant: "outline", icon: "text-muted-foreground" },
+  done: { variant: "success", icon: "text-success" },
 };
 
 /**
@@ -77,9 +77,9 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
       <DateTile iso={when} phase={t.phase} />
 
       <div className="min-w-0 flex-1 space-y-1.5">
-        <h4 className={cn("line-clamp-2 font-semibold leading-tight", t.phase === "finished" && "text-muted-foreground")}>
+        <h3 className={cn("line-clamp-2 font-semibold leading-tight", t.phase === "finished" && "text-muted-foreground")}>
           {t.name}
-        </h4>
+        </h3>
 
         <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
           <span>{TIME.format(new Date(when))} Uhr</span>
@@ -94,7 +94,7 @@ export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
 
         <div className="flex flex-wrap items-center gap-1.5">
           {status && StatusIcon && (
-            <Badge variant="outline" className={cn("font-semibold", TONE[status.tone].pill)}>
+            <Badge variant={TONE[status.tone].variant} className="font-semibold">
               <StatusIcon className={TONE[status.tone].icon} aria-hidden="true" />
               {status.text}
             </Badge>

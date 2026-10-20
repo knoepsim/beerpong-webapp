@@ -81,7 +81,6 @@ class TournamentStartResponse(BaseModel):
 class TournamentJoinRequest(BaseModel):
     """Request body for joining a tournament with a team."""
     team_id: UUID
-    invite_token: str | None = None
 
 
 class TableCreate(BaseModel):

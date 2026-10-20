@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { errorMessage } from "@/lib/errors";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { logout } from "@/lib/auth";
 import { useCurrentUser, useRequestPhoneChange, useUpdateMe, useVerifyPhoneChange } from "@/hooks/queries/user";
 import { useTheme } from "next-themes";
@@ -23,12 +26,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-  InputOTPSeparator,
-} from "@/components/ui/input-otp";
-import {
   Form,
   FormControl,
   FormField,
@@ -37,19 +34,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { z } from "zod";
-import { phoneSchema, toE164, toNationalDigits } from "@/lib/phone";
+import { codeSchema, phoneSchema, toE164 } from "@/lib/phone";
+import { profileSchema } from "@/lib/profile";
+import { PhoneInput, SmsCodeInput } from "@/components/phone-fields";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LogOut, Save, User as UserIcon, Monitor, Moon, Sun, Smartphone, RefreshCwIcon } from "lucide-react";
-
-const profileSchema = z.object({
-  name: z.string().min(2, "Der Anzeigename muss mindestens 2 Zeichen lang sein."),
-  email: z.string().email("Bitte gib eine gültige E-Mail Adresse ein.").or(z.literal("")).optional(),
-});
-
-const codeSchema = z.object({
-  code: z.string().length(6, "Bitte gib den 6-stelligen Code ein."),
-});
 
 export default function ProfilePage() {
   const { user } = useCurrentUser();
@@ -77,7 +67,7 @@ export default function ProfilePage() {
   }, []);
 
   const profileForm = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema as any),
+    resolver: zodResolver(profileSchema),
     defaultValues: { 
       name: user?.name || "", 
       email: user?.email || "" 
@@ -92,12 +82,12 @@ export default function ProfilePage() {
   }, [user, profileForm]);
 
   const phoneForm = useForm<z.infer<typeof phoneSchema>>({
-    resolver: zodResolver(phoneSchema as any),
+    resolver: zodResolver(phoneSchema),
     defaultValues: { phone: "" },
   });
 
   const codeForm = useForm<z.infer<typeof codeSchema>>({
-    resolver: zodResolver(codeSchema as any),
+    resolver: zodResolver(codeSchema),
     defaultValues: { code: "" },
   });
 
@@ -131,7 +121,13 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    return <div className="p-8 text-center animate-pulse">Lade Profil…</div>;
+    return (
+      <div className="mx-auto max-w-xl space-y-6 px-4 pt-6">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-36 w-full rounded-xl" />
+      </div>
+    );
   }
 
   // Check if profile values changed to disable save button
@@ -140,7 +136,7 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 pt-6 pb-20 md:pb-6 space-y-6">
-      <h1 className="text-2xl font-bold">Einstellungen</h1>
+      <h1 className="text-2xl font-bold">Profil</h1>
 
       <Card>
         <CardHeader>
@@ -228,60 +224,40 @@ export default function ProfilePage() {
       <Card>
         <CardHeader>
           <CardTitle>Erscheinungsbild</CardTitle>
-          <CardDescription>Passe das Theme der App an deine Vorlieben an.</CardDescription>
+          <CardDescription>Hell, dunkel oder wie dein Gerät eingestellt ist.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            <Label>Theme</Label>
-            {mounted ? (
-              <div className="flex bg-muted p-1 rounded-lg w-fit">
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "light"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sun className="h-4 w-4" />
-                  Hell
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "dark"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Moon className="h-4 w-4" />
-                  Dunkel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("system")}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    theme === "system"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Monitor className="h-4 w-4" />
-                  System
-                </button>
-              </div>
-            ) : (
-              <div className="h-9 w-[280px] rounded-lg bg-muted animate-pulse" />
-            )}
-          </div>
+          {mounted ? (
+            <ToggleGroup
+              aria-label="Erscheinungsbild"
+              variant="outline"
+              spacing={0}
+              value={[theme ?? "system"]}
+              onValueChange={(value) => value[0] && setTheme(value[0])}
+            >
+              <ToggleGroupItem value="light">
+                <Sun data-icon="inline-start" aria-hidden="true" />
+                Hell
+              </ToggleGroupItem>
+              <ToggleGroupItem value="dark">
+                <Moon data-icon="inline-start" aria-hidden="true" />
+                Dunkel
+              </ToggleGroupItem>
+              <ToggleGroupItem value="system">
+                <Monitor data-icon="inline-start" aria-hidden="true" />
+                System
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : (
+            <Skeleton className="h-9 w-[280px] rounded-lg" />
+          )}
         </CardContent>
       </Card>
 
-      <div className="flex justify-center pt-8 border-t">
+      <Separator />
+      <div className="flex justify-center">
         <Button variant="ghost" className="text-muted-foreground" onClick={handleLogout}>
-          <LogOut className="mr-2 h-4 w-4" />
+          <LogOut data-icon="inline-start" aria-hidden="true" />
           Abmelden
         </Button>
       </div>
@@ -296,21 +272,17 @@ export default function ProfilePage() {
                 : (
                   <span className="flex items-center gap-1 flex-wrap">
                     Wir haben einen 6-stelligen Code an +49 {currentPhone} gesendet.
-                    <span 
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => { resetPhoneErrors(); setPhoneStep(1); }} 
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          resetPhoneErrors();
-                          setPhoneStep(1);
-                        }
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0"
+                      onClick={() => {
+                        resetPhoneErrors();
+                        setPhoneStep(1);
                       }}
-                      className="text-primary hover:underline font-medium cursor-pointer rounded-sm outline-hidden focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
-                      Ändern?
-                    </span>
+                      Nummer ändern
+                    </Button>
                   </span>
                 )}
             </DialogDescription>
@@ -326,23 +298,13 @@ export default function ProfilePage() {
                     <FormItem>
                       <FormLabel>Neue Handynummer</FormLabel>
                       <FormControl>
-                        <div className="flex rounded-md border border-input focus-within:ring-1 focus-within:ring-ring shadow-sm overflow-hidden" aria-invalid={!!phoneForm.formState.errors.phone}>
-                          <div className="flex items-center px-3 bg-muted text-sm text-muted-foreground select-none border-r">
-                            +49
-                          </div>
-                          <Input
-                            type="tel"
-                            autoComplete="tel-national"
-                            placeholder="151 12345678"
-                            {...field}
-                            onChange={(e) => {
-                              const val = toNationalDigits(e.target.value);
-                              field.onChange(val);
-                            }}
-                            disabled={isPhoneLoading}
-                            className="border-0 focus-visible:ring-0 rounded-l-none shadow-none flex-1"
-                          />
-                        </div>
+                        <PhoneInput
+                          name={field.name}
+                          value={field.value}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          disabled={isPhoneLoading}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -377,30 +339,11 @@ export default function ProfilePage() {
                           Erneut senden
                         </Button>
                       </div>
-                      <div className="flex justify-center">
-                          <InputOTP
-                            maxLength={6}
-                            disabled={isPhoneLoading}
-                            aria-invalid={!!codeForm.formState.errors.code}
-                            className={codeForm.formState.errors.code ? "border-destructive" : ""}
-                            value={codeForm.watch("code") || ""}
-                            onChange={(val) => {
-                              codeForm.setValue("code", val, { shouldValidate: true });
-                            }}
-                          >
-                            <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
-                              <InputOTPSlot index={0} />
-                              <InputOTPSlot index={1} />
-                              <InputOTPSlot index={2} />
-                            </InputOTPGroup>
-                            <InputOTPSeparator className="mx-2" />
-                            <InputOTPGroup className="*:data-[slot=input-otp-slot]:h-12 *:data-[slot=input-otp-slot]:w-11 *:data-[slot=input-otp-slot]:text-xl">
-                              <InputOTPSlot index={3} />
-                              <InputOTPSlot index={4} />
-                              <InputOTPSlot index={5} />
-                            </InputOTPGroup>
-                          </InputOTP>
-                        </div>
+                      <SmsCodeInput
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        disabled={isPhoneLoading}
+                      />
                       <FormMessage className="text-center" />
                     </FormItem>
                   )}
@@ -411,7 +354,7 @@ export default function ProfilePage() {
                   className="w-full" 
                   disabled={isPhoneLoading}
                 >
-                  {isPhoneLoading ? "Überprüfe…" : "Bestätigen & Speichern"}
+                  {isPhoneLoading ? "Wird geprüft…" : "Nummer bestätigen"}
                 </Button>
               </form>
             </Form>

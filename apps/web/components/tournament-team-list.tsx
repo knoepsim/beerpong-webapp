@@ -1,7 +1,7 @@
 import { Check, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Toggle } from "@/components/ui/toggle";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { TournamentTeam } from "@/types";
 
 interface TeamListProps {
@@ -25,32 +25,30 @@ function CheckinControl({
 }: Readonly<Pick<TeamListProps, "canManage" | "checkinOpen" | "onCheckin"> & { team: TournamentTeam }>) {
   if (!canManage) {
     return team.is_checked_in ? (
-      <Badge variant="outline" className="shrink-0 border-green-600 text-green-700 dark:border-green-500 dark:text-green-400">
+      <Badge variant="success" className="shrink-0">
         <Check aria-hidden="true" />
         Eingecheckt
       </Badge>
     ) : null;
   }
+  // a switch with two states: checked in or not (the organization toggles it at the door)
   return (
-    <Button
+    <Toggle
       variant="outline"
-      className={cn(
-        "h-10 shrink-0",
-        team.is_checked_in && "border-green-600 text-green-700 dark:border-green-500 dark:text-green-400",
-      )}
-      onClick={() => onCheckin(team, !team.is_checked_in)}
+      className="h-10 shrink-0 aria-pressed:border-success/60 aria-pressed:bg-success/10"
+      pressed={team.is_checked_in}
+      onPressedChange={(pressed) => onCheckin(team, pressed)}
       disabled={!checkinOpen}
-      aria-pressed={team.is_checked_in}
       aria-label={`${team.name} ${team.is_checked_in ? "ist eingecheckt, Check-in zurücknehmen" : "einchecken"}`}
     >
       {team.is_checked_in ? (
         <>
-          <Check aria-hidden="true" /> Eingecheckt
+          <Check data-icon="inline-start" aria-hidden="true" /> Eingecheckt
         </>
       ) : (
         "Einchecken"
       )}
-    </Button>
+    </Toggle>
   );
 }
 

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useCreateTeam } from "@/hooks/queries/teams";
 import { useCurrentUser, useUpdateMe } from "@/hooks/queries/user";
 import { errorMessage } from "@/lib/errors";
+import { onboardingSchema } from "@/lib/profile";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getRedirectParam } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +29,6 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-const profileSchema = z.object({
-  name: z.string().min(2, "Der Anzeigename muss mindestens 2 Zeichen lang sein."),
-  email: z.string().email("Bitte gib eine gültige E-Mail Adresse ein."),
-});
-
 const teamSchema = z.object({
   teamName: z.string().min(2, "Der Teamname muss mindestens 2 Zeichen lang sein."),
 });
@@ -46,13 +43,13 @@ export default function OnboardingPage() {
   const failure = step === "profile" ? updateMe.error : createTeam.error;
   const apiError = failure ? errorMessage(failure) : null;
 
-  const profileForm = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema as any),
+  const profileForm = useForm<z.infer<typeof onboardingSchema>>({
+    resolver: zodResolver(onboardingSchema),
     defaultValues: { name: "", email: "" },
   });
 
   const teamForm = useForm<z.infer<typeof teamSchema>>({
-    resolver: zodResolver(teamSchema as any),
+    resolver: zodResolver(teamSchema),
     defaultValues: { teamName: "" },
   });
 
@@ -68,7 +65,7 @@ export default function OnboardingPage() {
     profileForm.reset({ name: user.name.startsWith("+49") ? "" : user.name, email: user.email ?? "" });
   }, [user, profileComplete, profileForm]);
 
-  const onProfileSubmit = (values: z.infer<typeof profileSchema>) =>
+  const onProfileSubmit = (values: z.infer<typeof onboardingSchema>) =>
     updateMe.mutate(
       { name: values.name.trim(), email: values.email.trim() },
       {
@@ -88,7 +85,11 @@ export default function OnboardingPage() {
     });
 
   if (isLoading || profileComplete) {
-    return <div className="flex min-h-screen items-center justify-center p-4 text-muted-foreground animate-pulse">Lade…</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Skeleton className="h-80 w-full max-w-sm rounded-xl" />
+      </div>
+    );
   }
 
   return (
@@ -153,7 +154,7 @@ export default function OnboardingPage() {
                 {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
                 
                 <Button type="submit" className="w-full" disabled={isSaving}>
-                  {isSaving ? "Speichere…" : "Weiter"}
+                  {isSaving ? "Wird gespeichert…" : "Weiter"}
                 </Button>
               </form>
             </Form>
@@ -186,7 +187,7 @@ export default function OnboardingPage() {
                 {apiError && <p className="text-sm text-destructive font-medium">{apiError}</p>}
                 
                 <Button type="submit" className="w-full" disabled={isSaving}>
-                  {isSaving ? "Erstelle…" : "Team gründen & loslegen"}
+                  {isSaving ? "Wird erstellt…" : "Team gründen und loslegen"}
                 </Button>
                 
                 <Button 

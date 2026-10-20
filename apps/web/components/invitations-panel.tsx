@@ -5,8 +5,9 @@ import { InvitationRow } from "@/components/invitation-status";
 import { InvitePerson } from "@/components/invite-person";
 import { InviteLinks } from "@/components/invite-links";
 import { Button } from "@/components/ui/button";
+import { ItemGroup } from "@/components/ui/item";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTournamentInvitations } from "@/hooks/queries/invitations";
 import { useTournamentInvites } from "@/hooks/queries/tournaments";
@@ -17,7 +18,7 @@ const originOf = (invitation: TournamentInvitation, links: TournamentInvite[]) =
 
 /**
  * The organization's invitations, in the participants tab until the start: the open ones (closed by default) and
- * "Einladen" with a person or a link in a sheet from below.
+ * "Einladen" with a person or a link in a drawer from below.
  */
 export function InvitationsPanel({
   tournamentId,
@@ -40,7 +41,7 @@ export function InvitationsPanel({
             />
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul className="divide-y border-t px-3">
+            <ItemGroup className="gap-0 divide-y border-t px-3">
               {pending.map((invitation) => (
                 <InvitationRow
                   key={invitation.id}
@@ -49,21 +50,23 @@ export function InvitationsPanel({
                   detail={originOf(invitation, links)}
                 />
               ))}
-            </ul>
+            </ItemGroup>
           </CollapsibleContent>
         </Collapsible>
       )}
 
-      <Sheet>
-        <SheetTrigger render={<Button className="h-11 w-full" />}>
+      <Drawer showSwipeHandle>
+        <DrawerTrigger render={<Button className="h-11 w-full" />}>
           <UserPlus aria-hidden="true" />
           Einladen
-        </SheetTrigger>
-        <SheetContent side="bottom" className="max-h-[88dvh] overflow-y-auto rounded-t-2xl sm:mx-auto sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Einladen</SheetTitle>
-            <SheetDescription>Eingeladene finden das Turnier unter Meine Turniere und wählen dort ihr Team.</SheetDescription>
-          </SheetHeader>
+        </DrawerTrigger>
+        <DrawerContent className="sm:mx-auto sm:max-w-lg">
+          {/* the content scrolls, the drawer itself is swiped */}
+          <div className="overflow-y-auto">
+          <DrawerHeader>
+            <DrawerTitle>Einladen</DrawerTitle>
+            <DrawerDescription>Eingeladene finden das Turnier unter Meine Turniere und wählen dort ihr Team.</DrawerDescription>
+          </DrawerHeader>
           <Tabs defaultValue="person" className="px-4 pb-6">
             <TabsList className="w-full">
               <TabsTrigger value="person" className="flex-1">Person</TabsTrigger>
@@ -76,8 +79,9 @@ export function InvitationsPanel({
               <InviteLinks tournamentId={tournamentId} />
             </TabsContent>
           </Tabs>
-        </SheetContent>
-      </Sheet>
+        </div>
+</DrawerContent>
+      </Drawer>
     </section>
   );
 }

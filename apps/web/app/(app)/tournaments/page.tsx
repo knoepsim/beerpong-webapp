@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournaments";
 import { errorMessage } from "@/lib/errors";
 import { LoadError } from "@/components/load-error";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { InvitationItem } from "@/components/invitation-item";
 import { useMyInvitations } from "@/hooks/queries/invitations";
 import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
@@ -12,7 +14,6 @@ import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,8 @@ import {
 } from "@/components/ui/form";
 import { Plus, Trophy } from "lucide-react";
 import { AccessFields } from "@/components/access-fields";
-import { EmptyState } from "@/components/ui/empty-state";
+import { EmptyNote } from "@/components/empty-note";
+import { MarkdownEditor } from "@/components/markdown-editor";
 import { z } from "zod";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -43,7 +45,8 @@ const createTournamentSchema = z.object({
   name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
   location: z.string().optional(),
   description: z.string().optional(),
-  table_count: z.coerce.number().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
+  // the field gives a number (NaN when empty): no coercion, so what goes in is what comes out
+  table_count: z.number({ error: "Gib die Zahl der Tische an." }).int().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
   visibility: z.nativeEnum(TournamentVisibility),
   join_policy: z.nativeEnum(JoinPolicy),
 });
@@ -61,7 +64,7 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
   if (items.length === 0) return null;
   return (
     <section aria-label={title} className="space-y-3">
-      <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
       <ul className="space-y-3">
         {items.map((item) => (
           <li key={item.tournament.id}>
@@ -88,7 +91,7 @@ export default function TournamentsPage() {
   const startMissing = showScheduleErrors && !schedule.start_time;
 
   const form = useForm<z.infer<typeof createTournamentSchema>>({
-    resolver: zodResolver(createTournamentSchema as any),
+    resolver: zodResolver(createTournamentSchema),
     defaultValues: {
       name: "",
       location: "",
@@ -124,7 +127,7 @@ export default function TournamentsPage() {
     return (
       <div className="mx-auto max-w-2xl px-4 pt-8 space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />
+          <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>
     );
@@ -133,7 +136,7 @@ export default function TournamentsPage() {
   return (
     <div className="mx-auto max-w-2xl px-4 pt-6 pb-4 space-y-10">
             <div className="space-y-4">
-        <h2 className="text-2xl font-bold">Meine Turniere</h2>
+        <h1 className="text-2xl font-bold">Meine Turniere</h1>
         {tournamentsQuery.isError && (
           <LoadError
             error={tournamentsQuery.error}
@@ -143,7 +146,7 @@ export default function TournamentsPage() {
         )}
         {invitations.length > 0 && (
           <section aria-label="Einladungen" className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Einladungen</h3>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Einladungen</h2>
             <ul className="space-y-3">
               {invitations.map((invitation) => (
                 <li key={invitation.id}>
@@ -162,16 +165,17 @@ export default function TournamentsPage() {
           </div>
         )}
         {groups && !hasTournaments && invitations.length === 0 && (
-          <EmptyState
+          <EmptyNote
             icon={Trophy}
             title="Noch keine Turniere"
-            description="Du bist noch keinem Turnier beigetreten."
+            description="Über einen Einladungslink oder eine Turnieradresse kommst du ins erste Turnier. Oder erstelle selbst eins."
           />
         )}
       </div>
 
       {/* Create Tournament Button */}
-      <div className="pt-4 border-t border-border flex justify-center">
+      <Separator />
+      <div className="flex justify-center">
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) {
@@ -247,10 +251,13 @@ export default function TournamentsPage() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Beschreibung (Markdown unterstützt)</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Turnier-Regeln, Zeitplan, Preise…" className="min-h-24" {...field} />
-                      </FormControl>
+                      <FormLabel>Beschreibung</FormLabel>
+                      <MarkdownEditor
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        aria-label="Beschreibung"
+                        placeholder="Turnier-Regeln, Zeitplan, Preise…"
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -264,7 +271,15 @@ export default function TournamentsPage() {
                       <FormItem>
                         <FormLabel>Anzahl Tische</FormLabel>
                         <FormControl>
-                          <Input type="number" inputMode="numeric" min={1} max={100} {...field} />
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={100}
+                            {...field}
+                            value={Number.isNaN(field.value) ? "" : field.value}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
                         </FormControl>
                         <FormDescription>Du kannst sie später benennen, hinzufügen und löschen.</FormDescription>
                         <FormMessage />

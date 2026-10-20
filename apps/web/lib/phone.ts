@@ -18,3 +18,8 @@ export const toE164 = (national: string) => `+49${national}`;
 export const phoneSchema = z.object({
   phone: z.string().regex(GERMAN_MOBILE_NATIONAL, GERMAN_MOBILE_ONLY_MESSAGE),
 });
+
+/** The code of the SMS. */
+export const codeSchema = z.object({
+  code: z.string().length(6, "Bitte gib den 6-stelligen Code ein."),
+});
