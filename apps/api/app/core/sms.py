@@ -32,9 +32,9 @@ class DummySmsService:
         masked_phone = _mask_phone_number(phone_number)
         # Die Ausgabe des Codes ist im Dummy-Service für die lokale Entwicklung zwingend notwendig.
         # codeql[py/clear-text-logging-sensitive-data]
-        logger.info("SMS [DUMMY] → %s: Your verification code is %s", masked_phone, code)  # NOSONAR
+        logger.info("SMS [DUMMY] to %s: Your verification code is %s", masked_phone, code)  # NOSONAR
         print(f"\n{'='*50}")
-        print(f"  SMS → {masked_phone}")
+        print(f"  SMS to {masked_phone}")
         # codeql[py/clear-text-logging-sensitive-data]
         print(f"  Code: {code}")  # NOSONAR
         print(f"{'='*50}\n")

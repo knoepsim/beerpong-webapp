@@ -8,7 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { planStart } from "@/lib/tournament-phase";
 import type { Tournament, TournamentTeam } from "@/types";
 
-/** The organization's controls before the start (registration, check-in, start); afterwards where results go. */
+/**
+ * The organization's controls before the start (registration, check-in, start); while it runs where results go.
+ * After the end there is nothing left to steer: the podium shows the outcome, so the card is gone.
+ */
 export function TournamentControlCard({
   tournament,
   teams,
@@ -22,6 +25,7 @@ export function TournamentControlCard({
   onSetOpen: (kind: "registration" | "checkin", open: boolean) => void;
   onStart: () => void;
 }>) {
+  if (tournament.finished_at) return null;
   const plan = planStart(tournament, teams);
   return (
     <Card className="border-primary/50 bg-primary/5 shadow-sm">
