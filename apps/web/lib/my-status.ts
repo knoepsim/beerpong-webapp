@@ -2,6 +2,8 @@ import type { MatchSlot } from "@/lib/bracket-layout";
 import { formatWhen } from "@/lib/format-when";
 import { minutesSince } from "@/lib/minutes";
 import type { Match, Team, Tournament, TournamentTeam } from "@/types";
+import type { StationTerms } from "@/components/games";
+import { freeOne } from "@/lib/station-terms";
 
 /**
  * What the participant has to do, as a color: go now (urgent), get ready (attention), playing (active),
@@ -43,12 +45,13 @@ export interface ShortStatus {
 
 /**
  * The short form of the status card for the list of my tournaments, from what the list API brings along (no
- * bracket): check in now, go to your table, you are next, a break, the place at the end. Nothing when all is fine
+ * bracket): check in now, go to your station, you are next, a break, the place at the end. Nothing when all is fine
  * and nothing is to do (registered, check-in not open yet): the team badge says that already.
  */
 export function listStatus(
   tournament: Tournament,
   participation: { is_checked_in: boolean; next_match: Match | null; place: number | null },
+  terms: StationTerms,
 ): ShortStatus | null {
   const { is_checked_in, next_match: match, place } = participation;
   if (place === 1) return { tone: "done", icon: "trophy", text: "Gewonnen" };
@@ -60,9 +63,9 @@ export function listStatus(
   }
   switch (match?.status) {
     case "ready":
-      return { tone: "urgent", icon: "go", text: `Jetzt zu ${match.table_name ?? "deinem Tisch"}` };
+      return { tone: "urgent", icon: "go", text: `Jetzt zu ${match.station_name ?? terms.yours}` };
     case "live":
-      return { tone: "active", icon: "play", text: `Spielt an ${match.table_name ?? "einem Tisch"}` };
+      return { tone: "active", icon: "play", text: `Spielt an ${match.station_name ?? terms.dative}` };
     case "queued":
       return match.queue_position === 1
         ? { tone: "attention", icon: "queue", text: "Als Nächstes dran" }
@@ -117,7 +120,7 @@ function runningFor(startedAt: string | null, now: Date): string {
 
 /**
  * Who the opponent can be and how far that match is, so a waiting team can judge how long its break lasts and
- * where to watch. The table of the own match only when the API says it is certain; no place in the queue of the
+ * where to watch. The station of the own match only when the API says it is certain; no place in the queue of the
  * other match (it would read as the own one).
  */
 function opponentSource(
@@ -125,23 +128,24 @@ function opponentSource(
   slots: MatchSlot[],
   teamId: string,
   teamsMap: Record<string, Team>,
+  terms: StationTerms,
   now: Date,
 ): string {
   const missing = slot.match.team_a_id === teamId ? "b" : "a";
   const feeder = slots.find((s) => s.number === slot.sources[missing])?.match;
   if (!feeder?.team_a_id || !feeder.team_b_id) return "Dein Gegner steht noch nicht fest.";
   const [a, b] = [name(teamsMap, feeder.team_a_id), name(teamsMap, feeder.team_b_id)];
-  const upcoming = slot.match.upcoming_table_name;
-  const atTable = feeder.status === "live" || feeder.status === "ready" ? feeder.table_name : null;
-  if (upcoming && upcoming === atTable) {
+  const upcoming = slot.match.upcoming_station_name;
+  const atStation = feeder.status === "live" || feeder.status === "ready" ? feeder.station_name : null;
+  if (upcoming && upcoming === atStation) {
     // the usual case at the end: the winner stays, so the next match is where the opponent plays now
     const there = feeder.status === "live" ? `spielen gerade ${a} und ${b}${runningFor(feeder.started_at, now)}` : `spielen gleich ${a} und ${b}`;
     return `Euer Spiel ist danach an ${upcoming}. Dort ${there}.`;
   }
   const progress: Partial<Record<Match["status"], string>> = {
-    live: `spielen an ${feeder.table_name}${runningFor(feeder.started_at, now)}`,
-    ready: `gleich an ${feeder.table_name}`,
-    queued: "warten noch auf einen Tisch",
+    live: `spielen an ${feeder.station_name}${runningFor(feeder.started_at, now)}`,
+    ready: `gleich an ${feeder.station_name}`,
+    queued: `warten noch auf ${terms.accusative}`,
   };
   const opponent = `Dein Gegner: ${a} oder ${b} – ${progress[feeder.status] ?? "noch offen"}.`;
   return upcoming ? `Euer Spiel ist danach an ${upcoming}. ${opponent}` : opponent;
@@ -154,6 +158,7 @@ export function statusInBracket(
   team: TournamentTeam,
   teamsMap: Record<string, Team>,
   championTeamId: string | null,
+  terms: StationTerms,
   now: Date = new Date(),
 ): MyStatus | null {
   const mine = slots.filter((s) => s.match.team_a_id === team.id || s.match.team_b_id === team.id);
@@ -170,26 +175,26 @@ export function statusInBracket(
   const { match } = next;
   const opponentId = match.team_a_id === team.id ? match.team_b_id : match.team_a_id;
   const opponent = name(teamsMap, opponentId);
-  const table = match.table_name ?? "deinem Tisch";
+  const station = match.station_name ?? terms.yours;
   switch (match.status) {
     case "ready":
-      return { tone: "urgent", icon: "go", title: `Geh jetzt zu ${table}: Spiel gegen ${opponent}.`, slot: next };
+      return { tone: "urgent", icon: "go", title: `Geh jetzt zu ${station}: Spiel gegen ${opponent}.`, slot: next };
     case "live":
-      return { tone: "active", icon: "play", title: `Du spielst an ${table} gegen ${opponent}.`, slot: next };
+      return { tone: "active", icon: "play", title: `Du spielst an ${station} gegen ${opponent}.`, slot: next };
     case "queued":
       return match.queue_position === 1
         ? {
             tone: "attention",
             icon: "queue",
             title: `Halte dich bereit: Als Nächstes spielst du gegen ${opponent}.`,
-            detail: "Sobald ein Tisch frei wird, steht hier, wohin du gehst.",
+            detail: `Sobald ${terms.nominative} frei wird, steht hier, wohin du gehst.`,
             slot: next,
           }
         : {
             tone: "relaxed",
             icon: "queue",
-            title: `Warte auf einen freien Tisch für dein Spiel gegen ${opponent}.`,
-            detail: match.queue_position != null ? `Platz ${match.queue_position} in der Warteschlange.` : null,
+            title: `Warte auf ${freeOne(terms)} für dein Spiel gegen ${opponent}.`,
+            detail: match.queue_position != null ? `Nr. ${match.queue_position} in der Warteschlange.` : null,
             slot: next,
           };
     default:
@@ -197,7 +202,7 @@ export function statusInBracket(
         tone: "relaxed",
         icon: "pause",
         title: "Pause: Du wartest auf deinen Gegner.",
-        detail: opponentSource(next, slots, team.id, teamsMap, now),
+        detail: opponentSource(next, slots, team.id, teamsMap, terms, now),
         slot: next,
       };
   }

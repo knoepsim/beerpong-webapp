@@ -21,7 +21,7 @@ export function TeamCard({ team, onRename, onDelete, onShare, onCopy }: Readonly
           <h2 className="truncate text-lg font-semibold leading-tight">{team.name}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{team.members.map((m) => m.name).join(" · ")}</p>
         </div>
-        {/* the same icon buttons as every other list (tables, links, teams of a tournament) */}
+        {/* the same icon buttons as every other list (stations, links, teams of a tournament) */}
         <div className="-mr-2 -mt-1 flex shrink-0">
           <Button variant="ghost" size="icon" className="size-10" onClick={() => onRename(team)} aria-label={`${team.name} umbenennen`}>
             <Pencil aria-hidden="true" />

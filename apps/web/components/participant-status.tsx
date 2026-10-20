@@ -1,5 +1,6 @@
 "use client";
 
+import { useStationTerms } from "@/components/game-context";
 import { useMemo, type ReactNode } from "react";
 import { LogOut } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -70,6 +71,7 @@ export function ParticipantStatus({
 }: Readonly<ParticipantStatusProps>) {
   const slots = useMemo(() => (bracket ? allMatchSlots(buildBracketLayout(bracket)) : []), [bracket]);
   const now = useNow();
+  const terms = useStationTerms();
 
   if (!team) {
     if (!tournament.registration_open || canManage) return null;
@@ -95,7 +97,7 @@ export function ParticipantStatus({
   }
 
   const status = tournament.started_at
-    ? bracket && statusInBracket(slots, bracket.total_rounds, team, teamsMap, bracket.champion_team_id, now)
+    ? bracket && statusInBracket(slots, bracket.total_rounds, team, teamsMap, bracket.champion_team_id, terms, now)
     : statusBeforeStart(tournament, team);
   if (!status) return null;
 

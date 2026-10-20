@@ -2,6 +2,8 @@ import { render as rtlRender, renderHook as rtlRenderHook, type RenderOptions } 
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { GameProvider } from "@/components/game-context";
+import type { Game } from "@/types";
 import { makeQueryClient } from "@/lib/query-client";
 
 /** The query client of the app (its toasts and loading again included), without asking a failed query again. */
@@ -23,9 +25,11 @@ export function Providers({ children, client = testQueryClient() }: Readonly<{ c
   );
 }
 
-export function render(ui: ReactElement, options?: Omit<RenderOptions, "wrapper">) {
+/** Rendered like on its page; with `game` inside a tournament of that game (what a station is called). */
+export function render(ui: ReactElement, { game, ...options }: Omit<RenderOptions, "wrapper"> & { game?: Game } = {}) {
   const client = testQueryClient();
-  return { client, ...rtlRender(ui, { wrapper: ({ children }) => <Providers client={client}>{children}</Providers>, ...options }) };
+  const inGame = game ? <GameProvider game={game}>{ui}</GameProvider> : ui;
+  return { client, ...rtlRender(inGame, { wrapper: ({ children }) => <Providers client={client}>{children}</Providers>, ...options }) };
 }
 
 export function renderHook<T>(hook: () => T) {

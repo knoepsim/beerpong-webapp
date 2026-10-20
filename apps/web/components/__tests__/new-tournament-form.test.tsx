@@ -69,7 +69,7 @@ describe('NewTournamentForm', () => {
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/t/sommer-cup'))
     expect(api.tournaments.create).toHaveBeenCalledWith(
-      expect.objectContaining({ game: 'beerpong', mode: 'single_elimination', name: 'Sommer Cup', table_count: 1 }),
+      expect.objectContaining({ game: 'beerpong', mode: 'single_elimination', name: 'Sommer Cup', station_count: 1 }),
     )
     expect(sessionStorage.getItem(DRAFT)).toBeNull()
   })
@@ -80,5 +80,17 @@ describe('NewTournamentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neu beginnen' }))
     expect(screen.queryByText('Dein Entwurf von vorhin ist wieder da.')).not.toBeInTheDocument()
     expect(sessionStorage.getItem(DRAFT)).toBeNull()
+  })
+
+  it('names the stations of the chosen game', async () => {
+    draft({ game: 'football', mode: 'single_elimination', name: 'Kick', schedule: { start_time: '2099-07-01T18:00' } })
+    render(<NewTournamentForm />)
+    next()
+    await step('Turnier')
+    next()
+    await step('Zeitplan')
+    next()
+    await step('Zugang & Plätze')
+    expect(screen.getByLabelText('Anzahl Plätze')).toBeInTheDocument()
   })
 })

@@ -11,24 +11,24 @@ import { useSetMatchStarted } from "@/hooks/queries/matches";
 import { allMatchSlots, buildBracketLayout, type MatchSlot } from "@/lib/bracket-layout";
 import { minutesSince, sinceLabel } from "@/lib/minutes";
 import { cn } from "@/lib/utils";
-import type { Bracket, Match, Team, TournamentTable } from "@/types";
+import type { Bracket, Match, Team, Station } from "@/types";
 
-/** A match at its table this long without a start: the teams may not have come. */
+/** A match at its station this long without a start: the teams may not have come. */
 export const NOT_STARTED_WARNING_MINUTES = 5;
 
-interface TablesBoardProps {
+interface StationsBoardProps {
   tournamentId: string;
   bracket: Bracket;
-  tables: TournamentTable[];
+  stations: Station[];
   teamsMap: Record<string, Team>;
   highlightTeamId?: string | null;
   /** Referees, managers and admins: start a match and open its result. */
   onResult?: (match: Match) => void;
 }
 
-function TableCard({
+function StationCard({
   tournamentId,
-  table,
+  station,
   slot,
   next,
   teamsMap,
@@ -37,7 +37,7 @@ function TableCard({
   now,
 }: Readonly<{
   tournamentId: string;
-  table: TournamentTable;
+  station: Station;
   slot: MatchSlot | undefined;
   next: MatchSlot | undefined;
   teamsMap: Record<string, Team>;
@@ -48,21 +48,21 @@ function TableCard({
   const setStartedMutation = useSetMatchStarted(tournamentId);
   const starting = setStartedMutation.isPending;
   const match = slot?.match;
-  const since = match?.status === "live" ? match.started_at : match?.on_table_at;
+  const since = match?.status === "live" ? match.started_at : match?.on_station_at;
   const late =
-    match?.status === "ready" && !!match.on_table_at && minutesSince(match.on_table_at, now) >= NOT_STARTED_WARNING_MINUTES;
+    match?.status === "ready" && !!match.on_station_at && minutesSince(match.on_station_at, now) >= NOT_STARTED_WARNING_MINUTES;
 
-  /** Start the match at the table, or take the start back (a slip happens under time pressure). */
+  /** Start the match at the station, or take the start back (a slip happens under time pressure). */
   const setStarted = (started: boolean) => {
-    if (match) setStartedMutation.mutate({ match: { id: match.id, table_name: table.name }, started });
+    if (match) setStartedMutation.mutate({ match: { id: match.id, station_name: station.name }, started });
   };
 
   return (
     <li className={cn("space-y-2 rounded-xl border bg-card p-3", late && "border-warning/60")}>
-      {/* the table name is what people look for: never cut off, the time goes to its own line */}
+      {/* the station name is what people look for: never cut off, the time goes to its own line */}
       <div className="flex items-start gap-2">
         <MapPin className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <h3 className="min-w-0 flex-1 break-words text-lg font-semibold leading-snug">{table.name}</h3>
+        <h3 className="min-w-0 flex-1 break-words text-lg font-semibold leading-snug">{station.name}</h3>
         {match ? (
           <MatchStatusBadge match={match} className="mt-1" />
         ) : (
@@ -97,7 +97,7 @@ function TableCard({
               className="size-10 shrink-0"
               onClick={() => setStarted(false)}
               disabled={starting}
-              aria-label={`Start an ${table.name} zurücknehmen`}
+              aria-label={`Start an ${station.name} zurücknehmen`}
               title="Start zurücknehmen"
             >
               <Square className="size-4 fill-current" aria-hidden="true" />
@@ -117,24 +117,24 @@ function TableCard({
 }
 
 /**
- * What happens at every table right now, for everybody: the match at it (live or ready, and since when), free
- * tables, and the queue for the next free one. Organizers start matches and enter results right here, without
+ * What happens at every station right now, for everybody: the match at it (live or ready, and since when), free
+ * stations, and the queue for the next free one. Organizers start matches and enter results right here, without
  * looking for the match in the bracket.
  */
-export function TablesBoard({ tournamentId, bracket, tables, teamsMap, highlightTeamId, onResult }: Readonly<TablesBoardProps>) {
+export function StationsBoard({ tournamentId, bracket, stations, teamsMap, highlightTeamId, onResult }: Readonly<StationsBoardProps>) {
   const now = useNow();
   const slots = useMemo(() => allMatchSlots(buildBracketLayout(bracket)), [bracket]);
-  const atTable = (table: TournamentTable) =>
-    slots.find((s) => (s.match.status === "ready" || s.match.status === "live") && s.match.table_id === table.id);
-  const nextAt = (table: TournamentTable) =>
-    slots.find((s) => s.match.status === "waiting" && s.match.upcoming_table_id === table.id);
+  const atStation = (station: Station) =>
+    slots.find((s) => (s.match.status === "ready" || s.match.status === "live") && s.match.station_id === station.id);
+  const nextAt = (station: Station) =>
+    slots.find((s) => s.match.status === "waiting" && s.match.upcoming_station_id === station.id);
   const queue = slots
     .filter((s) => s.match.status === "queued")
     .sort((a, b) => (a.match.queue_position ?? Infinity) - (b.match.queue_position ?? Infinity));
 
   const live = slots.filter((s) => s.match.status === "live").length;
   const ready = slots.filter((s) => s.match.status === "ready").length;
-  const free = tables.length - live - ready;
+  const free = stations.length - live - ready;
   const summary = [
     live > 0 && `${live} live`,
     ready > 0 && `${ready} bereit`,
@@ -145,13 +145,13 @@ export function TablesBoard({ tournamentId, bracket, tables, teamsMap, highlight
     <div className="space-y-6">
       {summary.length > 0 && <p className="text-sm text-muted-foreground">{summary.join(" · ")}</p>}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {tables.map((table) => (
-          <TableCard
-            key={table.id}
+        {stations.map((station) => (
+          <StationCard
+            key={station.id}
             tournamentId={tournamentId}
-            table={table}
-            slot={atTable(table)}
-            next={nextAt(table)}
+            station={station}
+            slot={atStation(station)}
+            next={nextAt(station)}
             teamsMap={teamsMap}
             highlightTeamId={highlightTeamId}
             onResult={onResult}

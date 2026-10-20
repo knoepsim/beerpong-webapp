@@ -6,9 +6,10 @@ import {
   useTournamentBySlug,
   useTournamentPreview,
   useTournamentRoles,
-  useTournamentTables,
+  useStations,
   useTournamentTeams,
 } from "@/hooks/queries/tournaments";
+import { GAMES, STATION_TERMS } from "@/components/games";
 import { ApiError } from "@/lib/api";
 import { tournamentKeys } from "@/lib/query-keys";
 import type { Team } from "@/types";
@@ -25,7 +26,7 @@ export function useTournament(slug: string) {
   const id = tournament?.id ?? "";
   const teamsQuery = useTournamentTeams(id);
   const rolesQuery = useTournamentRoles(id);
-  const tablesQuery = useTournamentTables(id);
+  const stationsQuery = useStations(id, tournament ? GAMES[tournament.game].station : STATION_TERMS);
   const bracketQuery = useBracket(id);
 
   // a tournament that is not visible to me may still be open to join: what a stranger may see
@@ -41,7 +42,7 @@ export function useTournament(slug: string) {
     },
   });
 
-  const parts = [teamsQuery, rolesQuery, tablesQuery, bracketQuery];
+  const parts = [teamsQuery, rolesQuery, stationsQuery, bracketQuery];
   const teams = useMemo(() => teamsQuery.data ?? [], [teamsQuery.data]);
   const teamsMap = useMemo(() => {
     const map: Record<string, Team> = {};
@@ -54,7 +55,7 @@ export function useTournament(slug: string) {
     teams,
     teamsMap,
     roles: rolesQuery.data ?? [],
-    tables: tablesQuery.data ?? [],
+    stations: stationsQuery.data ?? [],
     bracket: bracketQuery.data ?? null,
     preview: denied ? previewQuery.data : undefined,
     /** The first load: the page waits for all parts, so it does not jump while they come in. */

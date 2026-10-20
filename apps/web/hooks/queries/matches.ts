@@ -22,25 +22,25 @@ export function currentResult(results: Result[] | undefined): Result | null {
 }
 
 interface StartVariables {
-  match: Pick<Match, "id" | "table_name">;
+  match: Pick<Match, "id" | "station_name">;
   started: boolean;
 }
 
-/** Start a match at its table, or take the start back (a slip happens under time pressure). */
+/** Start a match at its station, or take the start back (a slip happens under time pressure). */
 export function useSetMatchStarted(tournamentId: string) {
   return useMutation({
     mutationFn: ({ match, started }: StartVariables) => (started ? api.matches.start(match.id) : api.matches.undoStart(match.id)),
     meta: {
       invalidates: tournamentKeys(tournamentId, ["bracket"]),
       successMessage: successMessage((_: unknown, { match, started }: StartVariables) => {
-        const where = match.table_name ? ` an ${match.table_name}` : "";
+        const where = match.station_name ? ` an ${match.station_name}` : "";
         return started ? `Spiel${where} gestartet.` : `Start${where} zurückgenommen.`;
       }),
     },
   });
 }
 
-/** Report a result or change it (`existing`); without cups the winner had all of them left. */
+/** Report a result or change it (`existing`): the winner and the score of both teams. */
 export function useSaveResult(tournamentId: string, matchId: string) {
   return useMutation({
     mutationFn: ({ existing, ...result }: ReportedResult & { existing: boolean }) =>

@@ -8,12 +8,12 @@ export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round"
   team_b_id: null,
   next_match_id: null,
   next_match_slot: null,
-  table_id: null,
-  table_name: null,
+  station_id: null,
+  station_name: null,
   queue_position: null,
-  upcoming_table_id: null,
-  upcoming_table_name: null,
-  on_table_at: null,
+  upcoming_station_id: null,
+  upcoming_station_name: null,
+  on_station_at: null,
   started_at: null,
   created_at: "",
   status: "waiting",
@@ -42,7 +42,7 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
       makeMatch({
         id: "m1", round: 1, position: 1, team_a_id: "t4", team_b_id: "t5",
         next_match_id: "m2", next_match_slot: "b", status: "ready",
-        table_id: "x1", table_name: "Tisch 1", ...overrides.m1,
+        station_id: "x1", station_name: "Tisch 1", ...overrides.m1,
       }),
       makeMatch({
         id: "m2", round: 2, position: 0, team_a_id: "t1", team_b_id: null,
@@ -51,7 +51,7 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
       makeMatch({
         id: "m3", round: 2, position: 1, team_a_id: "t2", team_b_id: "t3",
         next_match_id: "m4", next_match_slot: "b", status: "ready",
-        table_id: "x2", table_name: "Tisch 2", ...overrides.m3,
+        station_id: "x2", station_name: "Tisch 2", ...overrides.m3,
       }),
       makeMatch({ id: "m4", round: 3, position: 0, ...overrides.m4 }),
     ],
@@ -69,5 +69,5 @@ export const makeSlot = (overrides: Partial<Match> = {}, sources: MatchSlot["sou
   number: 7,
   sources,
   match: makeMatch({ id: "m", round: 1, position: 0, team_a_id: "a", team_b_id: "b", status: "ready",
-    table_id: "x1", table_name: "Tisch 1", ...overrides }),
+    station_id: "x1", station_name: "Tisch 1", ...overrides }),
 });

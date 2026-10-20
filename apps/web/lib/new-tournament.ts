@@ -29,7 +29,7 @@ export const newTournamentSchema = z.object({
   description: z.string(),
   schedule: scheduleSchema,
   // the field gives a number (NaN when empty): no coercion, so what goes in is what comes out
-  table_count: z.number({ error: "Gib die Zahl der Tische an." }).int().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
+  station_count: z.number({ error: "Gib eine Zahl an." }).int().min(1, "Mindestens 1.").max(100, "Höchstens 100."),
   visibility: z.enum(TournamentVisibility),
   join_policy: z.enum(JoinPolicy),
 });
@@ -49,7 +49,7 @@ export const NEW_TOURNAMENT_DEFAULTS: DefaultValues<NewTournamentValues> = {
     checkin_start_time: "",
     checkin_auto_open: false,
   },
-  table_count: 1,
+  station_count: 1,
   visibility: TournamentVisibility.PUBLIC,
   join_policy: JoinPolicy.OPEN,
 };
@@ -68,7 +68,8 @@ export const NEW_TOURNAMENT_STEPS = [
   { id: "spiel", title: "Spiel & Modus", fields: ["game", "mode"] },
   { id: "turnier", title: "Turnier", fields: ["name", "location", "description"] },
   { id: "zeitplan", title: "Zeitplan", fields: SCHEDULE_FIELDS },
-  { id: "zugang", title: "Zugang & Tische", fields: ["visibility", "join_policy", "table_count"] },
+  // the title names the stations of the game ("Zugang & Tische"), see the form
+  { id: "zugang", title: "Zugang & Spielstätten", fields: ["visibility", "join_policy", "station_count"] },
 ] as const satisfies readonly FormStep<NewTournamentValues>[];
 
 export function toCreateRequest(values: NewTournamentValues): TournamentCreateRequest {
@@ -80,7 +81,7 @@ export function toCreateRequest(values: NewTournamentValues): TournamentCreateRe
     description: values.description.trim() || undefined,
     start_time: toIsoOrNull(values.schedule.start_time)!,
     ...scheduleToPayload(values.schedule),
-    table_count: values.table_count,
+    station_count: values.station_count,
     visibility: values.visibility,
     join_policy: values.join_policy,
   };

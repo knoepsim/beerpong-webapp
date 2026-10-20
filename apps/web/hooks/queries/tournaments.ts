@@ -4,6 +4,7 @@ import { successMessage } from "@/lib/query-client";
 import { queryKeys, tournamentKeys } from "@/lib/query-keys";
 import { ROLE_INFO } from "@/lib/roles";
 import type { Tournament, TournamentCreateRequest, TournamentRoleType, TournamentStartResponse, TournamentTeam } from "@/types";
+import type { StationTerms } from "@/components/games";
 
 // -- lists and lookups
 
@@ -44,12 +45,12 @@ export function useTournamentRoles(id: string) {
   return useQuery({ queryKey: queryKeys.tournamentRoles(id), queryFn: () => api.roles.list(id), enabled: !!id });
 }
 
-export function useTournamentTables(id: string) {
+export function useStations(id: string, terms: StationTerms) {
   return useQuery({
-    queryKey: queryKeys.tournamentTables(id),
-    queryFn: () => api.tournaments.listTables(id),
+    queryKey: queryKeys.tournamentStations(id),
+    queryFn: () => api.tournaments.listStations(id),
     enabled: !!id,
-    meta: { errorMessage: "Die Tische konnten nicht geladen werden." },
+    meta: { errorMessage: `Die ${terms.plural} konnten nicht geladen werden.` },
   });
 }
 
@@ -192,26 +193,26 @@ export function useStartTournament(id: string) {
   });
 }
 
-// -- tables
+// -- stations
 
-export function useAddTable(id: string) {
+export function useAddStation(id: string, terms: StationTerms) {
   return useMutation({
-    mutationFn: () => api.tournaments.addTable(id),
-    meta: { invalidates: tournamentKeys(id, ["bracket"]), successMessage: "Tisch hinzugefügt." },
+    mutationFn: () => api.tournaments.addStation(id),
+    meta: { invalidates: tournamentKeys(id, ["bracket"]), successMessage: `${terms.singular} hinzugefügt.` },
   });
 }
 
-export function useRenameTable(id: string) {
+export function useRenameStation(id: string) {
   return useMutation({
-    mutationFn: ({ tableId, name }: { tableId: string; name: string }) => api.tournaments.renameTable(id, tableId, name),
+    mutationFn: ({ stationId, name }: { stationId: string; name: string }) => api.tournaments.renameStation(id, stationId, name),
     meta: { inlineError: true, invalidates: tournamentKeys(id, ["bracket"]) },
   });
 }
 
-export function useDeleteTable(id: string) {
+export function useDeleteStation(id: string, terms: StationTerms) {
   return useMutation({
-    mutationFn: (tableId: string) => api.tournaments.deleteTable(id, tableId),
-    meta: { invalidates: tournamentKeys(id, ["bracket"]), successMessage: "Tisch gelöscht." },
+    mutationFn: (stationId: string) => api.tournaments.deleteStation(id, stationId),
+    meta: { invalidates: tournamentKeys(id, ["bracket"]), successMessage: `${terms.singular} gelöscht.` },
   });
 }
 

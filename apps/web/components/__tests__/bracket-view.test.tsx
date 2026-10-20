@@ -55,7 +55,7 @@ describe('BracketView', () => {
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
-  it('shows the table only of matches that can be played, not of played or waiting ones', () => {
+  it('shows the station only of matches that can be played, not of played or waiting ones', () => {
     const bracket = fiveTeamBracket({ m1: finished('t4') });
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 

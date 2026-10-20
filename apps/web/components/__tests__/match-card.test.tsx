@@ -28,15 +28,15 @@ describe('MatchCard', () => {
     expect(screen.getAllByText('Offen')).toHaveLength(2);
   });
 
-  it('shows the status with icon and short text, and the table only where to go', () => {
+  it('shows the status with icon and short text, and the station only where to go', () => {
     const { rerender } = render(<MatchCard slot={slot()} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
-    expect(screen.getByTitle('Wartet auf Tisch, Platz 2 in der Warteschlange')).toHaveTextContent('Platz 2');
+    rerender(<MatchCard slot={slot({ status: 'queued', station_id: null, station_name: null, queue_position: 2 })} teamsMap={teamsMap} />);
+    expect(screen.getByTitle('Wartet auf eine Spielstätte, Nr. 2 in der Warteschlange')).toHaveTextContent('Nr. 2');
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null, table_id: null, table_name: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
+    rerender(<MatchCard slot={slot({ status: 'waiting', team_b_id: null, station_id: null, station_name: null }, { a: null, b: 3 })} teamsMap={teamsMap} />);
     expect(screen.getByTitle('Wartet auf Team')).toHaveTextContent('Wartet');
     expect(screen.getByText('Sieger Spiel 3')).toBeInTheDocument(); // the row says where the team comes from
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
@@ -45,12 +45,12 @@ describe('MatchCard', () => {
     expect(screen.getByText('Live')).toBeInTheDocument();
     expect(screen.getByText('Tisch 1')).toBeInTheDocument();
 
-    rerender(<MatchCard slot={slot({ table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />);
+    rerender(<MatchCard slot={slot({ station_id: 't3', station_name: 'Tisch 3' })} teamsMap={teamsMap} />);
     expect(screen.getByText('Tisch 3')).toBeInTheDocument();
   });
 
-  it('shows no table for a finished match', () => {
-    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', table_id: 't2', table_name: 'Tisch 2' })} teamsMap={teamsMap} />);
+  it('shows no station for a finished match', () => {
+    render(<MatchCard slot={slot({ status: 'finished', winner_team_id: 'a', station_id: 't2', station_name: 'Tisch 2' })} teamsMap={teamsMap} />);
     expect(screen.queryByText(/Tisch/)).not.toBeInTheDocument();
   });
 

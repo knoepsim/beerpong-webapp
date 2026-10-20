@@ -155,7 +155,7 @@ describe('request: expired access token', () => {
     await request('/secure');
 
     expect(locks.request).toHaveBeenCalledTimes(1);
-    expect(locks.request.mock.calls[0][0]).toBe('beerpong-session');
+    expect(locks.request.mock.calls[0][0]).toBe('tournament-session');
     vi.unstubAllGlobals();
     vi.stubGlobal('fetch', fetchMock);
   });
@@ -241,11 +241,11 @@ describe('api endpoints', () => {
     ['tournaments.get', () => api.tournaments.get('x'), 'GET', '/tournaments/x', undefined],
     ['tournaments.getBySlug', () => api.tournaments.getBySlug('my-cup'), 'GET', '/tournaments/by-slug/my-cup', undefined],
     ['tournaments.getPreview', () => api.tournaments.getPreview('my-cup'), 'GET', '/tournaments/by-slug/my-cup/preview', undefined],
-    ['tournaments.listTables', () => api.tournaments.listTables('x'), 'GET', '/tournaments/x/tables', undefined],
-    ['tournaments.addTable', () => api.tournaments.addTable('x'), 'POST', '/tournaments/x/tables', { name: null }],
-    ['tournaments.addTable (named)', () => api.tournaments.addTable('x', 'Terrasse'), 'POST', '/tournaments/x/tables', { name: 'Terrasse' }],
-    ['tournaments.renameTable', () => api.tournaments.renameTable('x', 't1', 'Pool'), 'PATCH', '/tournaments/x/tables/t1', { name: 'Pool' }],
-    ['tournaments.deleteTable', () => api.tournaments.deleteTable('x', 't1'), 'DELETE', '/tournaments/x/tables/t1', undefined],
+    ['tournaments.listStations', () => api.tournaments.listStations('x'), 'GET', '/tournaments/x/stations', undefined],
+    ['tournaments.addStation', () => api.tournaments.addStation('x'), 'POST', '/tournaments/x/stations', { name: null }],
+    ['tournaments.addStation (named)', () => api.tournaments.addStation('x', 'Terrasse'), 'POST', '/tournaments/x/stations', { name: 'Terrasse' }],
+    ['tournaments.renameStation', () => api.tournaments.renameStation('x', 't1', 'Pool'), 'PATCH', '/tournaments/x/stations/t1', { name: 'Pool' }],
+    ['tournaments.deleteStation', () => api.tournaments.deleteStation('x', 't1'), 'DELETE', '/tournaments/x/stations/t1', undefined],
     ['tournaments.listInvites', () => api.tournaments.listInvites('x'), 'GET', '/tournaments/x/invites', undefined],
     ['tournaments.createInvite', () => api.tournaments.createInvite('x', 'WhatsApp'), 'POST', '/tournaments/x/invites', { label: 'WhatsApp' }],
     ['tournaments.createInvite (no name)', () => api.tournaments.createInvite('x'), 'POST', '/tournaments/x/invites', { label: null }],

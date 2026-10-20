@@ -16,7 +16,7 @@ describe('MatchList', () => {
     expect(within(sections[2]).getAllByRole('listitem')).toHaveLength(1)
   })
 
-  it('shows results, the table of playable matches and the open sources', () => {
+  it('shows results, the station of playable matches and the open sources', () => {
     render(<MatchList bracket={fiveTeamBracket({ m1: finished('t4', 6) })} teamsMap={fiveTeams} />)
     expect(screen.getByRole('article', { name: /Ergebnis 6:0/ })).toBeInTheDocument()
     expect(screen.getAllByText(/^Tisch \d$/)).toHaveLength(1) // only match 3 is ready

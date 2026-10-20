@@ -10,11 +10,12 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { RoleManager } from "@/components/role-manager";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { GamePicker } from "@/components/game-picker";
+import { GAMES } from "@/components/games";
 import { ModePicker } from "@/components/mode-picker";
-import { TableManager } from "@/components/table-manager";
+import { StationManager } from "@/components/station-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
-import { TournamentRoleType } from "@/types";
+import { Game, TournamentMode, TournamentRoleType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Trash2, ShieldAlert } from "lucide-react";
@@ -81,7 +82,12 @@ export function TournamentSettings({
   const [editJoinPolicy, setEditJoinPolicy] = useState(tournament.join_policy);
   const [editSlug, setEditSlug] = useState(tournament.slug);
   const [editGame, setEditGame] = useState(tournament.game);
-  const [editMode, setEditMode] = useState(tournament.mode);
+  const [editMode, setEditMode] = useState<TournamentMode | undefined>(tournament.mode);
+  // another game may not have the mode: then it is chosen again
+  const changeGame = (game: Game) => {
+    setEditGame(game);
+    if (editMode && !GAMES[game].modes.includes(editMode)) setEditMode(undefined);
+  };
   const initialSchedule: ScheduleValues = {
     start_time: toLocalInput(tournament.start_time),
     registration_end_time: toLocalInput(tournament.registration_end_time),
@@ -179,14 +185,15 @@ export function TournamentSettings({
           title="Spiel & Modus"
           description="Was und wie gespielt wird. Mit dem Start steht es fest und ist hier nicht mehr zu sehen."
           dirty={playDirty}
+          invalid={!editMode}
           saving={saving === "play"}
           onSave={() => save("play")}
         >
           <div className="space-y-2">
             <Label htmlFor="settings-game">Spiel</Label>
-            <GamePicker id="settings-game" value={editGame} onChange={(game) => game && setEditGame(game)} />
+            <GamePicker id="settings-game" value={editGame} onChange={(game) => game && changeGame(game)} />
           </div>
-          <ModePicker name="settings-mode" value={editMode} onChange={setEditMode} />
+          <ModePicker name="settings-mode" modes={GAMES[editGame].modes} value={editMode} onChange={setEditMode} />
         </SettingsCard>
       )}
 
@@ -211,10 +218,10 @@ export function TournamentSettings({
       {canManage && (
         <Card>
           <CardHeader>
-            <CardTitle>Tische</CardTitle>
+            <CardTitle>{GAMES[tournament.game].station.plural}</CardTitle>
           </CardHeader>
           <CardContent>
-            <TableManager tournamentId={tournament.id} />
+            <StationManager tournamentId={tournament.id} />
           </CardContent>
         </Card>
       )}

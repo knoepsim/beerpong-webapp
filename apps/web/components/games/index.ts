@@ -1,7 +1,8 @@
 import type { ComponentType } from "react";
 import { BeerpongResult } from "@/components/games/beerpong-result";
 import { FootballResult } from "@/components/games/football-result";
-import { Game, type ReportedResult } from "@/types";
+import type { ModeId } from "@/lib/modes";
+import { Game, TournamentMode, type ReportedResult } from "@/types";
 
 export interface TeamBasic {
   id: string;
@@ -23,26 +24,65 @@ export interface ResultInputProps {
   onChange: (result: ReportedResult | null) => void;
 }
 
+/**
+ * The word for where a match is played (a table, a pitch), in the forms the texts need. The API names the stations
+ * with the same word ("Tisch 3", "Platz 3", app/games.py).
+ */
+export interface StationTerms {
+  singular: string;
+  plural: string;
+  /** With the indefinite article in the accusative: "einen Tisch". */
+  accusative: string;
+  /** Negated: "keinen Tisch". */
+  none: string;
+  /** With the indefinite article: "ein Tisch". */
+  nominative: string;
+  /** With the indefinite article in the dative: "einem Tisch". */
+  dative: string;
+  /** With the possessive in the dative: "deinem Tisch". */
+  yours: string;
+}
+
+/** Before a game is chosen (and outside of a tournament): the neutral word. */
+export const STATION_TERMS: StationTerms = {
+  singular: "Spielstätte",
+  plural: "Spielstätten",
+  accusative: "eine Spielstätte",
+  none: "keine Spielstätte",
+  nominative: "eine Spielstätte",
+  dative: "einer Spielstätte",
+  yours: "deiner Spielstätte",
+};
+
 /** Everything that differs from game to game. A new game is a new entry here with its result input. */
 export interface GameDefinition {
   id: Game;
   label: string;
   /** An example name for a new tournament. */
   namePlaceholder: string;
+  station: StationTerms;
+  /** The modes a tournament of this game can have, the coming ones included (lib/modes says which are there). */
+  modes: ModeId[];
   ResultInput: ComponentType<ResultInputProps>;
 }
+
+const ALL_MODES: ModeId[] = [TournamentMode.SINGLE_ELIMINATION, "round_robin", "groups_knockout"];
 
 export const GAMES: Record<Game, GameDefinition> = {
   [Game.BEERPONG]: {
     id: Game.BEERPONG,
     label: "Bierpong",
     namePlaceholder: "z. B. Sommerfest-Bierpong",
+    station: { singular: "Tisch", plural: "Tische", accusative: "einen Tisch", none: "keinen Tisch", nominative: "ein Tisch", dative: "einem Tisch", yours: "deinem Tisch" },
+    modes: ALL_MODES,
     ResultInput: BeerpongResult,
   },
   [Game.FOOTBALL]: {
     id: Game.FOOTBALL,
     label: "Fußball",
     namePlaceholder: "z. B. Kleinfeld-Cup",
+    station: { singular: "Platz", plural: "Plätze", accusative: "einen Platz", none: "keinen Platz", nominative: "ein Platz", dative: "einem Platz", yours: "deinem Platz" },
+    modes: ALL_MODES,
     ResultInput: FootballResult,
   },
 };

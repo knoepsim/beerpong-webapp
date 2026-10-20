@@ -9,7 +9,7 @@ import { AccessFields } from "@/components/access-fields";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepProgress, StepSection, useFormSteps } from "@/components/form-steps";
 import { GamePicker } from "@/components/game-picker";
-import { GAMES } from "@/components/games";
+import { GAMES, STATION_TERMS } from "@/components/games";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { ModePicker } from "@/components/mode-picker";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
@@ -29,6 +29,7 @@ import {
   type NewTournamentValues,
 } from "@/lib/new-tournament";
 import type { ScheduleErrors, ScheduleValues } from "@/lib/tournament-schedule";
+import type { Game } from "@/types";
 
 const DRAFT_KEY = "draft:new-tournament";
 
@@ -115,11 +116,23 @@ export function NewTournamentForm() {
     else void steps.next();
   };
 
-  const [gameStep, detailsStep, scheduleStep, accessStep] = NEW_TOURNAMENT_STEPS;
+  // what a station is called follows the game ("Tische", "Plätze"); before it is chosen the neutral word
+  const terms = game ? GAMES[game].station : STATION_TERMS;
+  const stepList = NEW_TOURNAMENT_STEPS.map((step) =>
+    step.id === "zugang" ? { ...step, title: `Zugang & ${terms.plural}` } : step,
+  );
+  const [gameStep, detailsStep, scheduleStep, accessStep] = stepList;
+
+  // another game may not have the chosen mode: then it is chosen again
+  const chooseGame = (next: Game | undefined) => {
+    form.setValue("game", next as Game, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+    const mode = form.getValues("mode");
+    if (next && mode && !GAMES[next].modes.includes(mode)) form.resetField("mode", { defaultValue: undefined });
+  };
 
   return (
     <>
-      <StepProgress steps={NEW_TOURNAMENT_STEPS} index={steps.index} reached={steps.reached} onGoTo={steps.goTo} />
+      <StepProgress steps={stepList} index={steps.index} reached={steps.reached} onGoTo={steps.goTo} />
 
       {restored && (
         <Alert>
@@ -142,7 +155,7 @@ export function NewTournamentForm() {
                 <FormItem>
                   <FormLabel>Spiel</FormLabel>
                   <FormControl>
-                    <GamePicker value={field.value} onChange={field.onChange} />
+                    <GamePicker value={field.value} onChange={chooseGame} />
                   </FormControl>
                   <FormDescription>Es bestimmt, wie ein Ergebnis eingetragen wird.</FormDescription>
                   <FormMessage />
@@ -155,6 +168,7 @@ export function NewTournamentForm() {
               render={({ field, fieldState }) => (
                 <div className="flex flex-col gap-2">
                   <ModePicker
+                    modes={game ? GAMES[game].modes : undefined}
                     value={field.value}
                     onChange={field.onChange}
                     errorId={fieldState.error ? "new-mode-error" : undefined}
@@ -246,10 +260,10 @@ export function NewTournamentForm() {
             />
             <FormField
               control={form.control}
-              name="table_count"
+              name="station_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Anzahl Tische</FormLabel>
+                  <FormLabel>Anzahl {terms.plural}</FormLabel>
                   <FormControl>
                     <Input
                       type="number"

@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_BADGE, statusLabel, statusText } from "@/lib/match-display";
 import type { Match } from "@/types";
+import { useStationTerms } from "@/components/game-context";
 
 const ICONS = { waiting: Users, queued: Hourglass } as const;
 
@@ -11,12 +12,13 @@ const ICONS = { waiting: Users, queued: Hourglass } as const;
  * Live pulses gently.
  */
 export function MatchStatusBadge({ match, className }: Readonly<{ match: Match; className?: string }>) {
+  const terms = useStationTerms();
   if (match.status === "finished") return null;
   const Icon = match.status === "waiting" || match.status === "queued" ? ICONS[match.status] : null;
   const look: { variant: (typeof STATUS_BADGE)[keyof typeof STATUS_BADGE]["variant"]; className?: string } =
     STATUS_BADGE[match.status];
   return (
-    <Badge title={statusText(match) ?? undefined} variant={look.variant} className={cn(look.className, className)}>
+    <Badge title={statusText(match, terms) ?? undefined} variant={look.variant} className={cn(look.className, className)}>
       {Icon && <Icon aria-hidden="true" />}
       {match.status === "live" && (
         <span className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" aria-hidden="true" />

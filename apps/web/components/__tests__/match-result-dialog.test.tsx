@@ -347,8 +347,8 @@ describe('MatchResultDialog: start', () => {
     vi.mocked(api.matches.undoStart).mockReset().mockResolvedValue(undefined);
   });
 
-  it('starts a match at its table and shows the table', async () => {
-    const { onOpenChange } = setup({ match: match({ status: 'ready', table_id: 't', table_name: 'Terrasse' }) });
+  it('starts a match at its station and shows the station', async () => {
+    const { onOpenChange } = setup({ match: match({ status: 'ready', station_id: 't', station_name: 'Terrasse' }) });
     await ready();
 
     expect(screen.getByText('Terrasse')).toBeInTheDocument();
@@ -359,17 +359,17 @@ describe('MatchResultDialog: start', () => {
     expect(toast.success).toHaveBeenCalledWith('Spiel an Terrasse gestartet.');
   });
 
-  it('cannot start a match without a table, but the result can still be reported', async () => {
+  it('cannot start a match without a station, but the result can still be reported', async () => {
     setup({ match: match({ status: 'queued', queue_position: 2 }) });
     await ready();
 
     expect(screen.queryByRole('button', { name: 'Spiel starten' })).not.toBeInTheDocument();
-    expect(screen.getByText('Platz 2')).toBeInTheDocument();
+    expect(screen.getByText('Nr. 2')).toBeInTheDocument();
     expect(saveButton()).toBeInTheDocument();
   });
 
   it('shows since when a live match runs and can take the start back', async () => {
-    setup({ match: match({ status: 'live', table_id: 't', table_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
+    setup({ match: match({ status: 'live', station_id: 't', station_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
     await ready();
 
     expect(screen.getByText(/^seit \d{2}:\d{2} Uhr$/)).toBeInTheDocument();

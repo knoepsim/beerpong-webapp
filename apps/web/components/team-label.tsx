@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import type { SideInfo } from "@/lib/match-display";
 
 /**
- * A team's name (or where it comes from) like on a scoreboard: the cups it had left at the end on the right, the
+ * A team's name (or where it comes from) like on a scoreboard: its score at the end on the right, the
  * winner bold, the loser crossed out (not only by color). The champion gets the trophy. Shared by card and row.
  */
 export function TeamLabel({

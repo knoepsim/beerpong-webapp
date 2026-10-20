@@ -25,7 +25,7 @@ vi.mock('@/lib/api', async (importOriginal) => ({
       getBySlug: vi.fn(),
       getPreview: vi.fn(),
       getTeams: vi.fn(),
-      listTables: vi.fn(),
+      listStations: vi.fn(),
       getBracket: vi.fn(),
       checkin: vi.fn(),
       startTournament: vi.fn(),
@@ -46,7 +46,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   t.getBySlug.mockResolvedValue(tournament)
   t.getTeams.mockResolvedValue([team])
-  t.listTables.mockResolvedValue([])
+  t.listStations.mockResolvedValue([])
   t.getBracket.mockResolvedValue({ tournament_id: 't1', total_rounds: 0, matches: [] } as never)
   vi.mocked(api.roles.list).mockResolvedValue([])
 })
@@ -80,7 +80,7 @@ describe('useTournament', () => {
 
     await waitFor(() => expect(result.current.bracket).not.toBeNull())
     expect(t.getTeams).toHaveBeenCalledTimes(1)
-    expect(t.listTables).toHaveBeenCalledTimes(2) // the tables belong to the bracket
+    expect(t.listStations).toHaveBeenCalledTimes(2) // the stations belong to the bracket
   })
 
   it('keeps the last state when a refresh fails, and says so once', async () => {

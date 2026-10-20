@@ -37,7 +37,7 @@ const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digi
 const timeOf = (iso: string) => TIME.format(new Date(iso));
 
 /**
- * The organization's view of a match: start it at its table (or take the start back) and report its result.
+ * The organization's view of a match: start it at its station (or take the start back) and report its result.
  * A result can always be reported, also without a start. The game brings the picture and the score.
  */
 export function MatchResultDialog({ tournamentId, game, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
@@ -92,14 +92,14 @@ function MatchHeader({ match, teamA, teamB }: Readonly<{ match: Match; teamA: Te
     <DialogHeader className="space-y-3">
       <DialogTitle className="sr-only">Ergebnis eintragen</DialogTitle>
 
-      {/* Status and table of an open match */}
+      {/* Status and station of an open match */}
       {match.status !== "finished" && (
         <div className="flex items-center justify-center gap-2">
           <MatchStatusBadge match={match} className="text-xs" />
-          {match.table_name && (match.status === "ready" || match.status === "live") && (
+          {match.station_name && (match.status === "ready" || match.status === "live") && (
             <Badge variant="outline" className="text-xs gap-1 font-normal text-muted-foreground">
               <MapPin className="w-3 h-3" aria-hidden="true" />
-              {match.table_name}
+              {match.station_name}
             </Badge>
           )}
         </div>
@@ -114,7 +114,7 @@ function MatchHeader({ match, teamA, teamB }: Readonly<{ match: Match; teamA: Te
           </div>
         </div>
 
-        {/* no score here: the table below shows the cups */}
+        {/* no score here: the result input of the game below shows it */}
         <span className="shrink-0 text-xs text-muted-foreground">gegen</span>
 
         <div className="flex-1 min-w-0 text-left">
@@ -188,7 +188,7 @@ function ResultForm({
 
   return (
     <div>
-      {/* Start at the table: only for a match at its table; a live one can take the start back */}
+      {/* Start at the station: only for a match at its station; a live one can take the start back */}
       <StartControls match={match} isStarting={isStarting} onChange={changeStart} />
 
       {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} />}

@@ -190,8 +190,8 @@ export interface TournamentStartResponse {
   removed_team_ids: string[];
 }
 
-/** A table of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
-export interface TournamentTable {
+/** A station of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
+export interface Station {
   id: string;
   name: string;
   position: number;
@@ -208,8 +208,8 @@ export interface TournamentCreateRequest {
   checkin_enabled?: boolean;
   checkin_start_time?: string | null;
   checkin_auto_open?: boolean;
-  /** How many tables are created with the tournament; they are managed one by one afterwards. */
-  table_count?: number;
+  /** How many stations are created with the tournament; they are managed one by one afterwards. */
+  station_count?: number;
   game: Game;
   mode: TournamentMode;
   visibility?: TournamentVisibility;
@@ -238,8 +238,8 @@ export interface MyTournamentsResponse {
 }
 
 /**
- * Decided by the API: waiting (a team is still in another match), queued (waiting for a free table),
- * ready (at its table, not started), live (started), finished (has a result).
+ * Decided by the API: waiting (a team is still in another match), queued (waiting for a free station),
+ * ready (at its station, not started), live (started), finished (has a result).
  */
 export type MatchStatus = "waiting" | "queued" | "ready" | "live" | "finished";
 
@@ -252,17 +252,17 @@ export interface Match {
   team_b_id: string | null;
   next_match_id: string | null;
   next_match_slot: string | null;
-  /** The table it is played at (kept once it is finished); null while it has none. Decided by the API. */
-  table_id: string | null;
-  table_name: string | null;
-  /** A ready match without a table: its place in the queue for the next free table (1 = next). */
+  /** The station it is played at (kept once it is finished); null while it has none. Decided by the API. */
+  station_id: string | null;
+  station_name: string | null;
+  /** A ready match without a station: its place in the queue for the next free station (1 = next). */
   queue_position: number | null;
-  /** A match still waiting for a team whose table is already certain (towards the end, when nothing queues). */
-  upcoming_table_id: string | null;
-  upcoming_table_name: string | null;
-  /** Since when it is at its table (ready or live). */
-  on_table_at: string | null;
-  /** When it was started at its table (only while live). */
+  /** A match still waiting for a team whose station is already certain (towards the end, when nothing queues). */
+  upcoming_station_id: string | null;
+  upcoming_station_name: string | null;
+  /** Since when it is at its station (ready or live). */
+  on_station_at: string | null;
+  /** When it was started at its station (only while live). */
   started_at: string | null;
   created_at: string;
   status: MatchStatus;

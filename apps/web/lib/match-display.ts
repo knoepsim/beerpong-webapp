@@ -2,6 +2,7 @@ import type { BadgeVariant } from "@/components/ui/badge";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { cn } from "@/lib/utils";
 import type { Match, Team } from "@/types";
+import type { StationTerms } from "@/components/games";
 
 /**
  * How a match is shown, shared by the bracket card, the match list and "my matches", so they never disagree.
@@ -62,21 +63,21 @@ export function scoreText(match: Pick<Match, "score_a" | "score_b">): string | n
   return match.score_a != null && match.score_b != null ? `${match.score_a}:${match.score_b}` : null;
 }
 
-/** Both teams are known and there is no result yet: queued, at its table or live. */
+/** Both teams are known and there is no result yet: queued, at its station or live. */
 export function isOpen(match: Match): boolean {
   return match.status === "queued" || match.status === "ready" || match.status === "live";
 }
 
 /**
  * The status as short as it stays clear next to its icon: "Wartet" (for a team, the rows name the matches it comes
- * from), "Platz 2" (in the queue for a table), "Bereit", "Live", or the score ("3:0").
+ * from), "Nr. 2" (in the queue for a station), "Bereit", "Live", or the score ("3:0").
  */
 export function statusLabel(match: Match): string {
   switch (match.status) {
     case "waiting":
       return "Wartet";
     case "queued":
-      return match.queue_position != null ? `Platz ${match.queue_position}` : "Wartet";
+      return match.queue_position != null ? `Nr. ${match.queue_position}` : "Wartet";
     case "ready":
       return "Bereit";
     case "live":
@@ -87,14 +88,14 @@ export function statusLabel(match: Match): string {
 }
 
 /** The status in words, for screen readers and as tooltip of the badge; null for a finished match. */
-export function statusText(match: Match): string | null {
+export function statusText(match: Match, terms: StationTerms): string | null {
   switch (match.status) {
     case "waiting":
       return "Wartet auf Team";
     case "queued":
       return match.queue_position != null
-        ? `Wartet auf Tisch, Platz ${match.queue_position} in der Warteschlange`
-        : "Wartet auf Tisch";
+        ? `Wartet auf ${terms.accusative}, Nr. ${match.queue_position} in der Warteschlange`
+        : `Wartet auf ${terms.accusative}`;
     case "ready":
       return "Bereit";
     case "live":
@@ -104,7 +105,7 @@ export function statusText(match: Match): string | null {
   }
 }
 
-/** Badge colors by status: grey waits for a team, amber for a table, green can start, red is live. */
+/** Badge colors by status: grey waits for a team, amber for a station, green can start, red is live. */
 /**
  * The look of each open status, as a badge: waiting is quiet, the queue a warning, ready a success; live is the one
  * solid badge (white on red-600 keeps 4.5:1 in both themes).
@@ -117,12 +118,12 @@ export const STATUS_BADGE = {
 } as const satisfies Record<Exclude<Match["status"], "finished">, { variant: BadgeVariant; className?: string }>;
 
 /**
- * The table to go to, only while it matters: at the table (ready), playing there (live), or still waiting for a
- * team when the API says the table is already certain. Never a guess.
+ * The station to go to, only while it matters: at the station (ready), playing there (live), or still waiting for a
+ * team when the API says the station is already certain. Never a guess.
  */
-export function tableOf(match: Match): string | null {
-  if (match.status === "ready" || match.status === "live") return match.table_name;
-  return match.status === "waiting" ? match.upcoming_table_name : null;
+export function stationOf(match: Match): string | null {
+  if (match.status === "ready" || match.status === "live") return match.station_name;
+  return match.status === "waiting" ? match.upcoming_station_name : null;
 }
 
 /**
@@ -140,14 +141,19 @@ export function sideTone(side: SideInfo, isMine: boolean, tinted = true): string
 }
 
 /** One sentence for screen readers: number, teams with their colors, state and what it waits for, winner, score. */
-export function matchSummary(slot: MatchSlot, sides: [SideInfo, SideInfo], teamsMap: Record<string, Team>): string {
+export function matchSummary(
+  slot: MatchSlot,
+  sides: [SideInfo, SideInfo],
+  teamsMap: Record<string, Team>,
+  terms: StationTerms,
+): string {
   const { match, number } = slot;
   const finished = match.status === "finished";
   return [
     `Spiel ${number}`,
     sides.map((s) => `${s.name ?? s.placeholder} (${SIDE_STYLE[s.side].label})`).join(" gegen "),
-    statusText(match),
-    tableOf(match),
+    statusText(match, terms),
+    stationOf(match),
     finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
     finished && scoreText(match) ? `Ergebnis ${scoreText(match)}` : null,
   ]
