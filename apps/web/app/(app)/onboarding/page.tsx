@@ -101,7 +101,7 @@ export default function OnboardingPage() {
           <CardDescription>
             {step === "profile" 
               ? "Bevor du loslegst, schließe dein Profil ab." 
-              : "Gründe jetzt dein erstes Beerpong-Team."}
+              : "Gründe jetzt dein erstes Team."}
           </CardDescription>
         </CardHeader>
         <CardContent>

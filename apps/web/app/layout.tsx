@@ -24,8 +24,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Bierpong Turnier",
-  description: "Organisiere und verwalte deine Bierpong-Turniere",
+  title: "Turnierplattform",
+  description: "Organisiere Turniere und spiel mit: Anmeldung, Check-in, Spielplan und Ergebnisse an einem Ort"
 };
 
 import { ThemeProvider } from "@/components/theme-provider";
