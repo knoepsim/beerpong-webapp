@@ -19,7 +19,7 @@ export function useTeamInviteLink() {
       const link = await linkFor(team).catch(() => null);
       if (!link) return;
       await shareOrCopy(
-        { title: `Komm in mein Team: ${team.name}`, text: `Tritt meinem Team "${team.name}" bei Beerpong bei!`, url: link },
+        { title: `Komm in mein Team: ${team.name}`, text: `Tritt meinem Team "${team.name}" bei!`, url: link },
         COPIED,
       );
     },

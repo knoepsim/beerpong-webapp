@@ -25,7 +25,7 @@ from app.core.security import create_access_token
 from app.models.match import Match
 from app.models.result import Result
 from app.models.team import Team, TeamMember
-from app.models.tournament import Tournament, TournamentTeam, TournamentVisibility
+from app.models.tournament import Game, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentUserRole
 from app.models.tournament_table import TournamentTable
 from app.models.user import User
@@ -188,6 +188,8 @@ async def create_tournament(
             start_time=datetime.now(UTC) + timedelta(hours=4 if state == "registration" else 1),
             **_schedule(state),
             table_count=tables,
+            game=Game.BEERPONG,
+            mode=TournamentMode.SINGLE_ELIMINATION,
             visibility=TournamentVisibility.PUBLIC,
         ),
         owner.id,

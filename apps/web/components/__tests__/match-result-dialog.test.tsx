@@ -4,7 +4,7 @@ import { render } from '@/lib/test-fixtures/render';
 import type { ReactNode } from 'react';
 import { MatchResultDialog } from '../match-result-dialog';
 import { api, ApiError } from '@/lib/api';
-import { ResultType } from '@/types';
+import { Game, ResultType } from '@/types';
 import type { Match, Result } from '@/types';
 import { makeMatch } from '@/lib/test-fixtures/bracket';
 
@@ -48,6 +48,7 @@ function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = 
   const view = render(
     <MatchResultDialog
       tournamentId="t1"
+      game={Game.BEERPONG}
       match={match()}
       teamA={teamA}
       teamB={teamB}

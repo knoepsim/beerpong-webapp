@@ -261,6 +261,7 @@ export default function TournamentDetailPage({
       {selectedMatch && matchTeamA && matchTeamB && (
         <MatchResultDialog
           tournamentId={tournament.id}
+          game={tournament.game}
           match={selectedMatch}
           teamA={{ id: matchTeamA.id, name: matchTeamA.name }}
           teamB={{ id: matchTeamB.id, name: matchTeamB.name }}

@@ -6,7 +6,7 @@ from app.core.exceptions import register_exception_handlers
 from app.routers import admin, auth, events, invitations, invites, matches, results, roles, tables, teams, tournaments, users
 
 app = FastAPI(
-    title="Bierpong API",
+    title="Turnierplattform API",
     description="Backend API für die Bierpong-Turnier-App",
     version="0.1.0",
 )

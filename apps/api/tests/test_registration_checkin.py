@@ -8,6 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient
 
 from app.models.tournament import Tournament
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 LONG_AGO = "2020-01-01T10:00:00Z"
@@ -22,7 +23,7 @@ class Ctx:
     team_ids: list[str] = field(default_factory=list)
 
     async def create(self, **overrides) -> str:
-        body = {"name": "Cup", "start_time": FUTURE, "visibility": "public", **overrides}
+        body = {**PLAYS, "name": "Cup", "start_time": FUTURE, "visibility": "public", **overrides}
         resp = await self.client.post("/tournaments", json=body, headers=self.admin)
         assert resp.status_code == 201, resp.text
         return resp.json()["id"]
@@ -381,7 +382,7 @@ async def test_generate_bracket_endpoint_is_gone(ctx: Ctx):
 )
 async def test_invalid_schedule_or_values_are_rejected(ctx: Ctx, body: dict):
     resp = await ctx.client.post(
-        "/tournaments", json={"name": "Cup", "start_time": FUTURE, **body}, headers=ctx.admin
+        "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, **body}, headers=ctx.admin
     )
     assert resp.status_code == 422
 
@@ -428,7 +429,13 @@ async def test_after_the_start_the_schedule_and_who_may_join_stay_but_the_rest_c
         resp = await ctx.client.patch(f"/tournaments/{tid}", json=change, headers=ctx.admin)
         assert resp.status_code == 409, change
 
-    unchanged = {"start_time": current["start_time"], "join_policy": current["join_policy"], "name": "Cup 2026"}
+    unchanged = {
+        "start_time": current["start_time"],
+        "join_policy": current["join_policy"],
+        "game": current["game"],
+        "mode": current["mode"],
+        "name": "Cup 2026",
+    }
     resp = await ctx.client.patch(f"/tournaments/{tid}", json=unchanged, headers=ctx.admin)
     assert resp.status_code == 200
     assert (await ctx.get(tid))["name"] == "Cup 2026"

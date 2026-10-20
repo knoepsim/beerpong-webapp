@@ -46,6 +46,9 @@ BEFORE_START_ONLY = (
     "checkin_start_time",
     "checkin_auto_open",
     "join_policy",
+    # what is played and how: the bracket is drawn for them at the start
+    "game",
+    "mode",
 )
 
 

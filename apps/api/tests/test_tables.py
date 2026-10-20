@@ -7,6 +7,7 @@ from httpx import AsyncClient
 
 from app.services.table_service import next_default_name, normalize_table_name
 from app.core.exceptions import InvalidTableNameError
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -24,7 +25,7 @@ class Ctx:
 
     async def create(self, **body) -> str:
         resp = await self.client.post(
-            "/tournaments", json={"name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
         )
         assert resp.status_code == 201, resp.text
         return resp.json()["id"]
@@ -85,7 +86,7 @@ async def test_a_tournament_has_one_table_unless_told_otherwise(ctx: Ctx):
 @pytest.mark.parametrize("count", [0, 101])
 async def test_the_number_of_tables_at_creation_is_limited(ctx: Ctx, count: int):
     resp = await ctx.client.post(
-        "/tournaments", json={"name": "Cup", "start_time": FUTURE, "table_count": count}, headers=ctx.admin
+        "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, "table_count": count}, headers=ctx.admin
     )
     assert resp.status_code == 422
 

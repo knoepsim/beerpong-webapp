@@ -37,10 +37,7 @@ export function TournamentControlCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {tournament.started_at ? (
-          <div className="flex items-center gap-2 text-sm font-medium text-green-700 dark:text-green-400">
-            <div className="size-2 animate-pulse rounded-full bg-green-600 motion-reduce:animate-none" aria-hidden="true" />
-            Ergebnisse können im Spielplan eingetragen werden.
-          </div>
+          <p className="text-sm text-muted-foreground">Ergebnisse können im Spielplan eingetragen werden.</p>
         ) : (
           <>
             <PreparationControls

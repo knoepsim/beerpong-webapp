@@ -101,7 +101,7 @@ export default function OnboardingPage() {
           <CardDescription>
             {step === "profile" 
               ? "Bevor du loslegst, schließe dein Profil ab." 
-              : "Gründe jetzt dein erstes Beerpong-Team."}
+              : "Gründe jetzt dein erstes Team."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -116,7 +116,7 @@ export default function OnboardingPage() {
                       <FormLabel>Dein Name</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <User className="absolute left-3 top-2.5 size-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
                           <Input
                             placeholder="Wie sollen wir dich nennen?"
                             disabled={isSaving}
@@ -169,7 +169,7 @@ export default function OnboardingPage() {
                       <FormLabel>Team Name</FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Users className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Users className="absolute left-3 top-2.5 size-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
                           <Input
                             placeholder="Name deines Teams"
                             disabled={isSaving}

@@ -11,6 +11,7 @@ from sqlalchemy import event
 from app.core.config import settings
 from app.core.events import bus
 from conftest import TestingSessionLocal, engine
+from tests.helpers import PLAYS
 
 FUTURE = "2099-12-31T20:00:00Z"
 PAST = "2026-01-01T10:00:00Z"
@@ -29,7 +30,7 @@ class Ctx:
 
     async def create(self, **body) -> dict:
         resp = await self.client.post(
-            "/tournaments", json={"name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": FUTURE, **body}, headers=self.admin
         )
         assert resp.status_code == 201, resp.text
         return resp.json()

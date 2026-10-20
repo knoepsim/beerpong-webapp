@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from tests.helpers import PLAYS
 
 
 class Ctx:
@@ -38,7 +39,7 @@ async def ctx(async_client: AsyncClient) -> Ctx:
             ids.append((await async_client.get("/users/me", headers=headers[i])).json()["id"])
     tid = (
         await async_client.post(
-            "/tournaments", json={"name": "Cup", "start_time": "2026-12-31T20:00:00Z"}, headers=headers[0]
+            "/tournaments", json={**PLAYS, "name": "Cup", "start_time": "2026-12-31T20:00:00Z"}, headers=headers[0]
         )
     ).json()["id"]
     return Ctx(async_client, tid, headers, ids)

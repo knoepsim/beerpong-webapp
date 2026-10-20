@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { BeerpongTable } from '../BeerpongTable'
+import { BeerpongTable } from '../games/beerpong-table'
 
 describe('BeerpongTable', () => {
   it('renders correctly with 10 cups on each side', () => {

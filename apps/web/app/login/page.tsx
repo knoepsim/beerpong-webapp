@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { getRedirectParam } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
 import { useRequestCode, useVerifyCode } from "@/hooks/queries/user";
-import { RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,8 +83,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center space-y-1">
-          <div className="text-4xl mb-2">🏓</div>
-          <CardTitle className="text-2xl font-bold">Bierpong Turnier</CardTitle>
+          <Trophy className="mx-auto mb-2 size-10 text-primary" aria-hidden="true" />
+          <CardTitle className="text-2xl font-bold">Turnierplattform</CardTitle>
           <CardDescription>
             {step === "phone" && "Melde dich mit deiner Telefonnummer an"}
             {step === "code" && `Code an +49 ${currentPhone} gesendet`}

@@ -6,12 +6,12 @@ import { errorMessage } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { LoadError } from "@/components/load-error";
 import { Spinner } from "@/components/ui/spinner";
-import type { Match, Result } from "@/types";
+import type { Game, Match, Result } from "@/types";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { formatWhen } from "@/lib/format-when";
-import { BeerpongTable } from "@/components/BeerpongTable";
+import { GAMES, type GameDefinition } from "@/components/games";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,8 @@ interface TeamBasic {
 
 interface MatchResultDialogProps {
   tournamentId: string;
+  /** What is played: it decides the picture and the score that is entered. */
+  game: Game;
   match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
@@ -38,17 +40,14 @@ interface MatchResultDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/** Without an entry the winner had all cups left: what the placeholder shows is what is saved. */
-const DEFAULT_CUPS = 10;
-
 const TIME = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
 const timeOf = (iso: string) => TIME.format(new Date(iso));
 
 /**
  * The organization's view of a match: start it at its table (or take the start back) and report its result.
- * A result can always be reported, also without a start.
+ * A result can always be reported, also without a start. The game brings the picture and the score.
  */
-export function MatchResultDialog({ tournamentId, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
+export function MatchResultDialog({ tournamentId, game, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
   const resultsQuery = useMatchResults(match.id, { enabled: open });
   // a result in the next match locks this one: its winner plays there already
   const nextResultsQuery = useMatchResults(match.next_match_id, { enabled: open });
@@ -81,6 +80,7 @@ export function MatchResultDialog({ tournamentId, match, teamA, teamB, open, onO
           <ResultForm
             key={currentResult(resultsQuery.data)?.id ?? "new"}
             tournamentId={tournamentId}
+            game={GAMES[game]}
             match={match}
             teamA={teamA}
             teamB={teamB}
@@ -137,6 +137,7 @@ function MatchHeader({ match, teamA, teamB }: Readonly<{ match: Match; teamA: Te
 
 function ResultForm({
   tournamentId,
+  game,
   match,
   teamA,
   teamB,
@@ -145,6 +146,7 @@ function ResultForm({
   onDone,
 }: Readonly<{
   tournamentId: string;
+  game: GameDefinition;
   match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
@@ -160,12 +162,15 @@ function ResultForm({
   const setStarted = useSetMatchStarted(tournamentId);
   const save = useSaveResult(tournamentId, match.id);
   const remove = useDeleteResult(tournamentId, match.id);
-  // tapping the winner puts the cursor into its cups field (on a phone the number pad opens right away);
+  const { score } = game;
+  // tapping the winner puts the cursor into its score field (on a phone the number pad opens right away);
   // opening an existing result does not
   const [winnerTapped, setWinnerTapped] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [winnerId, setWinnerId] = useState<string | null>(existingResult?.winner_team_id ?? null);
-  const [cupsLeft, setCupsLeft] = useState<string>(existingResult?.cups_left ? String(existingResult.cups_left) : "");
+  // the score as typed; empty counts as the fallback (the placeholder)
+  const [scoreText, setScoreText] = useState<string>(existingResult?.cups_left ? String(existingResult.cups_left) : "");
+  const scoreValue = scoreText.trim() ? Number.parseInt(scoreText, 10) : score.fallback;
   const isStarting = setStarted.isPending;
   const isSubmitting = save.isPending;
   const isDeleting = remove.isPending;
@@ -174,27 +179,20 @@ function ResultForm({
 
   const handleSubmit = () => {
     if (!winnerId) return;
-    const cups = cupsLeft.trim() ? Number.parseInt(cupsLeft, 10) : DEFAULT_CUPS;
-    save.mutate({ winnerTeamId: winnerId, cupsLeft: cups, existing: !!existingResult }, { onSuccess: onDone });
+    save.mutate({ winnerTeamId: winnerId, cupsLeft: scoreValue, existing: !!existingResult }, { onSuccess: onDone });
   };
 
   const changeStart = (start: boolean) => setStarted.mutate({ match, started: start }, { onSuccess: onDone });
 
   const handleDelete = () => remove.mutate(undefined, { onSuccess: onDone });
 
-  let leftCups = 10;
-  let rightCups = 10;
-  if (winnerId === teamA.id) {
-    leftCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
-    rightCups = 0;
-  } else if (winnerId === teamB.id) {
-    leftCups = 0;
-    rightCups = cupsLeft ? Number.parseInt(cupsLeft, 10) : 10;
-  }
+  let winnerSide: "a" | "b" | null = null;
+  if (winnerId === teamA.id) winnerSide = "a";
+  else if (winnerId === teamB.id) winnerSide = "b";
 
   const hasChanges = !existingResult ||
     existingResult.winner_team_id !== winnerId ||
-    String(existingResult.cups_left ?? DEFAULT_CUPS) !== (cupsLeft.trim() || String(DEFAULT_CUPS));
+    (existingResult.cups_left ?? score.fallback) !== scoreValue;
 
   const savedWinner = existingResult?.winner_team_id === teamA.id ? teamA.name : teamB.name;
   const deleteConsequence = nextMatchId
@@ -204,7 +202,7 @@ function ResultForm({
   let submitLabel = existingResult ? "Ergebnis ändern" : "Ergebnis speichern";
   if (isSubmitting) submitLabel = "Wird gespeichert…";
 
-  // the cups are optional: empty means all cups left (the placeholder)
+  // the score is optional: empty means the fallback (the placeholder)
   const isValid = winnerId !== null;
 
   const chooseWinner = (teamId: string) => {
@@ -218,7 +216,7 @@ function ResultForm({
       {/* Start at the table: only for a match at its table; a live one can take the start back */}
       <StartControls match={match} isStarting={isStarting} onChange={changeStart} />
 
-      {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} />}
+      {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} format={score.format} />}
 
       {/* Lock warning */}
       {nextMatchHasResult && existingResult && (
@@ -230,14 +228,8 @@ function ResultForm({
         </div>
       )}
 
-      {/* Beerpong Table */}
       <div className="flex justify-center">
-        <BeerpongTable
-          leftCups={leftCups}
-          rightCups={rightCups}
-          compact={true}
-          className="w-full"
-        />
+        <game.Board winner={winnerSide} score={scoreValue} max={score.max} />
       </div>
 
       {/* Team selection cards */}
@@ -254,10 +246,11 @@ function ResultForm({
               side={side}
               isWinner={winnerId === team.id}
               locked={nextMatchHasResult}
-              focusCups={winnerTapped}
-              cupsLeft={cupsLeft}
+              focusScore={winnerTapped}
+              score={score}
+              scoreText={scoreText}
               onChoose={() => chooseWinner(team.id)}
-              onCupsChange={setCupsLeft}
+              onScoreChange={setScoreText}
             />
           ))}
         </div>
@@ -355,7 +348,12 @@ function StartControls({
 }
 
 /** Who reported what and when, closed until asked for. */
-function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; teamA: TeamBasic; teamB: TeamBasic }>) {
+function ResultHistory({
+  results,
+  teamA,
+  teamB,
+  format,
+}: Readonly<{ results: Result[]; teamA: TeamBasic; teamB: TeamBasic; format: (score: number) => string }>) {
   const [open, setOpen] = useState(false);
   const nameOf = (id: string | null) => [teamA, teamB].find((team) => team.id === id)?.name ?? "Unbekannt";
   return (
@@ -385,7 +383,7 @@ function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; 
                 ) : (
                   <span>
                     {r.type === ResultType.CREATED ? "Gemeldet" : "Geändert"}: {nameOf(r.winner_team_id)}
-                    {r.cups_left ? ` (${r.cups_left} Becher)` : ""}
+                    {r.cups_left ? ` (${format(r.cups_left)})` : ""}
                   </span>
                 )}
               </div>
@@ -414,28 +412,30 @@ const SIDES = {
   },
 };
 
-/** A team to tap as the winner; the winner gets the field for its cups left. */
+/** A team to tap as the winner; the winner gets the field for its score. */
 function WinnerCard({
   team,
   side,
   isWinner,
   locked,
-  focusCups,
-  cupsLeft,
+  focusScore,
+  score,
+  scoreText,
   onChoose,
-  onCupsChange,
+  onScoreChange,
 }: Readonly<{
   team: TeamBasic;
   side: keyof typeof SIDES;
   isWinner: boolean;
   locked: boolean;
-  focusCups: boolean;
-  cupsLeft: string;
+  focusScore: boolean;
+  score: GameDefinition["score"];
+  scoreText: string;
   onChoose: () => void;
-  onCupsChange: (cups: string) => void;
+  onScoreChange: (text: string) => void;
 }>) {
   const tone = SIDES[side];
-  const inputId = `cups_left_${side}`;
+  const inputId = `score_${side}`;
   return (
     <button
       type="button"
@@ -453,20 +453,20 @@ function WinnerCard({
       </div>
       {isWinner && (
         <div className="mt-auto pt-3 w-full animate-in fade-in zoom-in-95 duration-200" role="presentation" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-          <Label htmlFor={inputId} className={cn("text-xs font-medium", tone.label)}>Übrige Becher</Label>
+          <Label htmlFor={inputId} className={cn("text-xs font-medium", tone.label)}>{score.label}</Label>
           <Input
             id={inputId}
-            autoFocus={focusCups}
+            autoFocus={focusScore}
             onFocus={(e) => e.target.select()}
             type="number"
-            min={1}
-            max={10}
-            placeholder="10"
-            value={cupsLeft}
+            min={score.min}
+            max={score.max}
+            placeholder={String(score.fallback)}
+            value={scoreText}
             onChange={(e) => {
               const val = e.target.value;
-              const cups = Number.parseInt(val, 10);
-              if (val === "" || (cups >= 1 && cups <= 10)) onCupsChange(val);
+              const value = Number.parseInt(val, 10);
+              if (val === "" || (value >= score.min && value <= score.max)) onScoreChange(val);
             }}
             className={cn("mt-1.5 text-center text-lg h-10 bg-background", tone.input)}
             disabled={locked}

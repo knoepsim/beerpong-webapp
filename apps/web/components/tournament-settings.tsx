@@ -9,6 +9,8 @@ import { AccessFields } from "@/components/access-fields";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RoleManager } from "@/components/role-manager";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { GamePicker } from "@/components/game-picker";
+import { ModePicker } from "@/components/mode-picker";
 import { TableManager } from "@/components/table-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -56,6 +58,8 @@ function SettingsCard({
   );
 }
 
+type Group = "general" | "play" | "schedule" | "access";
+
 export function TournamentSettings({
   tournament,
   roles,
@@ -76,6 +80,8 @@ export function TournamentSettings({
   const [editVisibility, setEditVisibility] = useState(tournament.visibility);
   const [editJoinPolicy, setEditJoinPolicy] = useState(tournament.join_policy);
   const [editSlug, setEditSlug] = useState(tournament.slug);
+  const [editGame, setEditGame] = useState(tournament.game);
+  const [editMode, setEditMode] = useState(tournament.mode);
   const initialSchedule: ScheduleValues = {
     start_time: toLocalInput(tournament.start_time),
     registration_end_time: toLocalInput(tournament.registration_end_time),
@@ -86,7 +92,7 @@ export function TournamentSettings({
   };
   const [schedule, setSchedule] = useState<ScheduleValues>(initialSchedule);
   const scheduleErrors = validateSchedule(schedule);
-  const [saving, setSaving] = useState<"general" | "schedule" | "access" | null>(null);
+  const [saving, setSaving] = useState<Group | null>(null);
   const slugError = update.error && isSlugError(update.error) ? errorMessage(update.error) : null;
 
   // the schedule and who may join only matter before the start: afterwards they are not shown (the API keeps them too)
@@ -98,13 +104,15 @@ export function TournamentSettings({
   const scheduleDirty = (Object.keys(initialSchedule) as (keyof ScheduleValues)[]).some(
     (k) => schedule[k] !== initialSchedule[k],
   );
+  const playDirty = editGame !== tournament.game || editMode !== tournament.mode;
   const accessDirty =
     editVisibility !== tournament.visibility || editJoinPolicy !== tournament.join_policy || editSlug !== tournament.slug;
 
   /** Each card saves only its own fields. */
-  const save = (group: "general" | "schedule" | "access") => {
-    const payloads: Record<typeof group, Partial<TournamentCreateRequest>> = {
+  const save = (group: Group) => {
+    const payloads: Record<Group, Partial<TournamentCreateRequest>> = {
       general: { name: editName, location: editLocation || undefined, description: editDescription || undefined },
+      play: { game: editGame, mode: editMode },
       schedule: { start_time: toIsoOrNull(schedule.start_time) ?? undefined, ...scheduleToPayload(schedule) },
       access: { slug: editSlug, visibility: editVisibility, ...(started ? {} : { join_policy: editJoinPolicy }) },
     };
@@ -163,6 +171,22 @@ export function TournamentSettings({
               placeholder="Turnier-Regeln, Zeitplan, Preise…"
             />
           </div>
+        </SettingsCard>
+      )}
+
+      {canManage && !started && (
+        <SettingsCard
+          title="Spiel & Modus"
+          description="Was und wie gespielt wird. Mit dem Start steht es fest und ist hier nicht mehr zu sehen."
+          dirty={playDirty}
+          saving={saving === "play"}
+          onSave={() => save("play")}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="settings-game">Spiel</Label>
+            <GamePicker id="settings-game" value={editGame} onChange={(game) => game && setEditGame(game)} />
+          </div>
+          <ModePicker name="settings-mode" value={editMode} onChange={setEditMode} />
         </SettingsCard>
       )}
 
@@ -252,13 +276,13 @@ export function TournamentSettings({
         <Card className="border-destructive/50 bg-destructive/5">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5" />
+              <ShieldAlert className="size-5" aria-hidden="true" />
               Gefahrenzone
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Button variant="destructive" onClick={handleDeleteTournament}>
-              <Trash2 className="mr-2 h-4 w-4" /> Turnier endgültig löschen
+              <Trash2 aria-hidden="true" /> Turnier endgültig löschen
             </Button>
           </CardContent>
         </Card>

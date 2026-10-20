@@ -3,14 +3,18 @@ import uuid
 from datetime import UTC, datetime
 
 from app.models.team import Team
-from app.models.tournament import Tournament, TournamentMode, TournamentTeam, TournamentVisibility
+from app.models.tournament import Game, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.services.bracket_service import BracketService
+
+# what every new tournament has to say: which game and which mode (the API has no default for them)
+PLAYS = {"game": "beerpong", "mode": "single_elimination"}
 
 
 async def generate_started_tournament(db, n: int):
     """A started tournament with n teams and its bracket. Returns (service, tournament, team ids)."""
     tournament = Tournament(
         name="x",
+        game=Game.BEERPONG,
         mode=TournamentMode.SINGLE_ELIMINATION,
         visibility=TournamentVisibility.PRIVATE,
         created_by_id=uuid.uuid4(),

@@ -64,6 +64,12 @@ export interface TeamInviteDetails {
 }
 
 // ── Tournament ────────────────────────────────────────
+/** What is played; it decides how a result is entered (see lib/games). */
+export enum Game {
+  BEERPONG = "beerpong",
+}
+
+/** How the teams meet. Only the modes the API has; the coming ones live in lib/modes. */
 export enum TournamentMode {
   SINGLE_ELIMINATION = "single_elimination",
 }
@@ -168,6 +174,7 @@ export interface Tournament {
   phase: TournamentPhase;
   registration_open: boolean;
   checkin_open: boolean;
+  game: Game;
   mode: TournamentMode;
   visibility: TournamentVisibility;
   join_policy: JoinPolicy;
@@ -202,7 +209,8 @@ export interface TournamentCreateRequest {
   checkin_auto_open?: boolean;
   /** How many tables are created with the tournament; they are managed one by one afterwards. */
   table_count?: number;
-  mode?: TournamentMode;
+  game: Game;
+  mode: TournamentMode;
   visibility?: TournamentVisibility;
   join_policy?: JoinPolicy;
 }
