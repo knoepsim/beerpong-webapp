@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ReactNode } from 'react';
 import { TournamentSettings } from '../tournament-settings';
 import { api, ApiError } from '@/lib/api';
 import { queryKeys } from '@/lib/query-keys';
-import { JoinPolicy, TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
+import { Game, JoinPolicy, TournamentMode, TournamentRoleType, TournamentVisibility } from '@/types';
 import type { Tournament, TournamentUserRole, User } from '@/types';
 
 const push = vi.fn();
@@ -114,6 +114,7 @@ const tournament: Tournament = {
   phase: 'registration',
   registration_open: true,
   checkin_open: false,
+  game: Game.BEERPONG,
   mode: TournamentMode.SINGLE_ELIMINATION,
   visibility: TournamentVisibility.PUBLIC,
   join_policy: JoinPolicy.OPEN,

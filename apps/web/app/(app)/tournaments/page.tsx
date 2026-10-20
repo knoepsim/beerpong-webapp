@@ -1,64 +1,20 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { useCreateTournament, useMyTournaments } from "@/hooks/queries/tournaments";
-import { errorMessage } from "@/lib/errors";
+import { useMemo } from "react";
+import Link from "next/link";
+import { useMyTournaments } from "@/hooks/queries/tournaments";
 import { LoadError } from "@/components/load-error";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { InvitationItem } from "@/components/invitation-item";
 import { useMyInvitations } from "@/hooks/queries/invitations";
-import { JoinPolicy, TournamentRoleType, TournamentVisibility } from "@/types";
+import { TournamentRoleType } from "@/types";
 import { TournamentCard } from "@/components/tournament-card";
 import { groupTournaments, mergeMyTournaments, type MyTournament } from "@/lib/tournament-groups";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { buttonVariants } from "@/components/ui/button";
 import { Plus, Trophy } from "lucide-react";
-import { AccessFields } from "@/components/access-fields";
 import { EmptyNote } from "@/components/empty-note";
-import { MarkdownEditor } from "@/components/markdown-editor";
-import { z } from "zod";
-import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
-import { scheduleToPayload, toIsoOrNull, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-const createTournamentSchema = z.object({
-  name: z.string().min(3, "Der Name muss mindestens 3 Zeichen lang sein."),
-  location: z.string().optional(),
-  description: z.string().optional(),
-  // the field gives a number (NaN when empty): no coercion, so what goes in is what comes out
-  table_count: z.number({ error: "Gib die Zahl der Tische an." }).int().min(1, "Mindestens 1 Tisch.").max(100, "Maximal 100 Tische."),
-  visibility: z.nativeEnum(TournamentVisibility),
-  join_policy: z.nativeEnum(JoinPolicy),
-});
-
-const EMPTY_SCHEDULE: ScheduleValues = {
-  start_time: "",
-  registration_end_time: "",
-  registration_auto_close: false,
-  checkin_enabled: false,
-  checkin_start_time: "",
-  checkin_auto_open: false,
-};
+import { cn } from "@/lib/utils";
 
 function TournamentSection({ title, items }: Readonly<{ title: string; items: MyTournament[] }>) {
   if (items.length === 0) return null;
@@ -77,48 +33,10 @@ function TournamentSection({ title, items }: Readonly<{ title: string; items: My
 }
 
 export default function TournamentsPage() {
-  const router = useRouter();
   const tournamentsQuery = useMyTournaments();
   const invitations = useMyInvitations().data ?? [];
   const data = tournamentsQuery.data;
-  const create = useCreateTournament();
-  const [dialogOpen, setDialogOpen] = useState(false);
   const organizes = !!data?.managing.some((m) => m.role === TournamentRoleType.ADMIN || m.role === TournamentRoleType.MANAGER);
-
-  const [schedule, setSchedule] = useState<ScheduleValues>(EMPTY_SCHEDULE);
-  const [showScheduleErrors, setShowScheduleErrors] = useState(false);
-  const scheduleErrors = validateSchedule(schedule);
-  const startMissing = showScheduleErrors && !schedule.start_time;
-
-  const form = useForm<z.infer<typeof createTournamentSchema>>({
-    resolver: zodResolver(createTournamentSchema),
-    defaultValues: {
-      name: "",
-      location: "",
-      description: "",
-      table_count: 1,
-      visibility: TournamentVisibility.PUBLIC,
-      join_policy: JoinPolicy.OPEN,
-    },
-  });
-
-  const onSubmit = (values: z.infer<typeof createTournamentSchema>) => {
-    setShowScheduleErrors(true);
-    if (!schedule.start_time || Object.keys(scheduleErrors).length > 0) return;
-    create.mutate(
-      {
-        name: values.name.trim(),
-        location: values.location?.trim() || undefined,
-        description: values.description?.trim() || undefined,
-        start_time: toIsoOrNull(schedule.start_time)!,
-        ...scheduleToPayload(schedule),
-        table_count: values.table_count,
-        visibility: values.visibility,
-        join_policy: values.join_policy,
-      },
-      { onSuccess: (tournament) => router.push(`/t/${tournament.slug}`) },
-    );
-  };
 
   const groups = useMemo(() => (data ? groupTournaments(mergeMyTournaments(data)) : null), [data]);
   const hasTournaments = !!groups && groups.active.length + groups.planned.length + groups.finished.length > 0;
@@ -176,145 +94,18 @@ export default function TournamentsPage() {
       {/* Create Tournament Button */}
       <Separator />
       <div className="flex justify-center">
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) {
-            form.reset();
-            setSchedule(EMPTY_SCHEDULE);
-            setShowScheduleErrors(false);
-            create.reset();
-          }
-        }}>
-          {/* the one highlighted action only for whoever organizes tournaments already; for players it is secondary */}
-          <DialogTrigger
-            render={
-              <Button
-                size="lg"
-                variant={organizes ? "default" : "outline"}
-                className={organizes ? "w-full sm:w-auto shadow-md" : "w-full sm:w-auto"}
-              />
-            }
-          >
-            <Plus aria-hidden="true" />
-            Neues Turnier
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Turnier erstellen</DialogTitle>
-              <DialogDescription>
-                Erstelle ein neues Bierpong-Turnier
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="z.B. Sommerfest-Turnier" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ort</FormLabel>
-                      <FormControl>
-                        <Input placeholder="z.B. Garten, Keller, …" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <TournamentScheduleFields
-                  idPrefix="create"
-                  values={schedule}
-                  errors={{
-                    ...scheduleErrors,
-                    ...(startMissing ? { start_time: "Bitte gib ein Startdatum und eine Startzeit an." } : {}),
-                  }}
-                  onChange={(patch) => setSchedule((prev) => ({ ...prev, ...patch }))}
-                  disabled={create.isPending}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Beschreibung</FormLabel>
-                      <MarkdownEditor
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        aria-label="Beschreibung"
-                        placeholder="Turnier-Regeln, Zeitplan, Preise…"
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="table_count"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Anzahl Tische</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={100}
-                            {...field}
-                            value={Number.isNaN(field.value) ? "" : field.value}
-                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                          />
-                        </FormControl>
-                        <FormDescription>Du kannst sie später benennen, hinzufügen und löschen.</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div className="space-y-4 sm:col-span-2">
-                    <AccessFields
-                      values={{ visibility: form.watch("visibility"), join_policy: form.watch("join_policy") }}
-                      onChange={(patch) => {
-                        if (patch.visibility) form.setValue("visibility", patch.visibility);
-                        if (patch.join_policy) form.setValue("join_policy", patch.join_policy);
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {create.isError && (
-                  <p role="alert" className="text-sm text-destructive font-medium">
-                    {errorMessage(create.error)}
-                  </p>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full mt-2"
-                  disabled={create.isPending}
-                >
-                  {create.isPending ? "Wird erstellt…" : "Turnier erstellen"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+        {/* the one highlighted action only for whoever organizes tournaments already; for players it is secondary */}
+        <Link
+          href="/tournaments/new"
+          className={cn(
+            buttonVariants({ size: "lg", variant: organizes ? "default" : "outline" }),
+            "w-full sm:w-auto",
+            organizes && "shadow-md",
+          )}
+        >
+          <Plus aria-hidden="true" />
+          Neues Turnier
+        </Link>
       </div>
 
     </div>
