@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { activeRounds, allMatchSlots, buildBracketLayout, focusRound, isAdvanced, isMatchSlot } from './bracket-layout'
 import { fiveTeamBracket, makeMatch } from './test-fixtures/bracket'
 import type { Bracket } from '@/types'
+import { TournamentMode } from '@/types'
 
 describe('buildBracketLayout', () => {
   const layout = buildBracketLayout(fiveTeamBracket())
@@ -38,7 +39,7 @@ describe('buildBracketLayout', () => {
   })
 
   it('is empty without rounds', () => {
-    expect(buildBracketLayout({ tournament_id: 't', total_rounds: 0, champion_team_id: null, matches: [] }).rounds).toEqual([])
+    expect(buildBracketLayout({ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, total_rounds: 0, champion_team_id: null, matches: [] }).rounds).toEqual([])
   })
 })
 

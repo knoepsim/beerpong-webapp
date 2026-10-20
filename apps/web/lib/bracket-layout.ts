@@ -1,5 +1,6 @@
 import { isOpen } from "@/lib/match-display";
-import type { Bracket, Match } from "@/types";
+import { roundLabel } from "@/lib/utils";
+import { TournamentMode, type Bracket, type Match } from "@/types";
 
 /**
  * Turns the flat match list of the API into the grid the bracket is drawn on:
@@ -34,6 +35,7 @@ export interface RoundLayout {
 }
 
 export interface BracketLayout {
+  mode: TournamentMode;
   totalRounds: number;
   rounds: RoundLayout[];
 }
@@ -54,7 +56,19 @@ function byeTeamId(parent: Match | undefined, position: number): string | null {
   return position % 2 === 0 ? parent.team_a_id : parent.team_b_id;
 }
 
+/** Everybody against everybody: per match day its matches, numbered on (nobody waits for a winner). */
+function buildMatchDays(bracket: Bracket): BracketLayout {
+  const matches = orderedMatches(bracket);
+  const rounds: RoundLayout[] = Array.from({ length: bracket.total_rounds }, (_, index) => ({ round: index + 1, slots: [] }));
+  matches.forEach((match, i) =>
+    rounds[match.round - 1].slots.push({ kind: "match", match, number: i + 1, sources: { a: null, b: null } }),
+  );
+  return { mode: bracket.mode, totalRounds: bracket.total_rounds, rounds };
+}
+
+/** The rounds as the mode has them: the tree of a knock-out, the match days of everybody against everybody. */
 export function buildBracketLayout(bracket: Bracket): BracketLayout {
+  if (bracket.mode === TournamentMode.ROUND_ROBIN) return buildMatchDays(bracket);
   const total = bracket.total_rounds;
   const matches = orderedMatches(bracket);
 
@@ -92,7 +106,12 @@ export function buildBracketLayout(bracket: Bracket): BracketLayout {
       slots: Array.from({ length: 2 ** (total - round) }, (_, position) => slotAt(round, position)),
     };
   });
-  return { totalRounds: total, rounds };
+  return { mode: bracket.mode, totalRounds: total, rounds };
+}
+
+/** The name of a round: "Finale", "Halbfinale", … in a knock-out, "3. Spieltag" where everybody plays everybody. */
+export function roundTitle(layout: BracketLayout, round: number): string {
+  return layout.mode === TournamentMode.ROUND_ROBIN ? `${round}. Spieltag` : roundLabel(round, layout.totalRounds);
 }
 
 /** A slot whose team has already moved on: a finished match or a bye. */

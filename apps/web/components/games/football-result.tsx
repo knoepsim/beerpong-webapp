@@ -8,11 +8,18 @@ import { cn } from "@/lib/utils";
 
 const parse = (text: string) => (text.trim() === "" ? null : Number.parseInt(text, 10));
 
+/** The team with more goals; null for a draw. */
+function winnerOf(a: number, b: number, teamA: TeamBasic, teamB: TeamBasic): string | null {
+  if (a === b) return null;
+  return a > b ? teamA.id : teamB.id;
+}
+
 /**
- * Football: the goals of both teams, the winner follows from them. A knockout match needs a winner, so a draw is
- * not a result: extra time and penalties count into the score (the same rule as the API).
+ * Football: the goals of both teams, the winner follows from them. A knock-out match needs a winner, so there a
+ * draw is no result: extra time and penalties count into the score. Where everybody plays everybody a draw counts
+ * (the same rules as the API).
  */
-export function FootballResult({ teamA, teamB, initial, locked, onChange }: Readonly<ResultInputProps>) {
+export function FootballResult({ teamA, teamB, initial, locked, allowDraw, onChange }: Readonly<ResultInputProps>) {
   const [goals, setGoals] = useState({
     a: initial ? String(initial.scoreA) : "",
     b: initial ? String(initial.scoreB) : "",
@@ -27,11 +34,8 @@ export function FootballResult({ teamA, teamB, initial, locked, onChange }: Read
     const next = { ...goals, [side]: text };
     setGoals(next);
     const [scoreA, scoreB] = [parse(next.a), parse(next.b)];
-    onChange(
-      scoreA === null || scoreB === null || scoreA === scoreB
-        ? null
-        : { winnerTeamId: scoreA > scoreB ? teamA.id : teamB.id, scoreA, scoreB },
-    );
+    if (scoreA === null || scoreB === null || (scoreA === scoreB && !allowDraw)) return onChange(null);
+    onChange({ winnerTeamId: winnerOf(scoreA, scoreB, teamA, teamB), scoreA, scoreB });
   };
 
   return (
@@ -44,7 +48,7 @@ export function FootballResult({ teamA, teamB, initial, locked, onChange }: Read
         </span>
         <GoalField team={teamB} side="b" value={goals.b} onChange={(text) => change("b", text)} />
       </div>
-      {draw && (
+      {draw && !allowDraw && (
         <p role="status" className="text-sm text-muted-foreground">
           Unentschieden gibt es hier nicht: Trag das Ergebnis nach Verlängerung oder Elfmeterschießen ein.
         </p>

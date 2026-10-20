@@ -5,7 +5,8 @@ import { currentResult, useDeleteResult, useMatchResults, useSaveResult, useSetM
 import { errorMessage } from "@/lib/errors";
 import { LoadError } from "@/components/load-error";
 import { Spinner } from "@/components/ui/spinner";
-import type { Game, Match, ReportedResult, Result } from "@/types";
+import type { Game, Match, ReportedResult, Result, TournamentMode } from "@/types";
+import { DRAW_MODES } from "@/lib/modes";
 import { ResultType } from "@/types";
 import { History, MapPin, Play, Timer, Undo2 } from "lucide-react";
 import { MatchStatusBadge } from "@/components/match-status-badge";
@@ -26,6 +27,8 @@ interface MatchResultDialogProps {
   tournamentId: string;
   /** What is played: it decides the picture and the score that is entered. */
   game: Game;
+  /** How the teams meet: everybody against everybody also has draws (where the game has them). */
+  mode: TournamentMode;
   match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
@@ -40,7 +43,7 @@ const timeOf = (iso: string) => TIME.format(new Date(iso));
  * The organization's view of a match: start it at its station (or take the start back) and report its result.
  * A result can always be reported, also without a start. The game brings the picture and the score.
  */
-export function MatchResultDialog({ tournamentId, game, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
+export function MatchResultDialog({ tournamentId, game, mode, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
   const resultsQuery = useMatchResults(match.id, { enabled: open });
   // a result in the next match locks this one: its winner plays there already
   const nextResultsQuery = useMatchResults(match.next_match_id, { enabled: open });
@@ -74,6 +77,7 @@ export function MatchResultDialog({ tournamentId, game, match, teamA, teamB, ope
             key={currentResult(resultsQuery.data)?.id ?? "new"}
             tournamentId={tournamentId}
             game={GAMES[game]}
+            allowDraw={GAMES[game].draws && DRAW_MODES.includes(mode)}
             match={match}
             teamA={teamA}
             teamB={teamB}
@@ -131,6 +135,7 @@ function MatchHeader({ match, teamA, teamB }: Readonly<{ match: Match; teamA: Te
 function ResultForm({
   tournamentId,
   game,
+  allowDraw,
   match,
   teamA,
   teamB,
@@ -140,6 +145,7 @@ function ResultForm({
 }: Readonly<{
   tournamentId: string;
   game: GameDefinition;
+  allowDraw: boolean;
   match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
@@ -165,14 +171,18 @@ function ResultForm({
   const failed = save.error ?? remove.error;
   const error = failed ? errorMessage(failed) : null;
 
+  // closes after the change, also when the form was built anew meanwhile (a new result is a new key): a callback
+  // of `mutate` would be dropped with the old form; a failure stays in the form (inline error)
+  const closeAfter = (change: Promise<unknown>) => change.then(onDone, () => undefined);
+
   const handleSubmit = () => {
     if (!entry) return;
-    save.mutate({ ...entry, existing: !!existingResult }, { onSuccess: onDone });
+    void closeAfter(save.mutateAsync({ ...entry, existing: !!existingResult }));
   };
 
-  const changeStart = (start: boolean) => setStarted.mutate({ match, started: start }, { onSuccess: onDone });
+  const changeStart = (start: boolean) => void closeAfter(setStarted.mutateAsync({ match, started: start }));
 
-  const handleDelete = () => remove.mutate(undefined, { onSuccess: onDone });
+  const handleDelete = () => void closeAfter(remove.mutateAsync());
 
   const hasChanges = !sameResult(entry, saved);
 
@@ -203,7 +213,14 @@ function ResultForm({
         </div>
       )}
 
-      <game.ResultInput teamA={teamA} teamB={teamB} initial={saved} locked={nextMatchHasResult} onChange={setEntry} />
+      <game.ResultInput
+        teamA={teamA}
+        teamB={teamB}
+        initial={saved}
+        locked={nextMatchHasResult}
+        allowDraw={allowDraw}
+        onChange={setEntry}
+      />
 
       {error && <p className="text-sm text-destructive mt-2">{error}</p>}
 
@@ -326,7 +343,7 @@ function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; 
                   <span className="text-destructive">Ergebnis gelöscht</span>
                 ) : (
                   <span>
-                    {r.type === ResultType.CREATED ? "Gemeldet" : "Geändert"}: {nameOf(r.winner_team_id)}
+                    {r.type === ResultType.CREATED ? "Gemeldet" : "Geändert"}: {r.winner_team_id || r.score_a == null ? nameOf(r.winner_team_id) : "Unentschieden"}
                     {scoreText(r) ? ` (${scoreText(r)})` : ""}
                   </span>
                 )}
@@ -341,6 +358,7 @@ function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; 
 
 /** A saved result as the inputs take it; null without one (or for a deletion). */
 function toReported(result: Result | null | undefined): ReportedResult | null {
-  if (!result?.winner_team_id || result.score_a == null || result.score_b == null) return null;
+  // a draw has no winner, but its scores
+  if (!result || result.score_a == null || result.score_b == null) return null;
   return { winnerTeamId: result.winner_team_id, scoreA: result.score_a, scoreB: result.score_b };
 }

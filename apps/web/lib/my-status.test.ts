@@ -13,7 +13,7 @@ const finished = (winner: string) => ({ status: 'finished' as const, winner_team
 
 function inBracket(bracket: Bracket, teamId: string, now = NOW) {
   const slots = allMatchSlots(buildBracketLayout(bracket))
-  return statusInBracket(slots, bracket.total_rounds, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, bracket.champion_team_id, TABLES, now)
+  return statusInBracket(slots, bracket, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, TABLES, now)
 }
 
 describe('statusBeforeStart', () => {

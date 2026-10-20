@@ -73,6 +73,7 @@ export enum Game {
 /** How the teams meet. Only the modes the API has; the coming ones live in lib/modes. */
 export enum TournamentMode {
   SINGLE_ELIMINATION = "single_elimination",
+  ROUND_ROBIN = "round_robin",
 }
 
 /** Who sees bracket and results. */
@@ -272,12 +273,31 @@ export interface Match {
   score_b: number | null;
 }
 
+/** A row of the table where everybody plays everybody (3 points for a win, 1 for a draw). */
+export interface Standing {
+  team_id: string;
+  /** Teams equal in everything share it. */
+  rank: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  score_for: number;
+  score_against: number;
+  points: number;
+}
+
+/** All matches of a tournament: a tree (knock-out) or match days (everybody against everybody). */
 export interface Bracket {
   tournament_id: string;
+  mode: TournamentMode;
+  /** Knock-out: rounds of the tree; everybody against everybody: match days. */
   total_rounds: number;
-  /** winner of the final, once it has a result */
+  /** Once decided: the winner of the final, or the first of the table when all is played. */
   champion_team_id: string | null;
   matches: Match[];
+  /** The table, only where everybody plays everybody. */
+  standings: Standing[] | null;
 }
 
 // ── Result ────────────────────────────────────────────
@@ -302,7 +322,8 @@ export interface Result {
 
 /** A result as it is reported: the winner and the score of both teams of the match. */
 export interface ReportedResult {
-  winnerTeamId: string;
+  /** null for a draw (where the game and the mode have draws). */
+  winnerTeamId: string | null;
   scoreA: number;
   scoreB: number;
 }

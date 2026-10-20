@@ -2,9 +2,8 @@
 
 import { useMemo } from "react";
 import { MatchRow } from "@/components/match-row";
-import { buildBracketLayout, isMatchSlot } from "@/lib/bracket-layout";
-import { roundLabel } from "@/lib/utils";
-import type { Bracket, Match, Team } from "@/types";
+import { buildBracketLayout, isMatchSlot, roundTitle } from "@/lib/bracket-layout";
+import { TournamentMode, type Bracket, type Match, type Team } from "@/types";
 
 interface MatchListProps {
   bracket: Bracket;
@@ -26,9 +25,9 @@ export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, in
         const slots = round.slots.filter(isMatchSlot).filter((s) => !include || include(s.match));
         if (slots.length === 0) return null;
         return (
-          <section key={round.round} aria-label={roundLabel(round.round, layout.totalRounds)}>
+          <section key={round.round} aria-label={roundTitle(layout, round.round)}>
             <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {roundLabel(round.round, layout.totalRounds)}
+              {roundTitle(layout, round.round)}
             </h4>
             <ul className="space-y-2">
               {slots.map((slot) => (
@@ -36,7 +35,12 @@ export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, in
                   <MatchRow
                     slot={slot}
                     teamsMap={teamsMap}
-                    championTeamId={round.round === layout.totalRounds ? bracket.champion_team_id : null}
+                    // the trophy belongs to the final of a knock-out; in a table it shows on the podium
+                    championTeamId={
+                      layout.mode === TournamentMode.SINGLE_ELIMINATION && round.round === layout.totalRounds
+                        ? bracket.champion_team_id
+                        : null
+                    }
                     highlightTeamId={highlightTeamId}
                     onClick={onMatchClick}
                   />

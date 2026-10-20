@@ -97,7 +97,7 @@ export function ParticipantStatus({
   }
 
   const status = tournament.started_at
-    ? bracket && statusInBracket(slots, bracket.total_rounds, team, teamsMap, bracket.champion_team_id, terms, now)
+    ? bracket && statusInBracket(slots, bracket, team, teamsMap, terms, now)
     : statusBeforeStart(tournament, team);
   if (!status) return null;
 

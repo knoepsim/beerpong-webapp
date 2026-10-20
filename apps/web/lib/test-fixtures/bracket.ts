@@ -1,5 +1,5 @@
 import type { MatchSlot } from "@/lib/bracket-layout";
-import type { Bracket, Match, Team } from "@/types";
+import { TournamentMode, type Bracket, type Match, type Team } from "@/types";
 
 /** Shorthand for a match with the defaults of an untouched, waiting match. */
 export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round" | "position">): Match => ({
@@ -36,6 +36,8 @@ export const fiveTeams: Record<string, Team> = Object.fromEntries(
 export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "m4", Partial<Match>>> = {}): Bracket {
   return {
     tournament_id: "t",
+    mode: TournamentMode.SINGLE_ELIMINATION,
+    standings: null,
     total_rounds: 3,
     champion_team_id: null,
     matches: [
@@ -71,3 +73,34 @@ export const makeSlot = (overrides: Partial<Match> = {}, sources: MatchSlot["sou
   match: makeMatch({ id: "m", round: 1, position: 0, team_a_id: "a", team_b_id: "b", status: "ready",
     station_id: "x1", station_name: "Tisch 1", ...overrides }),
 });
+
+/**
+ * Everybody against everybody with three teams a, b, c (three match days, one break each): a beat b, the other two
+ * matches are open unless overridden.
+ */
+export function roundRobinBracket(overrides: Partial<Bracket> = {}): Bracket {
+  const m = (id: string, round: number, a: string, b: string, more: Partial<Match> = {}) =>
+    makeMatch({ id, round, position: 0, team_a_id: a, team_b_id: b, status: "queued", ...more });
+  return {
+    tournament_id: "t",
+    mode: TournamentMode.ROUND_ROBIN,
+    total_rounds: 3,
+    champion_team_id: null,
+    matches: [
+      m("d1", 1, "a", "b", { status: "finished", winner_team_id: "a", score_a: 3, score_b: 0 }),
+      m("d2", 2, "b", "c"),
+      m("d3", 3, "c", "a"),
+    ],
+    standings: [
+      { team_id: "a", rank: 1, played: 1, won: 1, drawn: 0, lost: 0, score_for: 3, score_against: 0, points: 3 },
+      { team_id: "c", rank: 2, played: 0, won: 0, drawn: 0, lost: 0, score_for: 0, score_against: 0, points: 0 },
+      { team_id: "b", rank: 3, played: 1, won: 0, drawn: 0, lost: 1, score_for: 0, score_against: 3, points: 0 },
+    ],
+    ...overrides,
+  };
+}
+
+export const abcTeams: Record<string, Team> = {
+  ...abTeams,
+  c: { id: "c", name: "Charlie" } as Team,
+};

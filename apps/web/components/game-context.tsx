@@ -11,6 +11,11 @@ export function GameProvider({ game, children }: Readonly<{ game: Game; children
   return <GameContext.Provider value={GAMES[game]}>{children}</GameContext.Provider>;
 }
 
+/** The game of the tournament on the page; null outside of one. */
+export function useGame(): GameDefinition | null {
+  return useContext(GameContext);
+}
+
 /** The word for a station in this tournament; outside of one the neutral "Spielstätte". */
 export function useStationTerms(): StationTerms {
   return useContext(GameContext)?.station ?? STATION_TERMS;

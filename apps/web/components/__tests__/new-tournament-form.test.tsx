@@ -34,7 +34,8 @@ describe('NewTournamentForm', () => {
     expect(await screen.findByText('Wähle aus, was gespielt wird.')).toBeInTheDocument()
     expect(screen.getByText('Wähle aus, wie gespielt wird.')).toBeInTheDocument()
     expect(screen.getByText('Schritt 1 von 4 ·', { exact: false })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /Jeder gegen jeden/ })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('radio', { name: /Gruppenphase/ })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('radio', { name: /Jeder gegen jeden/ })).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('checks each step for its own fields: a missing start stays on the schedule', async () => {

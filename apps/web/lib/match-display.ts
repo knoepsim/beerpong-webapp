@@ -51,7 +51,8 @@ export function describeSides(
       placeholder: placeholderFor(source),
       isWinner,
       isChampion: id !== null && id === championTeamId,
-      isLoser: finished && id !== null && !isWinner,
+      // a draw has no loser
+      isLoser: finished && id !== null && match.winner_team_id !== null && !isWinner,
       score: finished && id !== null ? (side === "a" ? match.score_a : match.score_b) : null,
     };
   };
@@ -154,7 +155,8 @@ export function matchSummary(
     sides.map((s) => `${s.name ?? s.placeholder} (${SIDE_STYLE[s.side].label})`).join(" gegen "),
     statusText(match, terms),
     stationOf(match),
-    finished ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
+    finished && match.winner_team_id ? `beendet, Sieger ${teamName(teamsMap, match.winner_team_id) ?? "unbekannt"}` : null,
+    finished && !match.winner_team_id ? "beendet, unentschieden" : null,
     finished && scoreText(match) ? `Ergebnis ${scoreText(match)}` : null,
   ]
     .filter(Boolean)

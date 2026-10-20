@@ -13,9 +13,16 @@ function loser(match: Match): string | null {
   return match.team_a_id === match.winner_team_id ? match.team_b_id : match.team_a_id;
 }
 
-/** The places of a finished knock-out: winner, runner-up and the two shared third places; null before the end. */
+/**
+ * The places at the end: in a knock-out the winner, the runner-up and the two shared third places; where everybody
+ * plays everybody the first three of the table. null before the end.
+ */
 export function podium(bracket: Bracket): Podium | null {
   if (!bracket.champion_team_id) return null;
+  if (bracket.standings) {
+    const at = (rank: number) => bracket.standings!.filter((row) => row.rank === rank).map((row) => row.team_id);
+    return { champion: bracket.champion_team_id, runnerUp: at(2)[0] ?? null, third: at(3) };
+  }
   const final = bracket.matches.find((m) => m.round === bracket.total_rounds);
   const semis = bracket.matches.filter((m) => m.round === bracket.total_rounds - 1);
   return {

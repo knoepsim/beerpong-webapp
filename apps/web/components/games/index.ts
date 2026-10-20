@@ -20,6 +20,8 @@ export interface ResultInputProps {
   initial: ReportedResult | null;
   /** The next match has a result already: nothing can be changed. */
   locked: boolean;
+  /** A draw is a result here (the game has draws and the mode counts points). */
+  allowDraw: boolean;
   /** Every change; null while the entry is not complete (or not possible). */
   onChange: (result: ReportedResult | null) => void;
 }
@@ -63,10 +65,12 @@ export interface GameDefinition {
   station: StationTerms;
   /** The modes a tournament of this game can have, the coming ones included (lib/modes says which are there). */
   modes: ModeId[];
+  /** A match can end even (only in a mode without a winner of every match, lib/modes DRAW_MODES). */
+  draws: boolean;
   ResultInput: ComponentType<ResultInputProps>;
 }
 
-const ALL_MODES: ModeId[] = [TournamentMode.SINGLE_ELIMINATION, "round_robin", "groups_knockout"];
+const ALL_MODES: ModeId[] = [TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN, "groups_knockout"];
 
 export const GAMES: Record<Game, GameDefinition> = {
   [Game.BEERPONG]: {
@@ -75,6 +79,7 @@ export const GAMES: Record<Game, GameDefinition> = {
     namePlaceholder: "z. B. Sommerfest-Bierpong",
     station: { singular: "Tisch", plural: "Tische", accusative: "einen Tisch", none: "keinen Tisch", nominative: "ein Tisch", dative: "einem Tisch", yours: "deinem Tisch" },
     modes: ALL_MODES,
+    draws: false,
     ResultInput: BeerpongResult,
   },
   [Game.FOOTBALL]: {
@@ -83,6 +88,7 @@ export const GAMES: Record<Game, GameDefinition> = {
     namePlaceholder: "z. B. Kleinfeld-Cup",
     station: { singular: "Platz", plural: "Plätze", accusative: "einen Platz", none: "keinen Platz", nominative: "ein Platz", dative: "einem Platz", yours: "deinem Platz" },
     modes: ALL_MODES,
+    draws: true,
     ResultInput: FootballResult,
   },
 };

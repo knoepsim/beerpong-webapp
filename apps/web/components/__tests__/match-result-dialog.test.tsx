@@ -4,7 +4,7 @@ import { render } from '@/lib/test-fixtures/render';
 import type { ReactNode } from 'react';
 import { MatchResultDialog } from '../match-result-dialog';
 import { api, ApiError } from '@/lib/api';
-import { Game, ResultType } from '@/types';
+import { Game, ResultType, TournamentMode } from '@/types';
 import type { Match, Result } from '@/types';
 import { makeMatch } from '@/lib/test-fixtures/bracket';
 
@@ -50,6 +50,7 @@ function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = 
     <MatchResultDialog
       tournamentId="t1"
       game={Game.BEERPONG}
+      mode={TournamentMode.SINGLE_ELIMINATION}
       match={match()}
       teamA={teamA}
       teamB={teamB}
@@ -414,4 +415,27 @@ describe('MatchResultDialog: start', () => {
       expect(saveButton()).toBeDisabled(); // nothing changed
     });
   });
+
+  describe('everybody against everybody', () => {
+    it('saves a draw in football', async () => {
+      results.create.mockResolvedValue(result())
+      setup({ game: Game.FOOTBALL, mode: TournamentMode.ROUND_ROBIN })
+      await screen.findByText('Wie ist es ausgegangen?')
+      fireEvent.change(screen.getByLabelText('Tore Alpha'), { target: { value: '1' } })
+      fireEvent.change(screen.getByLabelText('Tore Bravo'), { target: { value: '1' } })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument() // no hint: a draw counts here
+      fireEvent.click(saveButton())
+      await waitFor(() =>
+        expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: null, scoreA: 1, scoreB: 1 }),
+      )
+    })
+
+    it('shows a saved draw in the history', async () => {
+      results.list.mockResolvedValue([result({ winner_team_id: null, score_a: 2, score_b: 2 })])
+      setup({ game: Game.FOOTBALL, mode: TournamentMode.ROUND_ROBIN })
+      await screen.findByText('Wie ist es ausgegangen?')
+      fireEvent.click(screen.getByText('Verlauf anzeigen'))
+      expect(screen.getByText(/Gemeldet: Unentschieden \(2:2\)/)).toBeInTheDocument()
+    })
+  })
 });
