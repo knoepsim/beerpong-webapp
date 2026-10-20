@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UserMinus, UserPlus } from "lucide-react";
+import { UserPlus, X } from "lucide-react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { PersonSearch } from "@/components/person-search";
 import { RadioCards } from "@/components/radio-cards";
@@ -126,7 +126,7 @@ export function RoleManager({
                     onClick={() => handleRevoke(role)}
                     aria-label={`${name}: Rolle ${ROLE_INFO[role.role].label} entziehen`}
                   >
-                    <UserMinus aria-hidden="true" />
+                    <X aria-hidden="true" />
                   </Button>
                 </ItemActions>
               )}

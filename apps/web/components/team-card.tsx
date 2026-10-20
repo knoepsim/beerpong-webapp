@@ -1,12 +1,5 @@
-import { Copy, MoreVertical, Pencil, Share, Trash } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
+import { Copy, Pencil, Share2, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Team } from "@/types";
 
 interface TeamCardProps {
@@ -28,28 +21,22 @@ export function TeamCard({ team, onRename, onDelete, onShare, onCopy }: Readonly
           <h2 className="truncate text-lg font-semibold leading-tight">{team.name}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{team.members.map((m) => m.name).join(" · ")}</p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "-mr-2 -mt-1 size-10 shrink-0")}
-            aria-label={`Optionen für ${team.name}`}
+        {/* the same icon buttons as every other list (tables, links, teams of a tournament) */}
+        <div className="-mr-2 -mt-1 flex shrink-0">
+          <Button variant="ghost" size="icon" className="size-10" onClick={() => onRename(team)} aria-label={`${team.name} umbenennen`}>
+            <Pencil aria-hidden="true" />
+          </Button>
+          {/* never greyed out: the dialog says what stands in the way */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-10 text-destructive hover:text-destructive"
+            onClick={() => onDelete(team)}
+            aria-label={`${team.name} löschen`}
           >
-            <MoreVertical aria-hidden="true" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onRename(team)}>
-              <Pencil className="mr-2 size-4" />
-              Umbenennen
-            </DropdownMenuItem>
-            {/* never greyed out: the dialog says what stands in the way */}
-            <DropdownMenuItem
-              className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
-              onClick={() => onDelete(team)}
-            >
-              <Trash className="mr-2 size-4" />
-              Löschen
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            <Trash2 aria-hidden="true" />
+          </Button>
+        </div>
       </div>
 
       {missing > 0 && (
@@ -59,7 +46,7 @@ export function TeamCard({ team, onRename, onDelete, onShare, onCopy }: Readonly
           </p>
           <div className="flex gap-2">
             <Button className="h-11 flex-1" onClick={() => onShare(team)}>
-              <Share aria-hidden="true" />
+              <Share2 aria-hidden="true" />
               Einladen
             </Button>
             <Button variant="outline" className="h-11 flex-1" onClick={() => onCopy(team)}>

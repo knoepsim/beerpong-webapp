@@ -11,6 +11,7 @@ import { groupTournaments, mergeMyTournaments } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 /** A dot: there is something to look at (an open invitation, a tournament that runs); for screen readers in words. */
 function NavDot({ label, floating = false }: Readonly<{ label: string | null; floating?: boolean }>) {
@@ -79,7 +80,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     }`}
                 >
-                  <item.icon className="h-4 w-4" />
+                  <item.icon className="size-4" aria-hidden="true" />
                   {item.label}
                   <NavDot label={dotFor(item.href)} />
                 </Link>
@@ -94,7 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
               >
-                <Wrench className="h-4 w-4" />
+                <Wrench className="size-4" aria-hidden="true" />
                 Admin
               </Link>
             )}
@@ -114,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     className="cursor-pointer text-destructive focus:text-destructive"
                     onClick={() => void logout()}
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
+                    <LogOut aria-hidden="true" />
                     Abmelden
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -142,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   }`}
               >
                 <span className="relative">
-                  <item.icon className={`h-5 w-5 ${isActive ? "text-primary" : ""}`} />
+                  <item.icon className={cn("size-5", isActive && "text-primary")} aria-hidden="true" />
                   <NavDot label={dotFor(item.href)} floating />
                 </span>
                 {item.label}
@@ -158,7 +159,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   : "text-muted-foreground"
                 }`}
             >
-              <Wrench className={`h-5 w-5 ${pathname.startsWith("/admin") ? "text-primary" : ""}`} />
+              <Wrench className={cn("size-5", pathname.startsWith("/admin") && "text-primary")} aria-hidden="true" />
               Admin
             </Link>
           )}

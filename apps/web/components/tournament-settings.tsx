@@ -252,13 +252,13 @@ export function TournamentSettings({
         <Card className="border-destructive/50 bg-destructive/5">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
-              <ShieldAlert className="h-5 w-5" />
+              <ShieldAlert className="size-5" aria-hidden="true" />
               Gefahrenzone
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Button variant="destructive" onClick={handleDeleteTournament}>
-              <Trash2 className="mr-2 h-4 w-4" /> Turnier endgültig löschen
+              <Trash2 aria-hidden="true" /> Turnier endgültig löschen
             </Button>
           </CardContent>
         </Card>
