@@ -1,4 +1,4 @@
-import { JoinPolicy, type Tournament, type TournamentTeam } from "@/types";
+import { Game, JoinPolicy, TournamentMode, type Tournament, type TournamentTeam } from "@/types";
 
 /** A tournament in its registration phase unless overridden. */
 export const makeTournament = (overrides: Partial<Tournament> = {}): Tournament =>
@@ -17,6 +17,8 @@ export const makeTournament = (overrides: Partial<Tournament> = {}): Tournament 
     registration_open: true,
     checkin_open: false,
     join_policy: JoinPolicy.OPEN,
+    game: Game.BEERPONG,
+    mode: TournamentMode.SINGLE_ELIMINATION,
     ...overrides,
   }) as Tournament;
 
