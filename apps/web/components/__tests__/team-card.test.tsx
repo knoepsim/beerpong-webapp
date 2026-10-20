@@ -41,4 +41,13 @@ describe('TeamCard', () => {
     expect(h.onShare).toHaveBeenCalledOnce()
     expect(h.onCopy).toHaveBeenCalledOnce()
   })
+
+  it('renames and deletes with icon buttons named after the team', () => {
+    const h = handlers()
+    render(<TeamCard team={team(['Anna', 'Ben'])} {...h} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Becherhelden umbenennen' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Becherhelden löschen' }))
+    expect(h.onRename).toHaveBeenCalledOnce()
+    expect(h.onDelete).toHaveBeenCalledOnce()
+  })
 })

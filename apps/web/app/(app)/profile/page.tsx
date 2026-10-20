@@ -207,7 +207,7 @@ export default function ProfilePage() {
                   disabled={updateMe.isPending || isProfileUnchanged} 
                   className="w-full sm:w-auto"
                 >
-                  <Save className="mr-2 h-4 w-4" />
+                  <Save aria-hidden="true" />
                   {updateMe.isPending ? "Wird gespeichert…" : "Profil speichern"}
                 </Button>
                 {updateMe.isError && (
@@ -312,7 +312,7 @@ export default function ProfilePage() {
                 />
                 {phoneApiError && <p className="text-sm text-destructive">{phoneApiError}</p>}
                 <Button type="submit" className="w-full" disabled={isPhoneLoading}>
-                  <Smartphone className="mr-2 h-4 w-4" />
+                  <Smartphone aria-hidden="true" />
                   Code anfordern
                 </Button>
               </form>

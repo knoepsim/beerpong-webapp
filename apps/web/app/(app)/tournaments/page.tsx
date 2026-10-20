@@ -195,7 +195,7 @@ export default function TournamentsPage() {
               />
             }
           >
-            <Plus className="mr-2 h-5 w-5" />
+            <Plus aria-hidden="true" />
             Neues Turnier
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
