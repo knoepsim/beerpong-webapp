@@ -10,6 +10,13 @@ from app.services.bracket_service import BracketService
 PLAYS = {"game": "beerpong", "mode": "single_elimination"}
 
 
+def won(match, winner_id, cups: int = 3) -> dict:
+    """A beer pong result as the API takes it: the winner kept `cups`, the loser none. `match` as dict or object."""
+    team_a = match["team_a_id"] if isinstance(match, dict) else match.team_a_id
+    score_a = cups if winner_id == team_a else 0
+    return {"winner_team_id": winner_id, "score_a": score_a, "score_b": cups - score_a}
+
+
 async def generate_started_tournament(db, n: int):
     """A started tournament with n teams and its bracket. Returns (service, tournament, team ids)."""
     tournament = Tournament(

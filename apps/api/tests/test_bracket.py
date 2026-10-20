@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.schemas.result import ResultCreate
 from app.services.bracket_layout import bracket_size, round_one_pairings, seed_order
 from main import app
-from tests.helpers import generate_started_tournament
+from tests.helpers import generate_started_tournament, won
 
 TEAM_COUNTS = range(2, 41)
 
@@ -75,7 +75,7 @@ async def test_bracket_can_be_played_to_the_end(n: int):
             if not ready:
                 break
             match = min(ready, key=lambda m: (m.round, m.position))
-            await service.report_result(match.id, ResultCreate(winner_team_id=match.team_a_id), uuid.uuid4())
+            await service.report_result(match.id, ResultCreate(**won(match, match.team_a_id)), uuid.uuid4())
             played.add(match.id)
             if match.next_match_id is None:
                 winner = match.team_a_id

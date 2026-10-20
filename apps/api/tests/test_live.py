@@ -11,7 +11,7 @@ from sqlalchemy import event
 from app.core.config import settings
 from app.core.events import bus
 from conftest import TestingSessionLocal, engine
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 FUTURE = "2099-12-31T20:00:00Z"
 PAST = "2026-01-01T10:00:00Z"
@@ -157,7 +157,7 @@ async def test_start_and_results_change_what_the_viewers_see(ctx: Ctx, watch):
     match = (await ctx.client.get(f"/tournaments/{tid}/bracket", headers=ctx.admin)).json()["matches"][0]
     resp = await ctx.client.post(
         f"/matches/{match['id']}/results",
-        json={"winner_team_id": match["team_a_id"], "cups_left": 4},
+        json=won(match, match["team_a_id"], 4),
         headers=ctx.admin,
     )
     assert resp.status_code == 201

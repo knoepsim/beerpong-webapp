@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.games import check_score
 from app.core.exceptions import (
     InvalidWinnerError,
     MatchNotAtTableError,
@@ -143,14 +144,14 @@ class BracketService:
         result_type: ResultType,
         user_id: UUID,
         winner_team_id: UUID | None = None,
-        cups_left: int | None = None,
+        score: tuple[int, int] | None = None,
     ) -> Result:
         """Append a result event and propagate the winner (or its removal) to the next match.
 
         Single place for all result rules:
         - the tournament must be running
         - CREATED needs a ready match without active result, MODIFIED/DELETED need an active one
-        - the winner must be one of the match's two teams
+        - the winner must be one of the match's two teams, and the score possible in the game with that winner
         - the next match must not be decided yet
         """
         # Lock the tournament, then the match and its successor (always in this order): concurrent reports cannot
@@ -174,6 +175,9 @@ class BracketService:
                 raise MatchNotReadyError()
             if winner_team_id not in (match.team_a_id, match.team_b_id):
                 raise InvalidWinnerError()
+            score_a, score_b = score or (0, 0)
+            winner_score, loser_score = (score_a, score_b) if winner_team_id == match.team_a_id else (score_b, score_a)
+            check_score(tournament.game, winner_score, loser_score)
 
         if match.next_match_id is not None and await self._has_active_result(match.next_match_id):
             raise ResultConflictError(
@@ -184,7 +188,8 @@ class BracketService:
             match_id=match_id,
             type=result_type,
             winner_team_id=winner_team_id,
-            cups_left=cups_left,
+            score_a=score[0] if score else None,
+            score_b=score[1] if score else None,
             reported_by_user_id=user_id,
         )
         self.db.add(entry)
@@ -290,14 +295,14 @@ class BracketService:
     async def report_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
         """Report the first result for a match and advance the winner."""
         return await self._record_result(
-            match_id, ResultType.CREATED, user_id, data.winner_team_id, data.cups_left
+            match_id, ResultType.CREATED, user_id, data.winner_team_id, (data.score_a, data.score_b)
         )
 
 
     async def modify_result(self, match_id: UUID, data: ResultCreate, user_id: UUID) -> Result:
         """Modify an existing result, updating the winner in the next match."""
         return await self._record_result(
-            match_id, ResultType.MODIFIED, user_id, data.winner_team_id, data.cups_left
+            match_id, ResultType.MODIFIED, user_id, data.winner_team_id, (data.score_a, data.score_b)
         )
 
 
@@ -363,7 +368,8 @@ class BracketService:
             update={
                 "status": status,
                 "winner_team_id": current.winner_team_id if current else None,
-                "cups_left": current.cups_left if current else None,
+                "score_a": current.score_a if current else None,
+                "score_b": current.score_b if current else None,
             }
         )
 

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -33,7 +33,7 @@ class Ctx:
     async def win(self, match: dict, side: str = "a"):
         resp = await self.client.post(
             f"/matches/{match['id']}/results",
-            json={"winner_team_id": match[f"team_{side}_id"], "cups_left": 2},
+            json=won(match, match[f"team_{side}_id"], 2),
             headers=self.admin,
         )
         assert resp.status_code == 201, resp.text

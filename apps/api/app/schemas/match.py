@@ -38,7 +38,9 @@ class MatchResponse(BaseModel):
     created_at: datetime
     status: MatchStatus = MatchStatus.WAITING
     winner_team_id: UUID | None = None
-    cups_left: int | None = None  # cups the winner had left
+    # the score of the current result (what it counts is up to the game), None before the result
+    score_a: int | None = None
+    score_b: int | None = None
 
     model_config = {"from_attributes": True}
 

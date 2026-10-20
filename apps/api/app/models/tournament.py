@@ -14,6 +14,7 @@ class Game(str, enum.Enum):
     """What is played. It decides how a result is entered (for beer pong: the cups that are left)."""
 
     BEERPONG = "beerpong"
+    FOOTBALL = "football"
 
 
 class TournamentMode(str, enum.Enum):

@@ -165,6 +165,13 @@ class InvalidWinnerError(AppException):
         super().__init__(400, "INVALID_WINNER", "Der Sieger muss eines der beiden Teams dieses Spiels sein.")
 
 
+class InvalidScoreError(AppException):
+    """The score is not possible in the game of the tournament (see app/games.py)."""
+
+    def __init__(self, detail: str):
+        super().__init__(400, "INVALID_SCORE", detail)
+
+
 class ResultConflictError(AppException):
     def __init__(self, detail: str):
         super().__init__(409, "RESULT_CONFLICT", detail)

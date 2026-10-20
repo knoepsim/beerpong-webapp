@@ -16,7 +16,7 @@ from app.core.database import Base, get_db
 from app.services.bracket_service import BracketService
 from app.services.team_service import TeamService
 from main import app
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 POSTGRES_URL = os.environ.get("TEST_POSTGRES_URL")
 pytestmark = pytest.mark.skipif(not POSTGRES_URL, reason="TEST_POSTGRES_URL not set")
@@ -145,7 +145,7 @@ async def test_match_result_cannot_be_reported_twice_concurrently(client: AsyncC
         await client.post(f"/tournaments/{tid}/join", json={"team_id": team_id}, headers=players[i * 2])
     assert (await client.post(f"/tournaments/{tid}/start", headers=admin)).status_code == 200
     match = (await client.get(f"/tournaments/{tid}/bracket", headers=admin)).json()["matches"][0]
-    body = {"winner_team_id": match["team_a_id"], "cups_left": 1}
+    body = won(match, match["team_a_id"], 1)
     rendezvous(monkeypatch, BracketService, "_has_active_result")
 
     result = await statuses(
@@ -178,7 +178,7 @@ async def test_two_results_at_the_same_time_do_not_give_one_table_to_two_matches
 
     result = await statuses(
         *(
-            client.post(f"/matches/{x['id']}/results", json={"winner_team_id": x["team_a_id"], "cups_left": 1}, headers=admin)
+            client.post(f"/matches/{x['id']}/results", json=won(x, x["team_a_id"], 1), headers=admin)
             for x in playing
         )
     )
