@@ -25,7 +25,7 @@ async def _set_started(match_id: UUID, started: bool, user: User, db: AsyncSessi
     "/start",
     status_code=204,
     summary="Spiel starten",
-    description="Startet ein Spiel an seinem Tisch (live). Nur Admin, Manager oder Schiedsrichter. "
+    description="Startet ein Spiel an seiner Spielstätte (live). Nur Admin, Manager oder Schiedsrichter. "
     "Ein Ergebnis kann auch ohne Start gemeldet werden.",
 )
 async def start_match(
@@ -40,7 +40,7 @@ async def start_match(
     "/start",
     status_code=204,
     summary="Start zurücknehmen",
-    description="Das Spiel ist wieder bereit an seinem Tisch, aber nicht gestartet.",
+    description="Das Spiel ist wieder bereit an seiner Spielstätte, aber nicht gestartet.",
 )
 async def undo_start(
     match_id: UUID,

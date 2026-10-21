@@ -6,7 +6,7 @@ import { fiveTeamBracket, fiveTeams } from '@/lib/test-fixtures/bracket'
 // the confetti has its own test (a canvas, which jsdom cannot draw)
 vi.mock('../celebration', () => ({ Celebration: () => null }))
 
-const won = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 2 })
+const won = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, score_a: 2, score_b: 0 })
 
 describe('PodiumCard', () => {
   it('shows the winner and the other places once the final is played', () => {

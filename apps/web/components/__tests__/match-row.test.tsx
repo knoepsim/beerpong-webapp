@@ -4,7 +4,7 @@ import { MatchRow } from '../match-row'
 import { abTeams as teamsMap, makeSlot as slot } from '@/lib/test-fixtures/bracket'
 
 describe('MatchRow', () => {
-  it('shows the number, both teams and, for a match that can be played, "Bereit" with the table', () => {
+  it('shows the number, both teams and, for a match that can be played, "Bereit" with the station', () => {
     render(<MatchRow slot={slot()} teamsMap={teamsMap} />)
     expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByText('Alpha')).toBeInTheDocument()
@@ -13,12 +13,12 @@ describe('MatchRow', () => {
     expect(screen.getByText('Tisch 1')).toBeInTheDocument()
   })
 
-  it('shows the place in the queue of a match without a table', () => {
-    render(<MatchRow slot={slot({ status: 'queued', table_id: null, table_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
-    expect(screen.getByTitle('Wartet auf Tisch, Platz 1 in der Warteschlange')).toHaveTextContent('Platz 1')
+  it('shows the place in the queue of a match without a station', () => {
+    render(<MatchRow slot={slot({ status: 'queued', station_id: null, station_name: null, queue_position: 1 })} teamsMap={teamsMap} />)
+    expect(screen.getByTitle('Wartet auf eine Spielstätte, Nr. 1 in der Warteschlange')).toHaveTextContent('Nr. 1')
   })
 
-  it('shows a waiting match as waiting, the rows name where the teams come from, no table', () => {
+  it('shows a waiting match as waiting, the rows name where the teams come from, no station', () => {
     const { container } = render(
       <MatchRow slot={slot({ status: 'waiting', team_a_id: null, team_b_id: null }, { a: 3, b: 4 })} teamsMap={teamsMap} />,
     )
@@ -29,8 +29,8 @@ describe('MatchRow', () => {
     expect(container.textContent).not.toMatch(/Tisch/)
   })
 
-  it('shows every piece of information once: winner bold, loser dimmed and crossed out, the score, no table', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', cups_left: 4, table_id: 't3', table_name: 'Tisch 3' })} teamsMap={teamsMap} />)
+  it('shows every piece of information once: winner bold, loser dimmed and crossed out, the score, no station', () => {
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'b', score_a: 0, score_b: 4, station_id: 't3', station_name: 'Tisch 3' })} teamsMap={teamsMap} />)
 
     const winner = screen.getByText('Bravo')
     const loser = screen.getByText('Alpha')
@@ -66,9 +66,9 @@ describe('MatchRow', () => {
   })
 
   it('describes the match for screen readers', () => {
-    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'a', cups_left: 2 })} teamsMap={teamsMap} />)
+    render(<MatchRow slot={slot({ status: 'finished', winner_team_id: 'a', score_a: 2, score_b: 0 })} teamsMap={teamsMap} />)
     expect(
-      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, 2 Becher übrig' }),
+      screen.getByRole('article', { name: 'Spiel 7, Alpha (rot) gegen Bravo (blau), beendet, Sieger Alpha, Ergebnis 2:0' }),
     ).toBeInTheDocument()
   })
 

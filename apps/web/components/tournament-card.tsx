@@ -3,6 +3,7 @@ import { ChevronRight, MapPin, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_ICONS } from "@/components/status-icons";
 import { listStatus, type StatusTone } from "@/lib/my-status";
+import { GAMES } from "@/components/games";
 import { phaseLabel } from "@/lib/tournament-phase";
 import type { MyTournament } from "@/lib/tournament-groups";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,7 @@ const isPreparing = (phase: TournamentPhase) => phase !== "running" && phase !==
 export function TournamentCard({ item }: Readonly<{ item: MyTournament }>) {
   const { tournament: t, team, role, participation } = item;
   const when = t.start_time ?? t.created_at;
-  const status = participation ? listStatus(t, participation) : null;
+  const status = participation ? listStatus(t, participation, GAMES[t.game].station) : null;
   const StatusIcon = status ? STATUS_ICONS[status.icon] : null;
 
   return (

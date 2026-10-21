@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { ByeCard, MatchCard } from "@/components/match-card";
-import { activeRounds, buildBracketLayout, focusRound, isAdvanced, type BracketSlot } from "@/lib/bracket-layout";
-import { cn, roundLabel } from "@/lib/utils";
+import { activeRounds, buildBracketLayout, focusRound, isAdvanced, roundTitle, type BracketSlot } from "@/lib/bracket-layout";
+import { cn } from "@/lib/utils";
 import type { Bracket, Match, Team } from "@/types";
 
 /** Height of one slot of the first round; every later round doubles it. A card (one-line names) plus a small gap. */
@@ -150,7 +150,7 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
                   if (el) rounds.current.set(round.round, el);
                   else rounds.current.delete(round.round);
                 }}
-                aria-label={roundLabel(round.round, layout.totalRounds)}
+                aria-label={roundTitle(layout, round.round)}
                 className="snap-start shrink-0 flex flex-col"
                 style={{ width: `calc(var(--col) + ${GUTTER}px)` }}
               >
@@ -164,7 +164,7 @@ export function BracketView({ bracket, teamsMap, onMatchClick, highlightTeamId }
                   )}
                 >
                   <h3 className="text-xs font-semibold uppercase tracking-wider">
-                    {roundLabel(round.round, layout.totalRounds)}
+                    {roundTitle(layout, round.round)}
                   </h3>
                   {active.has(round.round) && (
                     <p className="flex items-center gap-1 text-xs font-medium">

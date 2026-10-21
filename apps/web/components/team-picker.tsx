@@ -58,7 +58,7 @@ function NewTeamForm({ onCreated }: Readonly<{ onCreated: (team: Team) => void }
             setName(e.target.value);
             create.reset();
           }}
-          placeholder="z. B. Becherhelden"
+          placeholder="z. B. Die Unschlagbaren"
           className="h-11"
           aria-invalid={create.isError}
           disabled={create.isPending}

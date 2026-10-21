@@ -28,13 +28,13 @@ describe('NewTournamentForm', () => {
     vi.clearAllMocks()
   })
 
-  it('needs a game and a mode before it goes on, and the coming modes cannot be chosen', async () => {
+  it('needs a game and a mode before it goes on', async () => {
     render(<NewTournamentForm />)
     next()
     expect(await screen.findByText('Wähle aus, was gespielt wird.')).toBeInTheDocument()
     expect(screen.getByText('Wähle aus, wie gespielt wird.')).toBeInTheDocument()
     expect(screen.getByText('Schritt 1 von 4 ·', { exact: false })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: /Jeder gegen jeden/ })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('radio', { name: /Gruppenphase/ })).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('checks each step for its own fields: a missing start stays on the schedule', async () => {
@@ -69,7 +69,7 @@ describe('NewTournamentForm', () => {
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/t/sommer-cup'))
     expect(api.tournaments.create).toHaveBeenCalledWith(
-      expect.objectContaining({ game: 'beerpong', mode: 'single_elimination', name: 'Sommer Cup', table_count: 1 }),
+      expect.objectContaining({ game: 'beerpong', mode: 'single_elimination', name: 'Sommer Cup', station_count: 1 }),
     )
     expect(sessionStorage.getItem(DRAFT)).toBeNull()
   })
@@ -80,5 +80,40 @@ describe('NewTournamentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neu beginnen' }))
     expect(screen.queryByText('Dein Entwurf von vorhin ist wieder da.')).not.toBeInTheDocument()
     expect(sessionStorage.getItem(DRAFT)).toBeNull()
+  })
+
+  it('names the stations of the chosen game', async () => {
+    draft({ game: 'football', mode: 'single_elimination', name: 'Kick', schedule: { start_time: '2099-07-01T18:00' } })
+    render(<NewTournamentForm />)
+    next()
+    await step('Turnier')
+    next()
+    await step('Zeitplan')
+    next()
+    await step('Zugang & Plätze')
+    expect(screen.getByLabelText('Anzahl Plätze')).toBeInTheDocument()
+  })
+
+  it('asks for the groups only for group stage and knock-out, and sends them', async () => {
+    vi.mocked(api.tournaments.create).mockResolvedValue({ slug: 'cup' } as never)
+    draft({ game: 'football', mode: 'groups_knockout', name: 'Cup', schedule: { start_time: '2099-07-01T18:00' } })
+    render(<NewTournamentForm />)
+    expect(screen.getByText('Schritt 1 von 5 ·', { exact: false })).toBeInTheDocument()
+    next()
+    await step('Gruppen')
+    fireEvent.change(screen.getByLabelText('Anzahl Gruppen'), { target: { value: '4' } })
+    expect(screen.getByText(/In die K.-o.-Runde kommen 8 Teams/)).toBeInTheDocument()
+    next()
+    await step('Turnier')
+    next()
+    await step('Zeitplan')
+    next()
+    await step('Zugang & Plätze')
+    fireEvent.click(screen.getByRole('button', { name: 'Turnier erstellen' }))
+    await waitFor(() =>
+      expect(api.tournaments.create).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: 'groups_knockout', group_count: 4, advance_per_group: 2 }),
+      ),
+    )
   })
 })

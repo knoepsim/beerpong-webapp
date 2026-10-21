@@ -27,7 +27,7 @@ from app.models.result import Result
 from app.models.team import Team, TeamMember
 from app.models.tournament import Game, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentUserRole
-from app.models.tournament_table import TournamentTable
+from app.models.station import Station
 from app.models.user import User
 from app.schemas.result import ResultCreate
 from app.schemas.tournament import TournamentCreate
@@ -115,7 +115,7 @@ async def delete_dummy_tournaments(db: AsyncSession, name: str | None = None) ->
     await db.execute(delete(Result).where(Result.match_id.in_(match_ids)))
     await db.execute(update(Match).where(Match.tournament_id.in_(ids)).values(next_match_id=None))
     await db.execute(delete(Match).where(Match.tournament_id.in_(ids)))
-    await db.execute(delete(TournamentTable).where(TournamentTable.tournament_id.in_(ids)))
+    await db.execute(delete(Station).where(Station.tournament_id.in_(ids)))
     await db.execute(delete(TournamentTeam).where(TournamentTeam.tournament_id.in_(ids)))
     await db.execute(delete(TournamentUserRole).where(TournamentUserRole.tournament_id.in_(ids)))
     await db.execute(delete(Tournament).where(Tournament.id.in_(ids)))
@@ -158,15 +158,52 @@ def _schedule(state: str | None) -> dict:
     return {}
 
 
+GAME_NAMES = {Game.BEERPONG: "Bierpong", Game.FOOTBALL: "Fußball"}
+
+
+def random_score(game: Game, rng: random.Random) -> tuple[int, int]:
+    """A possible score of winner and loser (see app/games.py): beer pong 1-10 cups to none, football more goals."""
+    if game == Game.FOOTBALL:
+        lost = rng.randint(0, 3)  # NOSONAR
+        return lost + rng.randint(1, 3), lost  # NOSONAR
+    return rng.randint(1, 10), 0  # NOSONAR
+
+
+async def play(bracket_service: BracketService, tournament_id, target: int, game: Game, user_id) -> None:
+    """Report `target` results in the order of play with random winners: the groups first, then the knock-out (which
+    starts by itself, a tie going by the order of the table)."""
+    # Zufällige Testdaten für lokale Dummy-Turniere, kein Sicherheitsbezug
+    rng = random.Random()  # NOSONAR
+    done: set = set()
+    while len(done) < target:
+        bracket = await bracket_service.get_bracket(tournament_id)
+        ready = [m for m in bracket.matches if m.team_a_id and m.team_b_id and m.id not in done]
+        if not ready and bracket.groups is not None and not bracket.knockout_started:
+            order = {g.group: [row.team_id for row in g.standings] for g in bracket.groups}
+            await bracket_service.start_knockout(tournament_id, order)
+            continue
+        match = min(ready, key=lambda m: (m.group is None, m.round, m.position))
+        winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
+        won, lost = random_score(game, rng)
+        score = (won, lost) if winner == match.team_a_id else (lost, won)
+        await bracket_service.report_result(
+            match.id, ResultCreate(winner_team_id=winner, score_a=score[0], score_b=score[1]), user_id
+        )
+        done.add(match.id)
+
+
 async def create_tournament(
     db: AsyncSession,
     *,
     teams: int = 28,
-    tables: int = 8,
+    stations: int = 8,
     played: float | None = 0.0,
     state: str | None = None,
     owner_phone: str | None = None,
     name: str | None = None,
+    game: Game = Game.BEERPONG,
+    mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION,
+    groups: tuple[int, int] = (2, 2),
 ) -> dict:
     """Create (or replace) a dummy tournament. With `played` it is started and that share of its matches is played;
     without (`None`) it stays in the registration phase, or in the check-in phase if `state` is "checkin" / "both"."""
@@ -174,7 +211,10 @@ async def create_tournament(
     if owner is None:
         raise SystemExit(f"Besitzer {owner_phone or default_owner()} existiert nicht. Erst in der App anmelden oder --owner angeben.")
 
-    name = name or tournament_name(teams, played, state)
+    extra = [GAME_NAMES[game]] if game != Game.BEERPONG else []
+    extra += ["jeder gegen jeden"] if mode == TournamentMode.ROUND_ROBIN else []
+    extra += ["Gruppen"] if mode == TournamentMode.GROUPS_KNOCKOUT else []
+    name = name or tournament_name(teams, played, state) + (f" ({', '.join(extra)})" if extra else "")
     if not name.startswith(TOURNAMENT_PREFIX):
         name = TOURNAMENT_PREFIX + name  # keeps every dummy tournament findable by `delete`
     await delete_dummy_tournaments(db, name)
@@ -187,9 +227,11 @@ async def create_tournament(
             description=f"Testturnier mit {teams} Dummy-Teams, erzeugt mit scripts/seed_dummy_tournaments.py.",
             start_time=datetime.now(UTC) + timedelta(hours=4 if state == "registration" else 1),
             **_schedule(state),
-            table_count=tables,
-            game=Game.BEERPONG,
-            mode=TournamentMode.SINGLE_ELIMINATION,
+            station_count=stations,
+            game=game,
+            mode=mode,
+            group_count=groups[0] if mode == TournamentMode.GROUPS_KNOCKOUT else None,
+            advance_per_group=groups[1] if mode == TournamentMode.GROUPS_KNOCKOUT else None,
             visibility=TournamentVisibility.PUBLIC,
         ),
         owner.id,
@@ -208,18 +250,7 @@ async def create_tournament(
     bracket_service = BracketService(db)
     total = len((await bracket_service.get_bracket(tournament.id)).matches)
     target = round(played * total)
-    # Zufällige Testdaten für lokale Dummy-Turniere, kein Sicherheitsbezug
-    rng = random.Random()  # NOSONAR
-    done: set = set()
-    while len(done) < target:
-        matches = (await bracket_service.get_bracket(tournament.id)).matches
-        ready = [m for m in matches if m.team_a_id and m.team_b_id and m.id not in done]
-        match = min(ready, key=lambda m: (m.round, m.position))
-        winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
-        await bracket_service.report_result(
-            match.id, ResultCreate(winner_team_id=winner, cups_left=rng.randint(1, 10)), owner.id  # NOSONAR
-        )
-        done.add(match.id)
+    await play(bracket_service, tournament.id, target, game, owner.id)
 
     bracket = await bracket_service.get_bracket(tournament.id)
     return {
@@ -229,7 +260,7 @@ async def create_tournament(
         "teams": teams,
         "matches": total,
         "rounds": bracket.total_rounds,
-        "played": len(done),
+        "played": target,
     }
 
 
@@ -245,11 +276,15 @@ async def main() -> None:
 
     create = sub.add_parser("create", help="create (or replace) a dummy tournament")
     create.add_argument("--teams", type=int, default=28)
-    create.add_argument("--tables", type=int, default=8, help="number of tables (default 8)")
+    create.add_argument("--stations", type=int, default=8, help="number of stations (default 8)")
     create.add_argument("--state", choices=list(STATES), default="fresh")
     create.add_argument("--played", type=float, help="share of matches played (0.0 - 1.0), overrides --state")
     create.add_argument("--owner", help="phone of the organizer (default: first SUPER_ADMIN_PHONES)")
     create.add_argument("--name", help="tournament name (default: scheme)")
+    create.add_argument("--game", choices=[g.value for g in Game], default=Game.BEERPONG.value, help="what is played")
+    create.add_argument("--mode", choices=[m.value for m in TournamentMode], default=TournamentMode.SINGLE_ELIMINATION.value)
+    create.add_argument("--groups", type=int, default=2, help="groups_knockout: number of groups (default 2)")
+    create.add_argument("--advance", type=int, default=2, help="groups_knockout: teams going on per group (default 2)")
 
     seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, both open, running, finished)")
     seed.add_argument("--teams", type=int, default=28)
@@ -278,11 +313,14 @@ async def main() -> None:
             info = await create_tournament(
                 db,
                 teams=args.teams,
-                tables=args.tables,
+                stations=args.stations,
                 played=played,
                 state=None if args.played is not None else args.state,
                 owner_phone=args.owner,
                 name=args.name,
+                game=Game(args.game),
+                mode=TournamentMode(args.mode),
+                groups=(args.groups, args.advance),
             )
             await db.commit()
             print(f"{info['name']}: {info['matches']} Matches, {info['rounds']} Runden, {info['played']} gespielt")

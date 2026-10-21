@@ -3,8 +3,9 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { BracketView } from '../bracket-view';
 import { fiveTeamBracket, fiveTeams, makeMatch } from '@/lib/test-fixtures/bracket';
 import type { Bracket } from '@/types';
+import { TournamentMode } from '@/types'
 
-const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: cups });
+const finished = (winner: string, cups = 3) => ({ status: 'finished' as const, winner_team_id: winner, score_a: cups, score_b: 0 });
 
 describe('BracketView', () => {
   it('draws every round as a column with its name', () => {
@@ -55,7 +56,7 @@ describe('BracketView', () => {
     expect(screen.queryByText(/ausgeblendet/)).not.toBeInTheDocument();
   });
 
-  it('shows the table only of matches that can be played, not of played or waiting ones', () => {
+  it('shows the station only of matches that can be played, not of played or waiting ones', () => {
     const bracket = fiveTeamBracket({ m1: finished('t4') });
     render(<BracketView bracket={bracket} teamsMap={fiveTeams} />);
 
@@ -149,7 +150,7 @@ describe('BracketView', () => {
 
   it('renders nothing without a bracket', () => {
     const { container } = render(
-      <BracketView bracket={{ tournament_id: 't', total_rounds: 0, champion_team_id: null, matches: [] }} teamsMap={{}} />,
+      <BracketView bracket={{ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, groups: null, knockout_started: false, total_rounds: 0, champion_team_id: null, matches: [] }} teamsMap={{}} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

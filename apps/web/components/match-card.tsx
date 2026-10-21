@@ -2,9 +2,10 @@ import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
-import { MatchTable } from "@/components/match-table";
+import { MatchStation } from "@/components/match-station";
 import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
+import { useStationTerms } from "@/components/game-context";
 
 interface MatchCardProps {
   slot: MatchSlot;
@@ -16,9 +17,10 @@ interface MatchCardProps {
   onClick?: (match: Match) => void;
 }
 
-/** One match in the bracket: number, table, status and both teams. The state comes from the API. */
+/** One match in the bracket: number, station, status and both teams. The state comes from the API. */
 export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onClick }: Readonly<MatchCardProps>) {
   const { match, number } = slot;
+  const terms = useStationTerms();
   const sides = describeSides(slot, teamsMap, championTeamId);
   const mine = !!highlightTeamId && sides.some((s) => s.id === highlightTeamId);
 
@@ -31,12 +33,12 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
   );
   const content = (
     <>
-      {/* one line: number, table, status (the bracket has a fixed height per slot) */}
+      {/* one line: number, station, status (the bracket has a fixed height per slot) */}
       <div className="flex h-6 items-center gap-2 px-2 text-xs leading-4 text-muted-foreground">
         <span className="shrink-0 tabular-nums" title={`Spiel ${number}`}>
           {number}
         </span>
-        <MatchTable match={match} className="min-w-0" />
+        <MatchStation match={match} className="min-w-0" />
         <span className="flex-1" />
         <MatchStatusBadge match={match} />
       </div>
@@ -53,7 +55,7 @@ export function MatchCard({ slot, teamsMap, championTeamId, highlightTeamId, onC
       ))}
     </>
   );
-  const summary = matchSummary(slot, sides, teamsMap);
+  const summary = matchSummary(slot, sides, teamsMap, terms);
 
   return onClick ? (
     <button type="button" className={className} aria-label={summary} onClick={() => onClick(match)}>

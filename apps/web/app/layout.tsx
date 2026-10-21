@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { APP_NAME } from "@/components/brand";
 
 // text and data: compact for long team names, with tabular figures for scores, times and match numbers
 // (`tabular-nums`). DM Sans was considered: it has no tabular figures, numbers in lists would jump.
@@ -24,8 +25,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Turnierplattform",
-  description: "Organisiere Turniere und spiel mit: Anmeldung, Check-in, Spielplan und Ergebnisse an einem Ort"
+  title: APP_NAME,
+  description: "Organisiere Turniere und spiel mit: Anmeldung, Check-in, Spielplan und Ergebnisse an einem Ort",
+  applicationName: APP_NAME,
 };
 
 import { ThemeProvider } from "@/components/theme-provider";

@@ -95,7 +95,7 @@ describe('tournamentKeys', () => {
   it('names what a changed part makes stale, "Meine Turniere" included', () => {
     expect(tournamentKeys('t1', ['bracket'])).toEqual([
       queryKeys.bracket('t1'),
-      queryKeys.tournamentTables('t1'),
+      queryKeys.tournamentStations('t1'),
       queryKeys.results,
       queryKeys.myTournaments,
     ])

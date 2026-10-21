@@ -12,10 +12,10 @@ from app.models.tournament import TournamentPhase
 from app.schemas.match import MatchStatus
 from app.schemas.result import ResultCreate
 from main import app
-from tests.helpers import generate_started_tournament
+from tests.helpers import generate_started_tournament, won
 
 USER = uuid.uuid4()
-# both teams known, no result: at a table or waiting for one (depends on the tables of the test tournament)
+# both teams known, no result: at a station or waiting for one (depends on the stations of the test tournament)
 PLAYABLE = (MatchStatus.QUEUED, MatchStatus.READY)
 
 
@@ -31,7 +31,7 @@ async def test_fresh_bracket_has_ready_and_waiting_matches_and_no_winner():
 
         assert all(m.status in PLAYABLE for m in _by_round(bracket, 1))
         assert _by_round(bracket, 2)[0].status == MatchStatus.WAITING
-        assert all(m.winner_team_id is None and m.cups_left is None for m in bracket.matches)
+        assert all(m.winner_team_id is None and m.score_a is None for m in bracket.matches)
         assert bracket.champion_team_id is None
 
 
@@ -41,12 +41,12 @@ async def test_a_result_sets_status_winner_and_cups():
         service, tournament, _ = await generate_started_tournament(db, 4)
         first = _by_round(await service.get_bracket(tournament.id), 1)[0]
 
-        await service.report_result(first.id, ResultCreate(winner_team_id=first.team_b_id, cups_left=3), USER)
+        await service.report_result(first.id, ResultCreate(**won(first, first.team_b_id, 3)), USER)
         match = next(m for m in (await service.get_bracket(tournament.id)).matches if m.id == first.id)
 
         assert match.status == MatchStatus.FINISHED
         assert match.winner_team_id == first.team_b_id
-        assert match.cups_left == 3
+        assert (match.score_a, match.score_b) == (0, 3)
 
 
 @pytest.mark.asyncio
@@ -54,16 +54,16 @@ async def test_modified_and_deleted_results_are_followed():
     async for db in app.dependency_overrides[get_db]():
         service, tournament, _ = await generate_started_tournament(db, 4)
         first = _by_round(await service.get_bracket(tournament.id), 1)[0]
-        await service.report_result(first.id, ResultCreate(winner_team_id=first.team_a_id, cups_left=2), USER)
+        await service.report_result(first.id, ResultCreate(**won(first, first.team_a_id, 2)), USER)
 
-        await service.modify_result(first.id, ResultCreate(winner_team_id=first.team_b_id, cups_left=5), USER)
+        await service.modify_result(first.id, ResultCreate(**won(first, first.team_b_id, 5)), USER)
         match = next(m for m in (await service.get_bracket(tournament.id)).matches if m.id == first.id)
-        assert (match.winner_team_id, match.cups_left) == (first.team_b_id, 5)
+        assert (match.winner_team_id, match.score_a, match.score_b) == (first.team_b_id, 0, 5)
 
         await service.delete_result(first.id, USER)
         match = next(m for m in (await service.get_bracket(tournament.id)).matches if m.id == first.id)
         assert match.status in PLAYABLE
-        assert (match.winner_team_id, match.cups_left) == (None, None)
+        assert (match.winner_team_id, match.score_a, match.score_b) == (None, None, None)
 
 
 @pytest.mark.asyncio
@@ -71,11 +71,11 @@ async def test_champion_is_the_winner_of_the_final():
     async for db in app.dependency_overrides[get_db]():
         service, tournament, _ = await generate_started_tournament(db, 4)
         for match in _by_round(await service.get_bracket(tournament.id), 1):
-            await service.report_result(match.id, ResultCreate(winner_team_id=match.team_a_id), USER)
+            await service.report_result(match.id, ResultCreate(**won(match, match.team_a_id)), USER)
         final = _by_round(await service.get_bracket(tournament.id), 2)[0]
         assert final.status in PLAYABLE
 
-        await service.report_result(final.id, ResultCreate(winner_team_id=final.team_b_id, cups_left=1), USER)
+        await service.report_result(final.id, ResultCreate(**won(final, final.team_b_id, 1)), USER)
 
         assert (await service.get_bracket(tournament.id)).champion_team_id == final.team_b_id
 
@@ -88,11 +88,11 @@ async def test_the_result_of_the_final_finishes_and_reopens_the_tournament():
         assert tournament.finished_at is None
         assert tournament.phase == TournamentPhase.RUNNING
 
-        await service.report_result(final.id, ResultCreate(winner_team_id=final.team_a_id, cups_left=3), USER)
+        await service.report_result(final.id, ResultCreate(**won(final, final.team_a_id, 3)), USER)
         assert tournament.finished_at is not None
         assert tournament.phase == TournamentPhase.FINISHED
 
-        await service.modify_result(final.id, ResultCreate(winner_team_id=final.team_b_id, cups_left=1), USER)
+        await service.modify_result(final.id, ResultCreate(**won(final, final.team_b_id, 1)), USER)
         assert tournament.phase == TournamentPhase.FINISHED, "a correction does not reopen it"
 
         await service.delete_result(final.id, USER)
@@ -106,7 +106,7 @@ async def test_a_result_before_the_final_does_not_finish_the_tournament():
         service, tournament, _ = await generate_started_tournament(db, 4)
         first = _by_round(await service.get_bracket(tournament.id), 1)[0]
 
-        await service.report_result(first.id, ResultCreate(winner_team_id=first.team_a_id), USER)
+        await service.report_result(first.id, ResultCreate(**won(first, first.team_a_id)), USER)
 
         assert tournament.finished_at is None
 
@@ -142,4 +142,4 @@ async def test_api_returns_the_new_fields(async_client: AsyncClient):
     body = resp.json()
     assert body["champion_team_id"] is None
     assert body["matches"][0]["status"] in ("queued", "ready")
-    assert {"winner_team_id", "cups_left"} <= set(body["matches"][0])
+    assert {"winner_team_id", "score_a", "score_b"} <= set(body["matches"][0])

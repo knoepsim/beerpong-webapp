@@ -20,7 +20,7 @@ export const ROLE_INFO: Record<TournamentRoleType, { label: string; description:
   [TournamentRoleType.REFEREE]: { label: "Schiedsrichter", description: "Startet Spiele und trägt Ergebnisse ein." },
   [TournamentRoleType.MANAGER]: {
     label: "Manager",
-    description: "Verwaltet das Turnier: Einstellungen, Tische, Einladungen, Start. Vergibt Schiedsrichter.",
+    description: "Verwaltet das Turnier: Einstellungen, Spielstätten, Einladungen, Start. Vergibt Schiedsrichter.",
   },
   [TournamentRoleType.ADMIN]: {
     label: "Admin",

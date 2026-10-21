@@ -5,7 +5,10 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, func, select
 
+from app.games import GAMES, stations_of
 from app.core.exceptions import (
+    InvalidGroupsError,
+    InvalidModeError,
     NotFoundError,
     PlayerAlreadyInTournamentError,
     CheckinDisabledError,
@@ -19,7 +22,7 @@ from app.core.exceptions import (
 )
 from app.core.slug import MAX_LENGTH, normalize_slug, random_slug, slugify
 from app.models.team import Team, TeamMember
-from app.models.tournament import JoinPolicy, Tournament, TournamentTeam, TournamentVisibility
+from app.models.tournament import Game, JoinPolicy, Tournament, TournamentMode, TournamentTeam, TournamentVisibility
 from app.models.tournament_role import TournamentRoleType, TournamentUserRole
 from app.repositories.tournament_repository import tournament_repository
 from app.schemas.team import TeamResponse
@@ -28,7 +31,7 @@ from app.services.invitation_service import InvitationService
 from app.services.invite_service import InviteService
 from app.services.revision import bump
 from app.services.schedule import validate_schedule
-from app.services.table_service import TableService
+from app.services.station_service import StationService
 from app.services.team_service import TeamService
 from fastapi import Depends
 from typing import Annotated
@@ -49,6 +52,8 @@ BEFORE_START_ONLY = (
     # what is played and how: the bracket is drawn for them at the start
     "game",
     "mode",
+    "group_count",
+    "advance_per_group",
 )
 
 
@@ -60,20 +65,39 @@ def _same(a, b) -> bool:
     return a == b
 
 
+def _check_mode(game: Game, mode: TournamentMode) -> None:
+    """Every game has its modes (app/games.py)."""
+    if mode not in GAMES[game].modes:
+        raise InvalidModeError(GAMES[game].label)
+
+
+def _group_settings(mode: TournamentMode, group_count: int | None, advance: int | None) -> dict:
+    """The group settings of the mode: required for group stage and knock-out, none for the other modes."""
+    if mode != TournamentMode.GROUPS_KNOCKOUT:
+        return {"group_count": None, "advance_per_group": None}
+    if group_count is None or advance is None:
+        raise InvalidGroupsError("Lege fest, wie viele Gruppen es gibt und wie viele aus jeder weiterkommen.")
+    if group_count * advance < 2:
+        raise InvalidGroupsError("In die K.-o.-Runde müssen mindestens 2 Teams kommen.")
+    return {"group_count": group_count, "advance_per_group": advance}
+
+
 class TournamentService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
     async def create_tournament(self, data: TournamentCreate, creator_id: UUID) -> Tournament:
         """Create a new tournament and assign the creator as Admin."""
+        _check_mode(data.game, data.mode)
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = self._normalize_automation(data.model_dump())
-        table_count = obj_in.pop("table_count")
+        obj_in.update(_group_settings(data.mode, data.group_count, data.advance_per_group))
+        station_count = obj_in.pop("station_count")
         obj_in["slug"] = await self._unique_slug(slugify(data.name))
         obj_in["created_by_id"] = creator_id
         tournament = await tournament_repository.create(self.db, obj_in=obj_in)
         await self.db.flush()
-        await TableService(self.db).create_default_tables(tournament.id, table_count)
+        await StationService(self.db).create_default_stations(tournament.id, station_count, stations_of(tournament.game))
 
         # Assign Admin role to the creator
         admin_role = TournamentUserRole(
@@ -181,6 +205,8 @@ class TournamentService:
         ):
             raise TournamentAlreadyStartedError()
 
+        await self._apply_play(tournament, update_data)
+
         if "slug" in update_data:
             slug = normalize_slug(update_data["slug"]) if update_data["slug"] is not None else tournament.slug
             if slug == tournament.slug:
@@ -217,6 +243,23 @@ class TournamentService:
         return updated
 
 
+    async def _apply_play(self, tournament: Tournament, update_data: dict) -> None:
+        """Game, mode and groups of an update: the mode must belong to the game, the groups to the mode; another game
+        renames the numbered stations ("Tisch 3" -> "Platz 3")."""
+        game = update_data.get("game") or tournament.game
+        mode = update_data.get("mode") or tournament.mode
+        _check_mode(game, mode)
+        if {"mode", "group_count", "advance_per_group"} & update_data.keys():
+            update_data.update(
+                _group_settings(
+                    mode,
+                    update_data.get("group_count", tournament.group_count),
+                    update_data.get("advance_per_group", tournament.advance_per_group),
+                )
+            )
+        if game != tournament.game:
+            await StationService(self.db).rename_defaults(tournament.id, stations_of(tournament.game), stations_of(game))
+
     async def delete_tournament(self, tournament_id: UUID) -> None:
         """Soft delete a tournament."""
         tournament = await self.get_tournament(tournament_id)
@@ -252,6 +295,7 @@ class TournamentService:
 
     async def _my_progress(self, tournament: Tournament, team_id: UUID) -> dict:
         """The next match of a team in a started tournament, or its place once it is out or has won."""
+        from app.schemas.match import MatchStatus
         from app.services.bracket_service import BracketService  # imported here: the bracket uses this service
 
         bracket = await BracketService(self.db).get_bracket(tournament.id)
@@ -260,10 +304,18 @@ class TournamentService:
         )
         if bracket.champion_team_id == team_id:
             return {"place": 1}
-        lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
-        if lost is not None:
-            return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
-        return {"next_match": next((m for m in mine if m.winner_team_id is None), None)}
+        if bracket.standings is not None:
+            # everybody against everybody: the rank once all is played, before that the next match
+            if tournament.finished_at:
+                return {"place": next((row.rank for row in bracket.standings if row.team_id == team_id), None)}
+        elif bracket.groups is not None and bracket.knockout_started and not any(m.group is None for m in mine):
+            # out in the group stage: no place in the end result, no match any more
+            return {}
+        else:
+            lost = next((m for m in mine if m.group is None and m.winner_team_id is not None and m.winner_team_id != team_id), None)
+            if lost is not None:
+                return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
+        return {"next_match": next((m for m in mine if m.status != MatchStatus.FINISHED), None)}
 
     async def join_tournament(self, tournament_id: UUID, team_id: UUID, user_id: UUID) -> TournamentTeam:
         """Join a tournament with a team. Implements the 5-step validation from requirements."""

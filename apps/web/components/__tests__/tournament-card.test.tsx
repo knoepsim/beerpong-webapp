@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { TournamentCard } from '../tournament-card'
 import type { MyTournament } from '@/lib/tournament-groups'
-import type { Team, Tournament } from '@/types'
+import { Game, type Team, type Tournament } from '@/types'
 import { TournamentRoleType } from '@/types'
 
 const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
@@ -16,6 +16,7 @@ const tournament = (overrides: Partial<Tournament> = {}): Tournament =>
     phase: 'registration',
     started_at: null,
     finished_at: null,
+    game: Game.BEERPONG,
     ...overrides,
   }) as Tournament
 

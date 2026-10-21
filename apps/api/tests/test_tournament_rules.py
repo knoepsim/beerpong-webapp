@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 
 @dataclass
@@ -29,11 +29,11 @@ class Setup:
     async def start(self) -> None:
         assert (await self.post("start")).status_code == 200
 
-    async def report(self, match_id: str, winner: str, method: str = "post"):
+    async def report(self, match: dict, winner: str, method: str = "post"):
         return await self.client.request(
             method,
-            f"/matches/{match_id}/results",
-            json={"winner_team_id": winner, "cups_left": 2},
+            f"/matches/{match['id']}/results",
+            json=won(match, winner, 2),
             headers=self.headers[0],
         )
 
@@ -113,7 +113,7 @@ async def test_winner_must_play_in_match(setup: Setup):
     await setup.start()
     first = next(m for m in await setup.bracket() if m["round"] == 1)
     outsider = next(t for t in setup.team_ids if t not in (first["team_a_id"], first["team_b_id"]))
-    resp = await setup.report(first["id"], outsider)
+    resp = await setup.report(first, outsider)
     assert resp.status_code == 400
     assert resp.json()["error_code"] == "INVALID_WINNER"
 
@@ -123,7 +123,7 @@ async def test_match_without_both_teams_is_not_ready(setup: Setup):
     await _join_all(setup)
     await setup.start()
     final = await setup.final()
-    resp = await setup.report(final["id"], setup.team_ids[0])
+    resp = await setup.report(final, setup.team_ids[0])
     assert resp.status_code == 409
     assert resp.json()["error_code"] == "MATCH_NOT_READY"
 
@@ -136,14 +136,14 @@ async def test_result_event_rules(setup: Setup):
     a, b = first["team_a_id"], first["team_b_id"]
 
     # modify / delete need an existing result
-    assert (await setup.report(first["id"], a, "patch")).status_code == 409
+    assert (await setup.report(first, a, "patch")).status_code == 409
     assert (await setup.client.delete(f"/matches/{first['id']}/results", headers=setup.headers[0])).status_code == 409
 
-    assert (await setup.report(first["id"], a)).status_code == 201
+    assert (await setup.report(first, a)).status_code == 201
     # a second CREATED is a conflict
-    assert (await setup.report(first["id"], b)).status_code == 409
+    assert (await setup.report(first, b)).status_code == 409
     # modifying switches the winner in the next match
-    assert (await setup.report(first["id"], b, "patch")).status_code == 200
+    assert (await setup.report(first, b, "patch")).status_code == 200
     final = await setup.final()
     assert b in (final["team_a_id"], final["team_b_id"])
     assert a not in (final["team_a_id"], final["team_b_id"])
@@ -155,7 +155,7 @@ async def test_result_event_rules(setup: Setup):
     assert (await setup.client.delete(f"/matches/{first['id']}/results", headers=setup.headers[0])).status_code == 409
 
     # after deletion a new result can be created again
-    assert (await setup.report(first["id"], a)).status_code == 201
+    assert (await setup.report(first, a)).status_code == 201
 
 
 @pytest.mark.asyncio
@@ -163,11 +163,11 @@ async def test_result_locked_once_next_match_is_decided(setup: Setup):
     await _join_all(setup)
     await setup.start()
     for m in [m for m in await setup.bracket() if m["round"] == 1]:
-        assert (await setup.report(m["id"], m["team_a_id"])).status_code == 201
+        assert (await setup.report(m, m["team_a_id"])).status_code == 201
     final = await setup.final()
-    assert (await setup.report(final["id"], final["team_a_id"])).status_code == 201
+    assert (await setup.report(final, final["team_a_id"])).status_code == 201
 
     first = next(m for m in await setup.bracket() if m["round"] == 1)
-    resp = await setup.report(first["id"], first["team_b_id"], "patch")
+    resp = await setup.report(first, first["team_b_id"], "patch")
     assert resp.status_code == 409
     assert resp.json()["error_code"] == "RESULT_CONFLICT"

@@ -1,7 +1,7 @@
 import { TournamentMode } from "@/types";
 
-/** The modes the API has, and the coming ones (not available yet: shown, but not to choose). */
-export type ModeId = TournamentMode | "round_robin" | "groups_knockout";
+/** The modes: the ones the API has (a coming one would be shown, but not to choose). */
+export type ModeId = TournamentMode;
 
 export interface ModeDefinition {
   id: ModeId;
@@ -18,17 +18,20 @@ export const MODES: ModeDefinition[] = [
     available: true,
   },
   {
-    id: "round_robin",
+    id: TournamentMode.ROUND_ROBIN,
     label: "Jeder gegen jeden",
     description: "Alle spielen gegen alle, die Tabelle entscheidet.",
-    available: false,
+    available: true,
   },
   {
-    id: "groups_knockout",
+    id: TournamentMode.GROUPS_KNOCKOUT,
     label: "Gruppenphase und K.-o.-System",
     description: "Erst in Gruppen jeder gegen jeden, die Besten spielen im K.-o.-System weiter.",
-    available: false,
+    available: true,
   },
 ];
 
 export const modeLabel = (id: ModeId) => MODES.find((mode) => mode.id === id)?.label ?? id;
+
+/** The modes in which a match may end even: everybody against everybody counts points, a knock-out needs a winner. */
+export const DRAW_MODES: TournamentMode[] = [TournamentMode.ROUND_ROBIN];

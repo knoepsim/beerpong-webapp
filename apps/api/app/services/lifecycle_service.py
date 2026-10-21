@@ -5,11 +5,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import DbSession
-from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, TournamentAlreadyStartedError
+from app.core.exceptions import (
+    CheckinDisabledError,
+    InvalidGroupsError,
+    NotEnoughTeamsError,
+    TournamentAlreadyStartedError,
+)
 from app.models.team import Team
-from app.models.tournament import TournamentTeam
+from app.models.tournament import TournamentMode, TournamentTeam
 from app.schemas.tournament import TournamentStartResponse
 from app.services.bracket_service import BracketService
+from app.services.groups import size_problem
 from app.services.revision import bump
 from app.services.tournament_service import TournamentService
 
@@ -62,6 +68,11 @@ class LifecycleService:
         if len(playing) < 2:
             raise NotEnoughTeamsError(tournament.checkin_enabled)
 
+        if tournament.mode == TournamentMode.GROUPS_KNOCKOUT:
+            problem = size_problem(len(playing), tournament.group_count, tournament.advance_per_group)
+            if problem:
+                raise InvalidGroupsError(problem)
+
         removed = [e for e in entries if e not in playing]
         for entry in removed:
             await self.db.delete(entry)
@@ -74,10 +85,10 @@ class LifecycleService:
             entry.team_name = names[entry.team_id]
 
         bracket = BracketService(self.db)
-        await bracket.generate_bracket(tournament_id, [e.team_id for e in playing])
+        await bracket.generate(tournament_id, [e.team_id for e in playing], tournament.mode)
         tournament.started_at = datetime.now(UTC)
         await self.db.flush()
-        await bracket.assign_tables(tournament_id)
+        await bracket.assign_stations(tournament_id)
         await bump(self.db, tournament_id, "tournament", "teams", "bracket")
 
         return TournamentStartResponse(team_count=len(playing), removed_team_ids=[e.team_id for e in removed])

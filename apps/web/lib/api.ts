@@ -9,11 +9,12 @@ import type {
   TournamentInvite,
   TournamentPreview,
   TournamentStartResponse,
-  TournamentTable,
+  Station,
   TournamentUserRole,
   User,
   PublicUser,
   Result,
+  ReportedResult,
   MyTournamentsResponse,
   TournamentTeam,
   Invitation,
@@ -42,7 +43,7 @@ export class ApiError extends Error {
 // background with the refresh cookie, so somebody who takes the phone out of the pocket after an hour is still logged
 // in; the session ends after REFRESH_TOKEN_EXPIRE_DAYS without use (every renewal starts the time again).
 const CSRF_HEADER = { "X-Requested-With": "fetch" };
-const SESSION_LOCK = "beerpong-session";
+const SESSION_LOCK = "tournament-session";
 
 /** Runs `task` alone: in all tabs of the browser if possible (they share the cookies), else only in this one. */
 function exclusively<T>(task: () => Promise<T>): Promise<T> {
@@ -144,6 +145,9 @@ export async function request<T>(endpoint: string, options: FetchOptions = {}): 
 
 // ── Typed API methods ─────────────────────────────────
 
+const resultBody = ({ winnerTeamId, scoreA, scoreB }: ReportedResult) =>
+  JSON.stringify({ winner_team_id: winnerTeamId, score_a: scoreA, score_b: scoreB });
+
 export const api = {
   auth: {
     requestCode: (phone_number: string) =>
@@ -215,20 +219,20 @@ export const api = {
     getState: (id: string) => request<{ revision: number }>(`/tournaments/${id}/state`),
     getPreview: (slug: string) =>
       request<TournamentPreview>(`/tournaments/by-slug/${encodeURIComponent(slug)}/preview`),
-    listTables: (tournamentId: string) => request<TournamentTable[]>(`/tournaments/${tournamentId}/tables`),
-    /** Without a name the new table is called "Tisch {n}". */
-    addTable: (tournamentId: string, name?: string) =>
-      request<TournamentTable>(`/tournaments/${tournamentId}/tables`, {
+    listStations: (tournamentId: string) => request<Station[]>(`/tournaments/${tournamentId}/stations`),
+    /** Without a name the new station gets the next number of its game ("Tisch 3", "Platz 3"). */
+    addStation: (tournamentId: string, name?: string) =>
+      request<Station>(`/tournaments/${tournamentId}/stations`, {
         method: "POST",
         body: JSON.stringify({ name: name || null }),
       }),
-    renameTable: (tournamentId: string, tableId: string, name: string) =>
-      request<TournamentTable>(`/tournaments/${tournamentId}/tables/${tableId}`, {
+    renameStation: (tournamentId: string, stationId: string, name: string) =>
+      request<Station>(`/tournaments/${tournamentId}/stations/${stationId}`, {
         method: "PATCH",
         body: JSON.stringify({ name }),
       }),
-    deleteTable: (tournamentId: string, tableId: string) =>
-      request<void>(`/tournaments/${tournamentId}/tables/${tableId}`, { method: "DELETE" }),
+    deleteStation: (tournamentId: string, stationId: string) =>
+      request<void>(`/tournaments/${tournamentId}/stations/${stationId}`, { method: "DELETE" }),
     listInvites: (tournamentId: string) => request<TournamentInvite[]>(`/tournaments/${tournamentId}/invites`),
     createInvite: (tournamentId: string, label?: string) =>
       request<TournamentInvite>(`/tournaments/${tournamentId}/invites`, {
@@ -274,6 +278,9 @@ export const api = {
     startTournament: (id: string) =>
       request<TournamentStartResponse>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string) => request<Bracket>(`/tournaments/${id}/bracket`),
+    /** After the group stage: `order` gives the teams of a group with a tie in the order the organization decided. */
+    startKnockout: (id: string, order: Record<number, string[]>) =>
+      request<void>(`/tournaments/${id}/knockout`, { method: "POST", body: JSON.stringify({ order }) }),
     getTeams: (id: string) => request<TournamentTeam[]>(`/tournaments/${id}/teams`),
     checkin: (tournamentId: string, teamId: string, is_checked_in: boolean) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}/checkin`, {
@@ -313,23 +320,17 @@ export const api = {
   },
 
   matches: {
-    /** Start a match at its table (live); a result can also be reported without a start. */
+    /** Start a match at its station (live); a result can also be reported without a start. */
     start: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "POST" }),
     undoStart: (matchId: string) => request<void>(`/matches/${matchId}/start`, { method: "DELETE" }),
   },
 
   results: {
     list: (matchId: string) => request<Result[]>(`/matches/${matchId}/results`),
-    create: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
-      request<Result>(`/matches/${matchId}/results`, {
-        method: "POST",
-        body: JSON.stringify({ winner_team_id: winnerTeamId, cups_left: cupsLeft }),
-      }),
-    modify: (matchId: string, winnerTeamId: string, cupsLeft?: number) =>
-      request<Result>(`/matches/${matchId}/results`, {
-        method: "PATCH",
-        body: JSON.stringify({ winner_team_id: winnerTeamId, cups_left: cupsLeft }),
-      }),
+    create: (matchId: string, result: ReportedResult) =>
+      request<Result>(`/matches/${matchId}/results`, { method: "POST", body: resultBody(result) }),
+    modify: (matchId: string, result: ReportedResult) =>
+      request<Result>(`/matches/${matchId}/results`, { method: "PATCH", body: resultBody(result) }),
     delete: (matchId: string) =>
       request<Result>(`/matches/${matchId}/results`, { method: "DELETE" }),
   },

@@ -3,14 +3,17 @@ import { allMatchSlots, buildBracketLayout } from './bracket-layout'
 import { knockoutPlace, listStatus, statusBeforeStart, statusInBracket } from './my-status'
 import { fiveTeamBracket, fiveTeams } from './test-fixtures/bracket'
 import { makeTournament as tournament, makeTournamentTeam as team } from './test-fixtures/tournament'
-import type { Bracket, Match } from '@/types'
+import { GAMES } from '@/components/games'
+import { Game, type Bracket, type Match } from '@/types'
+
+const TABLES = GAMES[Game.BEERPONG].station
 
 const NOW = new Date('2099-07-01T12:00:00Z')
-const finished = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 3 })
+const finished = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, score_a: 3, score_b: 0 })
 
 function inBracket(bracket: Bracket, teamId: string, now = NOW) {
   const slots = allMatchSlots(buildBracketLayout(bracket))
-  return statusInBracket(slots, bracket.total_rounds, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, bracket.champion_team_id, now)
+  return statusInBracket(slots, bracket, team({ id: teamId, name: fiveTeams[teamId].name }), fiveTeams, TABLES, now)
 }
 
 describe('statusBeforeStart', () => {
@@ -46,7 +49,7 @@ describe('statusBeforeStart', () => {
 })
 
 describe('statusInBracket', () => {
-  it('sends a team to its table when its match is ready there', () => {
+  it('sends a team to its station when its match is ready there', () => {
     const s = inBracket(fiveTeamBracket(), 't4')!
     expect([s.tone, s.title, s.slot?.number]).toEqual(['urgent', 'Geh jetzt zu Tisch 1: Spiel gegen Team 5.', 1])
   })
@@ -57,11 +60,11 @@ describe('statusInBracket', () => {
   })
 
   it('gets the team ready when it is next in the queue, and lets it relax further back', () => {
-    const queued = (place: number): Partial<Match> => ({ status: 'queued', table_id: null, table_name: null, queue_position: place })
+    const queued = (place: number): Partial<Match> => ({ status: 'queued', station_id: null, station_name: null, queue_position: place })
     const next = inBracket(fiveTeamBracket({ m1: queued(1) }), 't4')!
     expect([next.tone, next.title]).toEqual(['attention', 'Halte dich bereit: Als Nächstes spielst du gegen Team 5.'])
     const later = inBracket(fiveTeamBracket({ m1: queued(3) }), 't4')!
-    expect([later.tone, later.detail]).toEqual(['relaxed', 'Platz 3 in der Warteschlange.'])
+    expect([later.tone, later.detail]).toEqual(['relaxed', 'Nr. 3 in der Warteschlange.'])
   })
 
   it('tells a team waiting for its opponent who it can be and since when that match runs', () => {
@@ -74,18 +77,18 @@ describe('statusInBracket', () => {
   })
 
   it('shows no place in the queue while waiting for the opponent, the queue is the other match', () => {
-    const s = inBracket(fiveTeamBracket({ m1: { status: 'queued', table_id: null, table_name: null, queue_position: 2 } }), 't1')!
+    const s = inBracket(fiveTeamBracket({ m1: { status: 'queued', station_id: null, station_name: null, queue_position: 2 } }), 't1')!
     expect(s.detail).toBe('Dein Gegner: Team 4 oder Team 5 – warten noch auf einen Tisch.')
   })
 
-  it('names the table of the next match when the API says it is certain, where the opponent plays now', () => {
+  it('names the station of the next match when the API says it is certain, where the opponent plays now', () => {
     const bracket = fiveTeamBracket({
       m1: { status: 'live', started_at: new Date(NOW.getTime() - 5 * 60_000).toISOString() },
-      m2: { upcoming_table_id: 'x1', upcoming_table_name: 'Tisch 1' },
+      m2: { upcoming_station_id: 'x1', upcoming_station_name: 'Tisch 1' },
     })
     const s = inBracket(bracket, 't1')!
     expect(s.detail).toBe('Euer Spiel ist danach an Tisch 1. Dort spielen gerade Team 4 und Team 5, seit 5 Minuten.')
-    expect(s.slot?.match.upcoming_table_name).toBe('Tisch 1')
+    expect(s.slot?.match.upcoming_station_name).toBe('Tisch 1')
   })
 
   it('gives the place of a team that is out, and the winner its trophy', () => {
@@ -108,24 +111,24 @@ describe('listStatus', () => {
   const match = (overrides: Partial<Match>) => fiveTeamBracket({ m1: overrides }).matches[0]
 
   it('says only what matters before the start: check in now, or checked in', () => {
-    expect(listStatus(tournament(), part())).toBeNull() // registered, nothing to do
-    expect(listStatus(tournament({ checkin_enabled: true, checkin_open: true }), part())).toEqual({
+    expect(listStatus(tournament(), part(), TABLES)).toBeNull() // registered, nothing to do
+    expect(listStatus(tournament({ checkin_enabled: true, checkin_open: true }), part(), TABLES)).toEqual({
       tone: 'urgent', icon: 'alert', text: 'Jetzt einchecken',
     })
-    expect(listStatus(tournament({ checkin_enabled: true }), part({ is_checked_in: true }))?.text).toBe('Eingecheckt')
-    expect(listStatus(tournament({ checkin_enabled: true }), part())).toBeNull() // check-in not open yet
+    expect(listStatus(tournament({ checkin_enabled: true }), part({ is_checked_in: true }), TABLES)?.text).toBe('Eingecheckt')
+    expect(listStatus(tournament({ checkin_enabled: true }), part(), TABLES)).toBeNull() // check-in not open yet
   })
 
   it('says where to go and how urgent while it runs', () => {
-    expect(listStatus(started, part({ next_match: match({}) }))).toEqual({ tone: 'urgent', icon: 'go', text: 'Jetzt zu Tisch 1' })
-    expect(listStatus(started, part({ next_match: match({ status: 'live' }) }))?.text).toBe('Spielt an Tisch 1')
-    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 1 }) }))?.tone).toBe('attention')
-    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 4 }) }))?.text).toBe('Warteschlange #4')
-    expect(listStatus(started, part({ next_match: match({ status: 'waiting' }) }))?.text).toBe('Pause')
+    expect(listStatus(started, part({ next_match: match({}) }), TABLES)).toEqual({ tone: 'urgent', icon: 'go', text: 'Jetzt zu Tisch 1' })
+    expect(listStatus(started, part({ next_match: match({ status: 'live' }) }), TABLES)?.text).toBe('Spielt an Tisch 1')
+    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 1 }) }), TABLES)?.tone).toBe('attention')
+    expect(listStatus(started, part({ next_match: match({ status: 'queued', queue_position: 4 }) }), TABLES)?.text).toBe('Warteschlange #4')
+    expect(listStatus(started, part({ next_match: match({ status: 'waiting' }) }), TABLES)?.text).toBe('Pause')
   })
 
   it('gives the place at the end', () => {
-    expect(listStatus(started, part({ place: 1 }))).toEqual({ tone: 'done', icon: 'trophy', text: 'Gewonnen' })
-    expect(listStatus(started, part({ place: 5 }))?.text).toBe('Platz 5')
+    expect(listStatus(started, part({ place: 1 }), TABLES)).toEqual({ tone: 'done', icon: 'trophy', text: 'Gewonnen' })
+    expect(listStatus(started, part({ place: 5 }), TABLES)?.text).toBe('Platz 5')
   })
 })

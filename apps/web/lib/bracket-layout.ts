@@ -1,5 +1,6 @@
 import { isOpen } from "@/lib/match-display";
-import type { Bracket, Match } from "@/types";
+import { roundLabel } from "@/lib/utils";
+import { TournamentMode, type Bracket, type Match } from "@/types";
 
 /**
  * Turns the flat match list of the API into the grid the bracket is drawn on:
@@ -34,15 +35,23 @@ export interface RoundLayout {
 }
 
 export interface BracketLayout {
+  mode: TournamentMode;
+  /** A knock-out tree, or match days (everybody against everybody, a group). */
+  kind: "tree" | "days";
   totalRounds: number;
   rounds: RoundLayout[];
 }
 
-/** Matches inside the rounds of the bracket in the order of their numbers. */
+/** The matches of the tree (or of the match days where everybody plays everybody) in the order of their numbers. */
 function orderedMatches(bracket: Bracket): Match[] {
   return bracket.matches
-    .filter((m) => m.round >= 1 && m.round <= bracket.total_rounds)
+    .filter((m) => m.group === null && m.round >= 1 && m.round <= bracket.total_rounds)
     .sort((a, b) => a.round - b.round || a.position - b.position);
+}
+
+/** The group matches day by day (all groups play the same day): they come first and are numbered first. */
+function groupMatches(bracket: Bracket): Match[] {
+  return bracket.matches.filter((m) => m.group !== null).sort((a, b) => a.round - b.round || a.position - b.position);
 }
 
 /**
@@ -54,11 +63,37 @@ function byeTeamId(parent: Match | undefined, position: number): string | null {
   return position % 2 === 0 ? parent.team_a_id : parent.team_b_id;
 }
 
+/** Per match day its matches, numbered on from `first` (nobody waits for a winner). */
+function buildMatchDays(mode: TournamentMode, matches: Match[], first = 1): BracketLayout {
+  const days = Math.max(0, ...matches.map((m) => m.round));
+  const rounds: RoundLayout[] = Array.from({ length: days }, (_, index) => ({ round: index + 1, slots: [] }));
+  matches.forEach((match, i) =>
+    rounds[match.round - 1].slots.push({ kind: "match", match, number: first + i, sources: { a: null, b: null } }),
+  );
+  return { mode, kind: "days", totalRounds: days, rounds };
+}
+
+/** The groups with their match days, numbered like `matchSlotsOf` (group by group in the order of play). */
+export function buildGroupLayouts(bracket: Bracket): { group: number; layout: BracketLayout }[] {
+  const all = groupMatches(bracket);
+  const numberOf = new Map(all.map((m, i) => [m.id, i + 1]));
+  const groups = [...new Set(all.map((m) => m.group!))].sort((a, b) => a - b);
+  return groups.map((group) => {
+    const layout = buildMatchDays(bracket.mode, all.filter((m) => m.group === group));
+    for (const round of layout.rounds) for (const slot of round.slots) if (slot.kind === "match") slot.number = numberOf.get(slot.match.id)!;
+    return { group, layout };
+  });
+}
+
+/** The rounds as the mode has them: the tree of a knock-out, the match days of everybody against everybody. */
 export function buildBracketLayout(bracket: Bracket): BracketLayout {
+  if (bracket.mode === TournamentMode.ROUND_ROBIN) return buildMatchDays(bracket.mode, orderedMatches(bracket));
   const total = bracket.total_rounds;
   const matches = orderedMatches(bracket);
+  // after a group stage the tree goes on with the numbers
+  const first = groupMatches(bracket).length + 1;
 
-  const numberOf = new Map(matches.map((m, i) => [m.id, i + 1]));
+  const numberOf = new Map(matches.map((m, i) => [m.id, first + i]));
   const byPosition = new Map(matches.map((m) => [`${m.round}:${m.position}`, m]));
 
   // number of the match feeding slot "a" / "b" of a parent match
@@ -92,7 +127,12 @@ export function buildBracketLayout(bracket: Bracket): BracketLayout {
       slots: Array.from({ length: 2 ** (total - round) }, (_, position) => slotAt(round, position)),
     };
   });
-  return { totalRounds: total, rounds };
+  return { mode: bracket.mode, kind: "tree", totalRounds: total, rounds };
+}
+
+/** The name of a round: "Finale", "Halbfinale", … in a knock-out, "3. Spieltag" where everybody plays everybody. */
+export function roundTitle(layout: BracketLayout, round: number): string {
+  return layout.kind === "days" ? `${round}. Spieltag` : roundLabel(round, layout.totalRounds);
 }
 
 /** A slot whose team has already moved on: a finished match or a bye. */
@@ -127,4 +167,10 @@ export function isMatchSlot(slot: BracketSlot): slot is MatchSlot {
 /** All matches in the order of their numbers (round by round), without byes. */
 export function allMatchSlots(layout: BracketLayout): MatchSlot[] {
   return layout.rounds.flatMap((r) => r.slots.filter(isMatchSlot));
+}
+
+/** Every match of the tournament with its number: the group matches first, then the tree or the match days. */
+export function matchSlotsOf(bracket: Bracket): MatchSlot[] {
+  const groups = buildGroupLayouts(bracket).flatMap(({ layout }) => allMatchSlots(layout));
+  return [...groups.sort((a, b) => a.number - b.number), ...allMatchSlots(buildBracketLayout(bracket))];
 }

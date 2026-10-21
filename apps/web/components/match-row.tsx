@@ -2,9 +2,10 @@ import { cn } from "@/lib/utils";
 import { TeamLabel } from "@/components/team-label";
 import type { MatchSlot } from "@/lib/bracket-layout";
 import { MatchStatusBadge } from "@/components/match-status-badge";
-import { MatchTable } from "@/components/match-table";
+import { MatchStation } from "@/components/match-station";
 import { describeSides, matchSummary, sideTone } from "@/lib/match-display";
 import type { Match, Team } from "@/types";
+import { useStationTerms } from "@/components/game-context";
 
 interface MatchRowProps {
   slot: MatchSlot;
@@ -14,17 +15,17 @@ interface MatchRowProps {
   highlightTeamId?: string | null;
   /** Organizers open the result dialog by clicking a match. */
   onClick?: (match: Match) => void;
-  /** Without the right-hand side, where status and table are shown around the row already (the tables tab). */
+  /** Without the right-hand side, where status and station are shown around the row already (the stations tab). */
   aside?: boolean;
 }
 
-/** The right-hand side of a row: the status and the table to go to; a finished match has its score in the rows. */
+/** The right-hand side of a row: the status and the station to go to; a finished match has its score in the rows. */
 function Aside({ match }: Readonly<{ match: Match }>) {
   if (match.status === "finished") return null;
   return (
     <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 border-l px-2 py-1.5 text-right text-xs">
       <MatchStatusBadge match={match} />
-      <MatchTable match={match} className="max-w-full justify-end font-medium" />
+      <MatchStation match={match} className="max-w-full justify-end font-medium" />
     </div>
   );
 }
@@ -33,11 +34,12 @@ function Aside({ match }: Readonly<{ match: Match }>) {
  * A match as a list row, like a scoreboard: number | both teams | what matters now.
  * Used for the list of all matches and for "my matches", so both read the same.
  *
- * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out, the cups they had
- * left stand next to them; status and table only exist for matches that are not finished.
+ * Each piece of information appears once: the winner is bold, the loser dimmed and crossed out, the score they had
+ * left stand next to them; status and station only exist for matches that are not finished.
  */
 export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onClick, aside = true }: Readonly<MatchRowProps>) {
   const { match, number } = slot;
+  const terms = useStationTerms();
   const sides = describeSides(slot, teamsMap, championTeamId);
 
   const className = cn(
@@ -68,7 +70,7 @@ export function MatchRow({ slot, teamsMap, championTeamId, highlightTeamId, onCl
       {aside && <Aside match={match} />}
     </>
   );
-  const summary = matchSummary(slot, sides, teamsMap);
+  const summary = matchSummary(slot, sides, teamsMap, terms);
 
   return onClick ? (
     <button type="button" className={className} aria-label={summary} onClick={() => onClick(match)}>

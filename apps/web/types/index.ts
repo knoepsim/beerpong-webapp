@@ -67,11 +67,14 @@ export interface TeamInviteDetails {
 /** What is played; it decides how a result is entered (see lib/games). */
 export enum Game {
   BEERPONG = "beerpong",
+  FOOTBALL = "football",
 }
 
 /** How the teams meet. Only the modes the API has; the coming ones live in lib/modes. */
 export enum TournamentMode {
   SINGLE_ELIMINATION = "single_elimination",
+  ROUND_ROBIN = "round_robin",
+  GROUPS_KNOCKOUT = "groups_knockout",
 }
 
 /** Who sees bracket and results. */
@@ -176,6 +179,11 @@ export interface Tournament {
   checkin_open: boolean;
   game: Game;
   mode: TournamentMode;
+  /** Group stage and knock-out: how many groups, how many of each go on (null in the other modes). */
+  group_count: number | null;
+  advance_per_group: number | null;
+  /** When the organization started the knock-out stage: from then on the group results are fixed. */
+  knockout_started_at: string | null;
   visibility: TournamentVisibility;
   join_policy: JoinPolicy;
   is_deleted: boolean;
@@ -189,8 +197,8 @@ export interface TournamentStartResponse {
   removed_team_ids: string[];
 }
 
-/** A table of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
-export interface TournamentTable {
+/** A station of a tournament: "Tisch 1", "Tisch 2", ... unless renamed. */
+export interface Station {
   id: string;
   name: string;
   position: number;
@@ -207,10 +215,12 @@ export interface TournamentCreateRequest {
   checkin_enabled?: boolean;
   checkin_start_time?: string | null;
   checkin_auto_open?: boolean;
-  /** How many tables are created with the tournament; they are managed one by one afterwards. */
-  table_count?: number;
+  /** How many stations are created with the tournament; they are managed one by one afterwards. */
+  station_count?: number;
   game: Game;
   mode: TournamentMode;
+  group_count?: number | null;
+  advance_per_group?: number | null;
   visibility?: TournamentVisibility;
   join_policy?: JoinPolicy;
 }
@@ -237,8 +247,8 @@ export interface MyTournamentsResponse {
 }
 
 /**
- * Decided by the API: waiting (a team is still in another match), queued (waiting for a free table),
- * ready (at its table, not started), live (started), finished (has a result).
+ * Decided by the API: waiting (a team is still in another match), queued (waiting for a free station),
+ * ready (at its station, not started), live (started), finished (has a result).
  */
 export type MatchStatus = "waiting" | "queued" | "ready" | "live" | "finished";
 
@@ -251,31 +261,60 @@ export interface Match {
   team_b_id: string | null;
   next_match_id: string | null;
   next_match_slot: string | null;
-  /** The table it is played at (kept once it is finished); null while it has none. Decided by the API. */
-  table_id: string | null;
-  table_name: string | null;
-  /** A ready match without a table: its place in the queue for the next free table (1 = next). */
+  /** Group stage: its group (1 = A); null for a match of the knock-out. */
+  group: number | null;
+  /** Knock-out after groups: where its teams come from ("A1"), until the knock-out starts. */
+  source_a: string | null;
+  source_b: string | null;
+  /** The station it is played at (kept once it is finished); null while it has none. Decided by the API. */
+  station_id: string | null;
+  station_name: string | null;
+  /** A ready match without a station: its place in the queue for the next free station (1 = next). */
   queue_position: number | null;
-  /** A match still waiting for a team whose table is already certain (towards the end, when nothing queues). */
-  upcoming_table_id: string | null;
-  upcoming_table_name: string | null;
-  /** Since when it is at its table (ready or live). */
-  on_table_at: string | null;
-  /** When it was started at its table (only while live). */
+  /** A match still waiting for a team whose station is already certain (towards the end, when nothing queues). */
+  upcoming_station_id: string | null;
+  upcoming_station_name: string | null;
+  /** Since when it is at its station (ready or live). */
+  on_station_at: string | null;
+  /** When it was started at its station (only while live). */
   started_at: string | null;
   created_at: string;
   status: MatchStatus;
   winner_team_id: string | null;
-  /** cups the winner had left */
-  cups_left: number | null;
+  /** The score of each team (what it counts is up to the game: cups left, goals); null before the result. */
+  score_a: number | null;
+  score_b: number | null;
 }
 
+/** A row of the table where everybody plays everybody (3 points for a win, 1 for a draw). */
+export interface Standing {
+  team_id: string;
+  /** Teams equal in everything share it. */
+  rank: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  score_for: number;
+  score_against: number;
+  points: number;
+}
+
+/** All matches of a tournament: a tree (knock-out) or match days (everybody against everybody). */
 export interface Bracket {
   tournament_id: string;
+  mode: TournamentMode;
+  /** Knock-out: rounds of the tree; everybody against everybody: match days. */
   total_rounds: number;
-  /** winner of the final, once it has a result */
+  /** Once decided: the winner of the final, or the first of the table when all is played. */
   champion_team_id: string | null;
   matches: Match[];
+  /** The table, only where everybody plays everybody. */
+  standings: Standing[] | null;
+  /** Group stage and knock-out: the groups with their tables; the matches without a group are the knock-out tree. */
+  groups: { group: number; standings: Standing[] }[] | null;
+  /** The organization started the knock-out stage: its places have their teams, the groups are fixed. */
+  knockout_started: boolean;
 }
 
 // ── Result ────────────────────────────────────────────
@@ -290,10 +329,20 @@ export interface Result {
   match_id: string;
   type: ResultType;
   winner_team_id: string | null;
-  cups_left: number | null;
+  /** null for a deletion */
+  score_a: number | null;
+  score_b: number | null;
   reported_by_user_id: string;
   reported_by_username?: string;
   created_at: string;
+}
+
+/** A result as it is reported: the winner and the score of both teams of the match. */
+export interface ReportedResult {
+  /** null for a draw (where the game and the mode have draws). */
+  winnerTeamId: string | null;
+  scoreA: number;
+  scoreB: number;
 }
 
 // ── Roles ─────────────────────────────────────────────

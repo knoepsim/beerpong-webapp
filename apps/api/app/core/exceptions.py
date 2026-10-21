@@ -165,6 +165,13 @@ class InvalidWinnerError(AppException):
         super().__init__(400, "INVALID_WINNER", "Der Sieger muss eines der beiden Teams dieses Spiels sein.")
 
 
+class InvalidScoreError(AppException):
+    """The score is not possible in the game of the tournament (see app/games.py)."""
+
+    def __init__(self, detail: str):
+        super().__init__(400, "INVALID_SCORE", detail)
+
+
 class ResultConflictError(AppException):
     def __init__(self, detail: str):
         super().__init__(409, "RESULT_CONFLICT", detail)
@@ -175,29 +182,52 @@ class TeamInTournamentError(AppException):
         super().__init__(409, "TEAM_IN_TOURNAMENT", detail)
 
 
-class MatchNotAtTableError(AppException):
-    def __init__(self):
-        super().__init__(409, "MATCH_NOT_AT_TABLE", "Das Spiel hat noch keinen Tisch und kann noch nicht starten.")
+# the texts about stations name the game's word for them (app/games.py): "keinen Tisch", "keinen Platz"
+
+class MatchNotAtStationError(AppException):
+    def __init__(self, none: str):
+        super().__init__(409, "MATCH_NOT_AT_STATION", f"Das Spiel hat noch {none} und kann noch nicht starten.")
 
 
-class InvalidTableNameError(AppException):
+class InvalidStationNameError(AppException):
     def __init__(self, detail: str):
-        super().__init__(422, "INVALID_TABLE_NAME", detail)
+        super().__init__(422, "INVALID_STATION_NAME", detail)
 
 
-class TableNameTakenError(AppException):
-    def __init__(self):
-        super().__init__(409, "TABLE_NAME_TAKEN", "Einen Tisch mit diesem Namen gibt es schon.")
+class StationNameTakenError(AppException):
+    def __init__(self, accusative: str):
+        super().__init__(409, "STATION_NAME_TAKEN", f"{accusative[0].upper()}{accusative[1:]} mit diesem Namen gibt es schon.")
 
 
-class LastTableError(AppException):
-    def __init__(self):
-        super().__init__(409, "LAST_TABLE", "Ein Turnier braucht mindestens einen Tisch.")
+class LastStationError(AppException):
+    def __init__(self, accusative: str):
+        super().__init__(409, "LAST_STATION", f"Ein Turnier braucht mindestens {accusative}.")
 
 
-class TooManyTablesError(AppException):
-    def __init__(self, maximum: int):
-        super().__init__(409, "TOO_MANY_TABLES", f"Ein Turnier kann höchstens {maximum} Tische haben.")
+class TooManyStationsError(AppException):
+    def __init__(self, maximum: int, plural: str):
+        super().__init__(409, "TOO_MANY_STATIONS", f"Ein Turnier kann höchstens {maximum} {plural} haben.")
+
+
+class InvalidGroupsError(AppException):
+    """Groups that do not work: none set, too few to go on, or too few teams for them."""
+
+    def __init__(self, detail: str):
+        super().__init__(400, "INVALID_GROUPS", detail)
+
+
+class KnockoutError(AppException):
+    """The knock-out stage cannot start (yet): open group matches, a tie without a decision, already started."""
+
+    def __init__(self, detail: str):
+        super().__init__(409, "KNOCKOUT_NOT_POSSIBLE", detail)
+
+
+class InvalidModeError(AppException):
+    """The mode is not one of the modes of the game (app/games.py)."""
+
+    def __init__(self, game: str):
+        super().__init__(400, "INVALID_MODE", f"Diesen Turniermodus gibt es für {game} nicht.")
 
 
 def register_exception_handlers(app: FastAPI) -> None:

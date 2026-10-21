@@ -1,1 +1,1 @@
-"""Turnierplattform API application package."""
+"""MatchBase API application package."""

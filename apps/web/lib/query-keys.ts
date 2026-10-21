@@ -24,7 +24,7 @@ export const queryKeys = {
   tournament: (id: string) => ["tournament", id] as const,
   tournamentTeams: (id: string) => ["tournament", id, "teams"] as const,
   tournamentRoles: (id: string) => ["tournament", id, "roles"] as const,
-  tournamentTables: (id: string) => ["tournament", id, "tables"] as const,
+  tournamentStations: (id: string) => ["tournament", id, "stations"] as const,
   tournamentInvites: (id: string) => ["tournament", id, "invites"] as const,
   tournamentInvitations: (id: string) => ["tournament", id, "invitations"] as const,
   bracket: (id: string) => ["tournament", id, "bracket"] as const,
@@ -48,8 +48,8 @@ const SCOPE_KEYS: Record<LiveScope, (id: string) => QueryKey[]> = {
     queryKeys.invitations,
     queryKeys.myTournaments,
   ],
-  // the tables belong to the bracket: who plays where
-  bracket: (id) => [queryKeys.bracket(id), queryKeys.tournamentTables(id), queryKeys.results, queryKeys.myTournaments],
+  // the stations belong to the bracket: who plays where
+  bracket: (id) => [queryKeys.bracket(id), queryKeys.tournamentStations(id), queryKeys.results, queryKeys.myTournaments],
   roles: (id) => [queryKeys.tournamentRoles(id), queryKeys.myTournaments],
 };
 

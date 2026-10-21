@@ -4,7 +4,7 @@ import { render } from '@/lib/test-fixtures/render';
 import type { ReactNode } from 'react';
 import { MatchResultDialog } from '../match-result-dialog';
 import { api, ApiError } from '@/lib/api';
-import { Game, ResultType } from '@/types';
+import { Game, ResultType, TournamentMode } from '@/types';
 import type { Match, Result } from '@/types';
 import { makeMatch } from '@/lib/test-fixtures/bracket';
 
@@ -36,7 +36,8 @@ const result = (overrides: Partial<Result> = {}): Result => ({
   match_id: 'm1',
   type: ResultType.CREATED,
   winner_team_id: 'a',
-  cups_left: 4,
+  score_a: 4,
+  score_b: 0,
   reported_by_user_id: 'u1',
   reported_by_username: 'Ref',
   created_at: '2026-01-02T10:00:00Z',
@@ -49,6 +50,7 @@ function setup(props: Partial<React.ComponentProps<typeof MatchResultDialog>> = 
     <MatchResultDialog
       tournamentId="t1"
       game={Game.BEERPONG}
+      mode={TournamentMode.SINGLE_ELIMINATION}
       match={match()}
       teamA={teamA}
       teamB={teamB}
@@ -107,7 +109,7 @@ describe('MatchResultDialog', () => {
     expect(saveButton()).toBeEnabled();
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'a', 4));
+    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: 'a', scoreA: 4, scoreB: 0 }));
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(toast.success).toHaveBeenCalledWith('Ergebnis gespeichert.');
   });
@@ -118,7 +120,7 @@ describe('MatchResultDialog', () => {
     await ready();
     fireEvent.click(screen.getAllByText('Bravo')[1].closest('button')!);
     fireEvent.click(saveButton());
-    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'b', 10));
+    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: 'b', scoreA: 0, scoreB: 10 }));
   });
 
   it('does not jump into the cups when an existing result is opened', async () => {
@@ -143,7 +145,7 @@ describe('MatchResultDialog', () => {
     fireEvent.change(cupsInput(), { target: { value: '10' } });
     fireEvent.click(saveButton());
 
-    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', 'b', 10));
+    await waitFor(() => expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: 'b', scoreA: 0, scoreB: 10 }));
   });
 
   it('keeps clicks inside the cups input from toggling the card', async () => {
@@ -199,13 +201,13 @@ describe('MatchResultDialog', () => {
 
     fireEvent.change(cupsInput(), { target: { value: '6' } });
     fireEvent.click(saveButton());
-    await waitFor(() => expect(results.modify).toHaveBeenCalledWith('m1', 'a', 6));
+    await waitFor(() => expect(results.modify).toHaveBeenCalledWith('m1', { winnerTeamId: 'a', scoreA: 6, scoreB: 0 }));
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(toast.success).toHaveBeenCalledWith('Ergebnis geändert.');
   });
 
   it('treats a switched winner as a change', async () => {
-    results.list.mockResolvedValue([result({ cups_left: null })]);
+    results.list.mockResolvedValue([result({ score_a: 10, score_b: 0 })]);
     setup();
     await ready();
 
@@ -270,9 +272,9 @@ describe('MatchResultDialog', () => {
 
   it('toggles and renders the history of all entries', async () => {
     results.list.mockResolvedValue([
-      result({ id: '1', type: ResultType.CREATED, winner_team_id: 'a', cups_left: 4 }),
-      result({ id: '2', type: ResultType.MODIFIED, winner_team_id: 'b', cups_left: null, reported_by_username: undefined }),
-      result({ id: '3', type: ResultType.MODIFIED, winner_team_id: 'zzz', cups_left: null }),
+      result({ id: '1', type: ResultType.CREATED, winner_team_id: 'a', score_a: 4, score_b: 0 }),
+      result({ id: '2', type: ResultType.MODIFIED, winner_team_id: 'b', score_a: null, score_b: null, reported_by_username: undefined }),
+      result({ id: '3', type: ResultType.MODIFIED, winner_team_id: 'zzz', score_a: null, score_b: null }),
       result({ id: '4', type: ResultType.DELETED, winner_team_id: null }),
     ]);
     setup();
@@ -281,7 +283,7 @@ describe('MatchResultDialog', () => {
     expect(screen.queryByText(/Gemeldet/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Verlauf anzeigen'));
 
-    expect(screen.getByText(/Gemeldet: Alpha \(4 Becher\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Gemeldet: Alpha \(4:0\)/)).toBeInTheDocument();
     expect(screen.getByText(/Geändert: Bravo/)).toBeInTheDocument();
     expect(screen.getByText(/Geändert: Unbekannt/)).toBeInTheDocument();
     expect(screen.getByText('Ergebnis gelöscht')).toBeInTheDocument();
@@ -346,8 +348,8 @@ describe('MatchResultDialog: start', () => {
     vi.mocked(api.matches.undoStart).mockReset().mockResolvedValue(undefined);
   });
 
-  it('starts a match at its table and shows the table', async () => {
-    const { onOpenChange } = setup({ match: match({ status: 'ready', table_id: 't', table_name: 'Terrasse' }) });
+  it('starts a match at its station and shows the station', async () => {
+    const { onOpenChange } = setup({ match: match({ status: 'ready', station_id: 't', station_name: 'Terrasse' }) });
     await ready();
 
     expect(screen.getByText('Terrasse')).toBeInTheDocument();
@@ -358,21 +360,82 @@ describe('MatchResultDialog: start', () => {
     expect(toast.success).toHaveBeenCalledWith('Spiel an Terrasse gestartet.');
   });
 
-  it('cannot start a match without a table, but the result can still be reported', async () => {
+  it('cannot start a match without a station, but the result can still be reported', async () => {
     setup({ match: match({ status: 'queued', queue_position: 2 }) });
     await ready();
 
     expect(screen.queryByRole('button', { name: 'Spiel starten' })).not.toBeInTheDocument();
-    expect(screen.getByText('Platz 2')).toBeInTheDocument();
+    expect(screen.getByText('Nr. 2')).toBeInTheDocument();
     expect(saveButton()).toBeInTheDocument();
   });
 
   it('shows since when a live match runs and can take the start back', async () => {
-    setup({ match: match({ status: 'live', table_id: 't', table_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
+    setup({ match: match({ status: 'live', station_id: 't', station_name: 'Tisch 1', started_at: '2026-10-16T18:05:00Z' }) });
     await ready();
 
     expect(screen.getByText(/^seit \d{2}:\d{2} Uhr$/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Start zurücknehmen' }));
     await waitFor(() => expect(api.matches.undoStart).toHaveBeenCalledWith('m1'));
   });
+
+  describe('football', () => {
+    const goals = (team: string) => screen.getByLabelText(`Tore ${team}`) as HTMLInputElement;
+
+    it('takes the goals of both teams and the winner follows from them', async () => {
+      results.create.mockResolvedValue(result());
+      setup({ game: Game.FOOTBALL });
+      expect(await screen.findByText('Wie ist es ausgegangen?')).toBeInTheDocument();
+      expect(goals('Alpha')).toHaveFocus();
+
+      fireEvent.change(goals('Alpha'), { target: { value: '1' } });
+      expect(saveButton()).toBeDisabled(); // both scores are needed
+      fireEvent.change(goals('Bravo'), { target: { value: '2' } });
+      fireEvent.click(saveButton());
+
+      await waitFor(() =>
+        expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: 'b', scoreA: 1, scoreB: 2 }),
+      );
+    });
+
+    it('has no draws: it says how to enter one', async () => {
+      setup({ game: Game.FOOTBALL });
+      await screen.findByText('Wie ist es ausgegangen?');
+      fireEvent.change(goals('Alpha'), { target: { value: '2' } });
+      fireEvent.change(goals('Bravo'), { target: { value: '2' } });
+      expect(screen.getByRole('status')).toHaveTextContent('Elfmeterschießen');
+      expect(saveButton()).toBeDisabled();
+    });
+
+    it('prefills a saved score', async () => {
+      results.list.mockResolvedValue([result({ winner_team_id: 'a', score_a: 3, score_b: 1 })]);
+      setup({ game: Game.FOOTBALL });
+      await screen.findByText('Wie ist es ausgegangen?');
+      expect(goals('Alpha').value).toBe('3');
+      expect(goals('Bravo').value).toBe('1');
+      expect(saveButton()).toBeDisabled(); // nothing changed
+    });
+  });
+
+  describe('everybody against everybody', () => {
+    it('saves a draw in football', async () => {
+      results.create.mockResolvedValue(result())
+      setup({ game: Game.FOOTBALL, mode: TournamentMode.ROUND_ROBIN })
+      await screen.findByText('Wie ist es ausgegangen?')
+      fireEvent.change(screen.getByLabelText('Tore Alpha'), { target: { value: '1' } })
+      fireEvent.change(screen.getByLabelText('Tore Bravo'), { target: { value: '1' } })
+      expect(screen.queryByRole('status')).not.toBeInTheDocument() // no hint: a draw counts here
+      fireEvent.click(saveButton())
+      await waitFor(() =>
+        expect(results.create).toHaveBeenCalledWith('m1', { winnerTeamId: null, scoreA: 1, scoreB: 1 }),
+      )
+    })
+
+    it('shows a saved draw in the history', async () => {
+      results.list.mockResolvedValue([result({ winner_team_id: null, score_a: 2, score_b: 2 })])
+      setup({ game: Game.FOOTBALL, mode: TournamentMode.ROUND_ROBIN })
+      await screen.findByText('Wie ist es ausgegangen?')
+      fireEvent.click(screen.getByText('Verlauf anzeigen'))
+      expect(screen.getByText(/Gemeldet: Unentschieden \(2:2\)/)).toBeInTheDocument()
+    })
+  })
 });

@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 FUTURE = "2099-12-31T20:00:00Z"
 
@@ -40,7 +40,7 @@ class Ctx:
     async def finish(self):
         final = (await self.client.get(f"/tournaments/{self.tid}/bracket", headers=self.admin)).json()["matches"][0]
         resp = await self.client.post(
-            f"/matches/{final['id']}/results", json={"winner_team_id": final["team_a_id"], "cups_left": 2}, headers=self.admin
+            f"/matches/{final['id']}/results", json=won(final, final["team_a_id"], 2), headers=self.admin
         )
         assert resp.status_code == 201
 
@@ -124,7 +124,7 @@ async def test_my_tournaments_carry_the_next_match_and_at_the_end_the_place(ctx:
     await ctx.start()
     running = await _mine(ctx, 0)
     assert running["next_match"]["status"] == "ready"
-    assert running["next_match"]["table_name"] == "Tisch 1"
+    assert running["next_match"]["station_name"] == "Tisch 1"
 
     await ctx.finish()  # team a of the final wins
     final = (await ctx.client.get(f"/tournaments/{ctx.tid}/bracket", headers=ctx.admin)).json()["matches"][0]

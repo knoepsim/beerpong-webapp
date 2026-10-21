@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
-  const token = request.cookies.get("beerpong_access_token")?.value;
+  // the session cookie of the API (apps/api/app/core/security.py ACCESS_COOKIE)
+  const token = request.cookies.get("matchbase_access_token")?.value;
   
   // Protected routes
   const isProtectedRoute = 

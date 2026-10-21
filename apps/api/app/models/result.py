@@ -24,7 +24,10 @@ class Result(Base):
     winner_team_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("teams.id"), nullable=True
     )
-    cups_left: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # the score of both teams; what it counts is up to the game (beer pong: cups left, football: goals).
+    # None for a deletion
+    score_a: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_b: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reported_by_user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )

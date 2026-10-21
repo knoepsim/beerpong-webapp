@@ -118,7 +118,8 @@ async def list_results(
             match_id=r.match_id,
             type=r.type,
             winner_team_id=r.winner_team_id,
-            cups_left=r.cups_left,
+            score_a=r.score_a,
+            score_b=r.score_b,
             reported_by_user_id=r.reported_by_user_id,
             reported_by_username=r.reported_by_user.name if involved and r.reported_by_user else None,
             created_at=r.created_at

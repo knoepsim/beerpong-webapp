@@ -25,7 +25,7 @@ vi.mock('remark-gfm', () => ({ default: () => {} }));
 vi.mock('@/lib/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/api')>()),
   api: {
-    tournaments: { update: vi.fn(), delete: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn(), listTables: vi.fn() },
+    tournaments: { update: vi.fn(), delete: vi.fn(), listInvites: vi.fn(), createInvite: vi.fn(), deleteInvite: vi.fn(), listStations: vi.fn() },
     users: { search: vi.fn() },
     roles: { assign: vi.fn(), revoke: vi.fn() },
   },
@@ -89,7 +89,7 @@ vi.mock('@/components/ui/alert-dialog', async () => {
 const mocked = {
   update: vi.mocked(api.tournaments.update),
   invites: vi.mocked(api.tournaments.listInvites),
-  tables: vi.mocked(api.tournaments.listTables),
+  stations: vi.mocked(api.tournaments.listStations),
   remove: vi.mocked(api.tournaments.delete),
   search: vi.mocked(api.users.search),
   assign: vi.mocked(api.roles.assign),
@@ -116,6 +116,9 @@ const tournament: Tournament = {
   checkin_open: false,
   game: Game.BEERPONG,
   mode: TournamentMode.SINGLE_ELIMINATION,
+  group_count: null,
+  advance_per_group: null,
+  knockout_started_at: null,
   visibility: TournamentVisibility.PUBLIC,
   join_policy: JoinPolicy.OPEN,
   is_deleted: false,
@@ -150,7 +153,7 @@ const nameInput = () => screen.getByDisplayValue('Summer Cup');
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocked.tables.mockResolvedValue([{ id: 'x1', name: 'Tisch 1', position: 1 }]);
+  mocked.stations.mockResolvedValue([{ id: 'x1', name: 'Tisch 1', position: 1 }]);
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
 });
 afterEach(() => cleanup());
@@ -390,23 +393,23 @@ describe('editing the tournament: each card saves its own fields', () => {
   });
 });
 
-describe('tables', () => {
+describe('stations', () => {
   it('are managed by organisers, one card each', async () => {
-    mocked.tables.mockResolvedValue([
+    mocked.stations.mockResolvedValue([
       { id: 'x1', name: 'Tisch 1', position: 1 },
       { id: 'x2', name: 'Terrasse', position: 2 },
     ]);
     setup(TournamentRoleType.MANAGER);
     expect(await screen.findByText('Terrasse')).toBeInTheDocument();
     expect(screen.getByText('Tisch 1')).toBeInTheDocument();
-    expect(mocked.tables).toHaveBeenCalledWith('t1');
+    expect(mocked.stations).toHaveBeenCalledWith('t1');
     expect(screen.queryByText('Anzahl Tische')).not.toBeInTheDocument(); // no number to type any more
   });
 
   it('are not shown to referees', () => {
     setup(TournamentRoleType.REFEREE);
     expect(screen.queryByRole('button', { name: 'Tisch hinzufügen' })).not.toBeInTheDocument();
-    expect(mocked.tables).not.toHaveBeenCalled();
+    expect(mocked.stations).not.toHaveBeenCalled();
   });
 });
 

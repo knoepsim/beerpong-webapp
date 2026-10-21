@@ -1,22 +1,14 @@
-/** The tabs of a tournament page and how they appear in the address (?tab=spielplan), so reload, back and links keep them. */
-export type TournamentTab = "overview" | "bracket" | "tables" | "teams" | "admin";
+/** The tabs of a tournament page, in the address as they are called in the code (?tab=schedule), so reload, back and links keep them. */
+export const TOURNAMENT_TABS = ["overview", "schedule", "stations", "participants", "manage"] as const;
 
-const PARAM: Record<TournamentTab, string | null> = {
-  overview: null, // the default needs no parameter
-  bracket: "spielplan",
-  tables: "tische",
-  teams: "teilnehmer",
-  admin: "verwalten",
-};
+export type TournamentTab = (typeof TOURNAMENT_TABS)[number];
 
 /** The tab of a `?tab=` value; anything unknown is the overview. */
 export function tabFromParam(value: string | null | undefined): TournamentTab {
-  const found = (Object.keys(PARAM) as TournamentTab[]).find((tab) => PARAM[tab] === value);
-  return found ?? "overview";
+  return TOURNAMENT_TABS.find((tab) => tab === value) ?? "overview";
 }
 
-/** The query string for a tab ("" for the overview). */
+/** The query string for a tab ("" for the overview, the default needs no parameter). */
 export function tabQuery(tab: TournamentTab): string {
-  const value = PARAM[tab];
-  return value ? `?tab=${value}` : "";
+  return tab === "overview" ? "" : `?tab=${tab}`;
 }

@@ -9,8 +9,9 @@ import { AccessFields } from "@/components/access-fields";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepProgress, StepSection, useFormSteps } from "@/components/form-steps";
 import { GamePicker } from "@/components/game-picker";
-import { GAMES } from "@/components/games";
+import { GAMES, STATION_TERMS } from "@/components/games";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { NumberInput } from "@/components/number-input";
 import { ModePicker } from "@/components/mode-picker";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,13 +23,14 @@ import { clearDraft, readDraft, useFormDraft } from "@/hooks/use-form-draft";
 import { errorMessage } from "@/lib/errors";
 import {
   NEW_TOURNAMENT_DEFAULTS,
-  NEW_TOURNAMENT_STEPS,
+  newTournamentSteps,
   SCHEDULE_FIELDS,
   newTournamentSchema,
   toCreateRequest,
   type NewTournamentValues,
 } from "@/lib/new-tournament";
 import type { ScheduleErrors, ScheduleValues } from "@/lib/tournament-schedule";
+import { TournamentMode, type Game } from "@/types";
 
 const DRAFT_KEY = "draft:new-tournament";
 
@@ -66,10 +68,19 @@ export function NewTournamentForm() {
     resolver: zodResolver(newTournamentSchema),
     defaultValues: start.values,
   });
-  const steps = useFormSteps(form, NEW_TOURNAMENT_STEPS);
   useFormDraft(DRAFT_KEY, form);
 
-  const [game, visibility, joinPolicy] = useWatch({ control: form.control, name: ["game", "visibility", "join_policy"] });
+  const [game, mode, visibility, joinPolicy, groupCount, advance] = useWatch({
+    control: form.control,
+    name: ["game", "mode", "visibility", "join_policy", "group_count", "advance_per_group"],
+  });
+  // what a station is called follows the game ("Tische", "Plätze"); before it is chosen the neutral word
+  const terms = game ? GAMES[game].station : STATION_TERMS;
+  // the mode brings its own step (the groups)
+  const stepList = newTournamentSteps(mode, terms.plural);
+  const steps = useFormSteps(form, stepList);
+  const active = (id: string) => stepList[steps.index]?.id === id;
+  const step = (id: string) => stepList.find((s) => s.id === id) ?? { id, title: "" };
   // a hook, not form.formState: the compiler would keep an old proxy value
   const { isDirty } = useFormState({ control: form.control });
 
@@ -115,11 +126,18 @@ export function NewTournamentForm() {
     else void steps.next();
   };
 
-  const [gameStep, detailsStep, scheduleStep, accessStep] = NEW_TOURNAMENT_STEPS;
+  const [gameStep, detailsStep, scheduleStep, accessStep] = ["spiel", "turnier", "zeitplan", "zugang"].map(step);
+
+  // another game may not have the chosen mode: then it is chosen again
+  const chooseGame = (next: Game | undefined) => {
+    form.setValue("game", next as Game, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+    const mode = form.getValues("mode");
+    if (next && mode && !GAMES[next].modes.includes(mode)) form.resetField("mode", { defaultValue: undefined });
+  };
 
   return (
     <>
-      <StepProgress steps={NEW_TOURNAMENT_STEPS} index={steps.index} reached={steps.reached} onGoTo={steps.goTo} />
+      <StepProgress steps={stepList} index={steps.index} reached={steps.reached} onGoTo={steps.goTo} />
 
       {restored && (
         <Alert>
@@ -134,7 +152,7 @@ export function NewTournamentForm() {
 
       <Form {...form}>
         <form onSubmit={onSubmit} noValidate className="flex flex-col gap-6">
-          <StepSection id={gameStep.id} title={gameStep.title} active={steps.index === 0}>
+          <StepSection id={gameStep.id} title={gameStep.title} active={active("spiel")}>
             <FormField
               control={form.control}
               name="game"
@@ -142,7 +160,7 @@ export function NewTournamentForm() {
                 <FormItem>
                   <FormLabel>Spiel</FormLabel>
                   <FormControl>
-                    <GamePicker value={field.value} onChange={field.onChange} />
+                    <GamePicker value={field.value} onChange={chooseGame} />
                   </FormControl>
                   <FormDescription>Es bestimmt, wie ein Ergebnis eingetragen wird.</FormDescription>
                   <FormMessage />
@@ -155,6 +173,7 @@ export function NewTournamentForm() {
               render={({ field, fieldState }) => (
                 <div className="flex flex-col gap-2">
                   <ModePicker
+                    modes={game ? GAMES[game].modes : undefined}
                     value={field.value}
                     onChange={field.onChange}
                     errorId={fieldState.error ? "new-mode-error" : undefined}
@@ -169,7 +188,45 @@ export function NewTournamentForm() {
             />
           </StepSection>
 
-          <StepSection id={detailsStep.id} title={detailsStep.title} active={steps.index === 1}>
+          {mode === TournamentMode.GROUPS_KNOCKOUT && (
+            <StepSection id="gruppen" title="Gruppen" active={active("gruppen")}>
+              <FormField
+                control={form.control}
+                name="group_count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Anzahl Gruppen</FormLabel>
+                    <FormControl>
+                      <NumberInput min={1} max={26} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="advance_per_group"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Weiter pro Gruppe</FormLabel>
+                    <FormControl>
+                      <NumberInput min={1} max={16} {...field} />
+                    </FormControl>
+                    <FormDescription>So viele aus jeder Gruppe spielen in der K.-o.-Runde weiter.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {groupCount > 0 && advance > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  In die K.-o.-Runde kommen {groupCount * advance} Teams. Dafür braucht es mindestens{" "}
+                  {groupCount * Math.max(advance + 1, 2)} Teams, die Gruppen werden beim Start ausgelost.
+                </p>
+              )}
+            </StepSection>
+          )}
+
+          <StepSection id={detailsStep.id} title={detailsStep.title} active={active("turnier")}>
             <FormField
               control={form.control}
               name="name"
@@ -212,7 +269,7 @@ export function NewTournamentForm() {
             />
           </StepSection>
 
-          <StepSection id={scheduleStep.id} title={scheduleStep.title} active={steps.index === 2}>
+          <StepSection id={scheduleStep.id} title={scheduleStep.title} active={active("zeitplan")}>
             {/* a field of the form like the others: its errors come with the field state (react-hook-form changes its
                 error object in place, a value read from it outside of a field would stay old) */}
             <FormField
@@ -236,7 +293,7 @@ export function NewTournamentForm() {
             />
           </StepSection>
 
-          <StepSection id={accessStep.id} title={accessStep.title} active={steps.index === 3}>
+          <StepSection id={accessStep.id} title={accessStep.title} active={active("zugang")}>
             <AccessFields
               values={{ visibility, join_policy: joinPolicy }}
               onChange={(patch) => {
@@ -246,21 +303,12 @@ export function NewTournamentForm() {
             />
             <FormField
               control={form.control}
-              name="table_count"
+              name="station_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Anzahl Tische</FormLabel>
+                  <FormLabel>Anzahl {terms.plural}</FormLabel>
                   <FormControl>
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={100}
-                      className="max-w-32"
-                      {...field}
-                      value={Number.isNaN(field.value) ? "" : field.value}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                    />
+                    <NumberInput min={1} max={100} {...field} />
                   </FormControl>
                   <FormDescription>Du kannst sie später benennen, hinzufügen und löschen.</FormDescription>
                   <FormMessage />

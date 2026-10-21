@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 
 class Ctx:
@@ -127,7 +127,7 @@ async def test_strangers_do_not_learn_who_entered_a_result(ctx: Ctx):
     match = bracket["matches"][0]
     resp = await ctx.client.post(
         f"/matches/{match['id']}/results",
-        json={"winner_team_id": match["team_a_id"], "cups_left": 3},
+        json=won(match, match["team_a_id"], 3),
         headers=ctx.headers["referee"],
     )
     assert resp.status_code == 201, resp.text

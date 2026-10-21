@@ -376,7 +376,7 @@ async def test_generate_bracket_endpoint_is_gone(ctx: Ctx):
     [
         {"registration_end_time": "2099-12-31T21:00:00Z"},  # registration closes after the start
         {"checkin_enabled": True, "checkin_start_time": "2099-12-31T21:00:00Z"},  # check-in after the start
-        {"table_count": 0},
+        {"station_count": 0},
         {"name": ""},
     ],
 )

@@ -2,7 +2,7 @@ import pytest
 import asyncio
 from httpx import AsyncClient
 from unittest.mock import patch
-from tests.helpers import PLAYS
+from tests.helpers import PLAYS, won
 
 @pytest.mark.asyncio
 async def test_full_tournament_lifecycle(async_client: AsyncClient):
@@ -69,7 +69,7 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
         # 3. Create Tournament
         resp = await async_client.post(
             "/tournaments",
-            json={**PLAYS, "name": "Grand Championship", "table_count": 2, "location": "Berlin", "start_time": "2026-12-31T20:00:00Z"},
+            json={**PLAYS, "name": "Grand Championship", "station_count": 2, "location": "Berlin", "start_time": "2026-12-31T20:00:00Z"},
             headers=auth_header(0) # User 1 creates it
         )
         assert resp.status_code == 201
@@ -123,7 +123,7 @@ async def test_full_tournament_lifecycle(async_client: AsyncClient):
             winner_id = ready_match["team_a_id"]
             resp = await async_client.post(
                 f"/matches/{ready_match['id']}/results",
-                json={"winner_team_id": winner_id, "cups_left": 3},
+                json=won(ready_match, winner_id, 3),
                 headers=auth_header(0) # User 1 (Admin) reports the result
             )
             assert resp.status_code == 201

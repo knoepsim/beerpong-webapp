@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { podium } from './podium'
 import { fiveTeamBracket } from './test-fixtures/bracket'
 
-const won = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, cups_left: 2 })
+const won = (winner: string) => ({ status: 'finished' as const, winner_team_id: winner, score_a: 2, score_b: 0 })
 
 describe('podium', () => {
   it('is empty before the end', () => {

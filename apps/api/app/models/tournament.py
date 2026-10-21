@@ -14,12 +14,15 @@ class Game(str, enum.Enum):
     """What is played. It decides how a result is entered (for beer pong: the cups that are left)."""
 
     BEERPONG = "beerpong"
+    FOOTBALL = "football"
 
 
 class TournamentMode(str, enum.Enum):
     """How the teams meet. Only the modes that are implemented; the app shows the coming ones as not available."""
 
     SINGLE_ELIMINATION = "single_elimination"
+    ROUND_ROBIN = "round_robin"
+    GROUPS_KNOCKOUT = "groups_knockout"
 
 
 class TournamentVisibility(str, enum.Enum):
@@ -80,6 +83,11 @@ class Tournament(Base):
     checkin_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     game: Mapped[Game] = mapped_column(Enum(Game), nullable=False)
     mode: Mapped[TournamentMode] = mapped_column(Enum(TournamentMode), nullable=False)
+    # group stage and knock-out: how many groups, how many of each go on; None in the other modes
+    group_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    advance_per_group: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # when the organization started the knock-out stage: from then on the group results are fixed
+    knockout_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     visibility: Mapped[TournamentVisibility] = mapped_column(Enum(TournamentVisibility), nullable=False)
     join_policy: Mapped[JoinPolicy] = mapped_column(
         Enum(JoinPolicy), default=JoinPolicy.OPEN, server_default=JoinPolicy.OPEN.name, nullable=False

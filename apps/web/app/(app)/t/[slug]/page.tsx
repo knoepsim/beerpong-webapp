@@ -15,12 +15,14 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Schedule } from "@/components/schedule";
 import { ParticipantStatus } from "@/components/participant-status";
-import { TablesBoard } from "@/components/tables-board";
+import { StationsBoard } from "@/components/stations-board";
 import { PodiumCard } from "@/components/podium-card";
 import { TournamentSettings } from "@/components/tournament-settings";
 import { TournamentTimeline } from "@/components/tournament-timeline";
 import { TournamentHeader } from "@/components/tournament-header";
 import { TournamentControlCard } from "@/components/tournament-control-card";
+import { GameProvider } from "@/components/game-context";
+import { GAMES } from "@/components/games";
 import { TournamentTeamsTab } from "@/components/tournament-teams-tab";
 import { JoinTournament } from "@/components/join-tournament";
 import { TournamentPreviewCard } from "@/components/tournament-preview";
@@ -32,7 +34,7 @@ import { highestRole } from "@/lib/roles";
 import { tabFromParam, tabQuery, type TournamentTab } from "@/lib/tournament-tabs";
 import { cn } from "@/lib/utils";
 
-// only referees, managers and admins open it: the dialog with its cup animation is loaded then, not for everybody
+// only referees, managers and admins open it: the dialog with the result input of the game is loaded then, not for everybody
 const MatchResultDialog = dynamic(() => import("@/components/match-result-dialog").then((m) => m.MatchResultDialog), {
   ssr: false,
 });
@@ -63,7 +65,7 @@ export default function TournamentDetailPage({
   const { slug } = use(params);
   const { tab: tabParam } = use(searchParams);
   const { user } = useCurrentUser();
-  const { tournament, teams, teamsMap, roles, tables, bracket, preview, isLoading, error, retry, live } =
+  const { tournament, teams, teamsMap, roles, stations, bracket, preview, isLoading, error, retry, live } =
     useTournament(slug);
   const actions = useTournamentActions(tournament, teams);
 
@@ -124,11 +126,11 @@ export default function TournamentDetailPage({
     );
   }
 
-  // the tables only matter while it runs; a tab that is not there (tables before the start or after the end,
+  // the stations only matter while it runs; a tab that is not there (stations before the start or after the end,
   // settings without the role) shows the overview
-  const hasTables = !!bracket && !tournament.finished_at;
+  const hasStations = !!bracket && !tournament.finished_at;
   const shownTab: TournamentTab =
-    (tab === "tables" && !hasTables) || (tab === "admin" && !canManage) ? "overview" : tab;
+    (tab === "stations" && !hasStations) || (tab === "manage" && !canManage) ? "overview" : tab;
   // results only after the start and only for a match with both teams
   const openResult =
     canReferee && tournament.started_at
@@ -141,6 +143,7 @@ export default function TournamentDetailPage({
   const matchTeamB = selectedMatch?.team_b_id ? teamsMap[selectedMatch.team_b_id] : undefined;
 
   return (
+    <GameProvider game={tournament.game}>
     <div className="mx-auto max-w-4xl px-4 pt-6 pb-20 md:pb-6 space-y-6">
       <TournamentHeader tournament={tournament} teamCount={teams.length} />
 
@@ -165,16 +168,16 @@ export default function TournamentDetailPage({
       <Tabs value={shownTab} onValueChange={changeTab} className="w-full">
         <TabsList className="w-full flex flex-wrap h-auto bg-muted/50 p-1">
           <TabsTrigger value="overview" className="flex-1">Übersicht</TabsTrigger>
-          <TabsTrigger value="bracket" className="flex-1">Spielplan</TabsTrigger>
-          {hasTables && <TabsTrigger value="tables" className="flex-1">Tische</TabsTrigger>}
-          <TabsTrigger value="teams" className="flex-1">Teilnehmer</TabsTrigger>
+          <TabsTrigger value="schedule" className="flex-1">Spielplan</TabsTrigger>
+          {hasStations && <TabsTrigger value="stations" className="flex-1">{GAMES[tournament.game].station.plural}</TabsTrigger>}
+          <TabsTrigger value="participants" className="flex-1">Teilnehmer</TabsTrigger>
         </TabsList>
         {canManage && (
           <Button
             variant="outline"
-            className={cn("mt-2 h-11 w-full", tab === "admin" && "border-primary bg-primary/10 text-primary")}
-            onClick={() => changeTab("admin")}
-            aria-pressed={tab === "admin"}
+            className={cn("mt-2 h-11 w-full", tab === "manage" && "border-primary bg-primary/10 text-primary")}
+            onClick={() => changeTab("manage")}
+            aria-pressed={tab === "manage"}
           >
             <ShieldAlert aria-hidden="true" />
             Turnier verwalten
@@ -188,6 +191,8 @@ export default function TournamentDetailPage({
             <TournamentControlCard
               tournament={tournament}
               teams={teams}
+              bracket={bracket}
+              teamsMap={teamsMap}
               isStarting={actions.isStarting}
               onSetOpen={actions.setOpen}
               onStart={actions.startTournament}
@@ -215,9 +220,15 @@ export default function TournamentDetailPage({
           )}
         </TabsContent>
 
-        <TabsContent value="bracket" className="mt-6">
+        <TabsContent value="schedule" className="mt-6">
           {bracket ? (
-            <Schedule bracket={bracket} teamsMap={teamsMap} highlightTeamId={myTeam?.id} onMatchClick={openResult} />
+            <Schedule
+              bracket={bracket}
+              teamsMap={teamsMap}
+              highlightTeamId={myTeam?.id}
+              onMatchClick={openResult}
+              advance={tournament.advance_per_group ?? undefined}
+            />
           ) : (
             <EmptyNote
               icon={Trophy}
@@ -227,12 +238,12 @@ export default function TournamentDetailPage({
           )}
         </TabsContent>
 
-        {hasTables && bracket && (
-          <TabsContent value="tables" className="mt-6">
-            <TablesBoard
+        {hasStations && bracket && (
+          <TabsContent value="stations" className="mt-6">
+            <StationsBoard
               tournamentId={tournament.id}
               bracket={bracket}
-              tables={tables}
+              stations={stations}
               teamsMap={teamsMap}
               highlightTeamId={myTeam?.id}
               onResult={openResult}
@@ -240,7 +251,7 @@ export default function TournamentDetailPage({
           </TabsContent>
         )}
 
-        <TabsContent value="teams" className="mt-6">
+        <TabsContent value="participants" className="mt-6">
           <TournamentTeamsTab
             tournament={tournament}
             teams={teams}
@@ -252,7 +263,7 @@ export default function TournamentDetailPage({
         </TabsContent>
 
         {canManage && (
-          <TabsContent value="admin" className="mt-6">
+          <TabsContent value="manage" className="mt-6">
             <TournamentSettings tournament={tournament} roles={roles} userRole={userRole} />
           </TabsContent>
         )}
@@ -262,6 +273,8 @@ export default function TournamentDetailPage({
         <MatchResultDialog
           tournamentId={tournament.id}
           game={tournament.game}
+          mode={tournament.mode}
+          groupsFixed={!!tournament.knockout_started_at}
           match={selectedMatch}
           teamA={{ id: matchTeamA.id, name: matchTeamA.name }}
           teamB={{ id: matchTeamB.id, name: matchTeamB.name }}
@@ -270,5 +283,6 @@ export default function TournamentDetailPage({
         />
       )}
     </div>
+    </GameProvider>
   );
 }
