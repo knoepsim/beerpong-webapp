@@ -27,6 +27,11 @@ class Match(Base):
         UUID(as_uuid=True), ForeignKey("matches.id"), nullable=True
     )
     next_match_slot: Mapped[str | None] = mapped_column(String(1), nullable=True)  # "a" or "b"
+    # group stage: the group of the match (1 = A); None for a match of a knock-out
+    group_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # knock-out after groups: the place of the group the team comes from ("A1"), until the knock-out starts
+    source_a: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    source_b: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # the station it is played at (or was played at): decided by the station planner when the match gets a station
     station_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("stations.id", ondelete="SET NULL"), nullable=True

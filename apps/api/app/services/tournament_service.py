@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select
 
 from app.games import GAMES, stations_of
 from app.core.exceptions import (
+    InvalidGroupsError,
     InvalidModeError,
     NotFoundError,
     PlayerAlreadyInTournamentError,
@@ -51,6 +52,8 @@ BEFORE_START_ONLY = (
     # what is played and how: the bracket is drawn for them at the start
     "game",
     "mode",
+    "group_count",
+    "advance_per_group",
 )
 
 
@@ -68,6 +71,17 @@ def _check_mode(game: Game, mode: TournamentMode) -> None:
         raise InvalidModeError(GAMES[game].label)
 
 
+def _group_settings(mode: TournamentMode, group_count: int | None, advance: int | None) -> dict:
+    """The group settings of the mode: required for group stage and knock-out, none for the other modes."""
+    if mode != TournamentMode.GROUPS_KNOCKOUT:
+        return {"group_count": None, "advance_per_group": None}
+    if group_count is None or advance is None:
+        raise InvalidGroupsError("Lege fest, wie viele Gruppen es gibt und wie viele aus jeder weiterkommen.")
+    if group_count * advance < 2:
+        raise InvalidGroupsError("In die K.-o.-Runde müssen mindestens 2 Teams kommen.")
+    return {"group_count": group_count, "advance_per_group": advance}
+
+
 class TournamentService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -77,6 +91,7 @@ class TournamentService:
         _check_mode(data.game, data.mode)
         validate_schedule(data.start_time, data.registration_end_time, data.checkin_enabled, data.checkin_start_time)
         obj_in = self._normalize_automation(data.model_dump())
+        obj_in.update(_group_settings(data.mode, data.group_count, data.advance_per_group))
         station_count = obj_in.pop("station_count")
         obj_in["slug"] = await self._unique_slug(slugify(data.name))
         obj_in["created_by_id"] = creator_id
@@ -191,7 +206,16 @@ class TournamentService:
             raise TournamentAlreadyStartedError()
 
         game = update_data.get("game") or tournament.game
-        _check_mode(game, update_data.get("mode") or tournament.mode)
+        mode = update_data.get("mode") or tournament.mode
+        _check_mode(game, mode)
+        if {"mode", "group_count", "advance_per_group"} & update_data.keys():
+            update_data.update(
+                _group_settings(
+                    mode,
+                    update_data.get("group_count", tournament.group_count),
+                    update_data.get("advance_per_group", tournament.advance_per_group),
+                )
+            )
         if game != tournament.game:
             await StationService(self.db).rename_defaults(tournament.id, stations_of(tournament.game), stations_of(game))
 
@@ -279,8 +303,11 @@ class TournamentService:
             # everybody against everybody: the rank once all is played, before that the next match
             if tournament.finished_at:
                 return {"place": next((row.rank for row in bracket.standings if row.team_id == team_id), None)}
+        elif bracket.groups is not None and bracket.knockout_started and not any(m.group is None for m in mine):
+            # out in the group stage: no place in the end result, no match any more
+            return {}
         else:
-            lost = next((m for m in mine if m.winner_team_id is not None and m.winner_team_id != team_id), None)
+            lost = next((m for m in mine if m.group is None and m.winner_team_id is not None and m.winner_team_id != team_id), None)
             if lost is not None:
                 return {"place": 2 ** (bracket.total_rounds - lost.round) + 1}
         return {"next_match": next((m for m in mine if m.status != MatchStatus.FINISHED), None)}

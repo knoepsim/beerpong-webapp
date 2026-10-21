@@ -39,7 +39,7 @@ async def test_game_and_mode_are_stored_and_returned(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_a_mode_that_is_not_there_yet_is_refused(async_client: AsyncClient):
     admin = await _admin(async_client)
-    body = {**PLAYS, "mode": "groups_knockout", "name": "Cup", "start_time": FUTURE}
+    body = {**PLAYS, "mode": "swiss", "name": "Cup", "start_time": FUTURE}
     assert (await async_client.post("/tournaments", json=body, headers=admin)).status_code == 422
 
 
@@ -76,3 +76,18 @@ def test_a_mode_the_game_does_not_have_is_refused(monkeypatch):
     monkeypatch.setitem(GAMES, Game.FOOTBALL, GameRules(rules.label, rules.score, rules.station, modes=()))
     with pytest.raises(InvalidModeError, match="Fußball"):
         _check_mode(Game.FOOTBALL, TournamentMode.SINGLE_ELIMINATION)
+
+
+@pytest.mark.asyncio
+async def test_groups_need_their_numbers_and_belong_to_their_mode(async_client: AsyncClient):
+    admin = await _admin(async_client)
+    body = {**PLAYS, "mode": "groups_knockout", "name": "Cup", "start_time": FUTURE}
+    assert (await async_client.post("/tournaments", json=body, headers=admin)).status_code == 400
+    created = await async_client.post(
+        "/tournaments", json={**body, "group_count": 4, "advance_per_group": 2}, headers=admin
+    )
+    assert (created.json()["group_count"], created.json()["advance_per_group"]) == (4, 2)
+    # another mode has no groups
+    tid = created.json()["id"]
+    changed = await async_client.patch(f"/tournaments/{tid}", json={"mode": "round_robin"}, headers=admin)
+    assert changed.json()["group_count"] is None

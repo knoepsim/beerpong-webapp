@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.games import check_draw, check_score, stations_of
 from app.core.exceptions import (
     InvalidWinnerError,
+    KnockoutError,
     MatchNotAtStationError,
     MatchNotReadyError,
     NotFoundError,
@@ -18,16 +19,58 @@ from app.core.exceptions import (
 )
 from app.models.match import Match
 from app.models.result import Result, ResultType
-from app.schemas.match import BracketResponse, MatchResponse, MatchStatus, StandingResponse
+from app.schemas.match import BracketResponse, GroupResponse, MatchResponse, MatchStatus, StandingResponse
 from app.schemas.result import ResultCreate
 from app.models.tournament import TournamentMode, TournamentTeam
 from app.services.bracket_layout import round_one_pairings
+from app.services.groups import apply_order, group_letter, knockout_seeds, open_ties, place_label, split_into_groups
 from app.services.round_robin import Played, match_days, standings
 from app.models.station import Station
 from app.services.revision import bump
 from app.services.station_planner import PlanMatch, assign_free_stations, certain_next_stations, plan
 from app.services.tournament_service import TournamentService
 from app.core.database import DbSession
+
+
+# a team, or the place of a group ("A1") that gets its team when the knock-out starts
+Entrant = UUID | str
+
+
+def _entered(match: Match, slot: str, entrant: Entrant | None) -> Match:
+    """Put a team or a place of a group into slot "a" / "b" of a match."""
+    if isinstance(entrant, str):
+        setattr(match, f"source_{slot}", entrant)
+    else:
+        setattr(match, f"team_{slot}_id", entrant)
+    return match
+
+
+def _counts_points(tournament, match: Match) -> bool:
+    """A match of everybody against everybody or of a group counts points (and so may end even)."""
+    return tournament.mode == TournamentMode.ROUND_ROBIN or match.group_number is not None
+
+
+def _rows(team_ids: list[UUID], matches: list[Match], results: dict[UUID, Result]) -> list[StandingResponse]:
+    """The table of these teams from these matches (see round_robin.standings)."""
+    played = [
+        Played(m.team_a_id, m.team_b_id, r.score_a or 0, r.score_b or 0, r.winner_team_id)
+        for m in matches
+        if (r := results.get(m.id)) is not None and m.team_a_id is not None and m.team_b_id is not None
+    ]
+    return [
+        StandingResponse(
+            team_id=row.team_id,
+            rank=row.rank,
+            played=row.played,
+            won=row.won,
+            drawn=row.drawn,
+            lost=row.lost,
+            score_for=row.score_for,
+            score_against=row.score_against,
+            points=row.points,
+        )
+        for row in standings(team_ids, played)
+    ]
 
 
 class BracketService:
@@ -38,7 +81,91 @@ class BracketService:
         """The matches of a tournament at its start, as its mode wants them."""
         if mode == TournamentMode.ROUND_ROBIN:
             return await self.generate_round_robin(tournament_id, team_ids)
+        if mode == TournamentMode.GROUPS_KNOCKOUT:
+            return await self.generate_groups_knockout(tournament_id, team_ids)
         return await self.generate_bracket(tournament_id, team_ids)
+
+    async def generate_groups_knockout(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
+        """The groups drawn at random, each with its match days (all groups play day by day at the same time), and the
+        knock-out tree with the places of the groups ("A1" against "B2") until the organization starts it."""
+        tournament = await TournamentService(self.db).get_tournament(tournament_id)
+        shuffled = list(team_ids)
+        # Für das Mischen der Teams reicht diese Zufallsverteilung aus und birgt kein Sicherheitsrisiko
+        secrets.SystemRandom().shuffle(shuffled)  # NOSONAR
+        matches: list[Match] = []
+        positions: dict[int, int] = {}
+        for group, teams in enumerate(split_into_groups(shuffled, tournament.group_count), start=1):
+            for day, pairs in enumerate(match_days(teams), start=1):
+                for a, b in pairs:
+                    position = positions[day] = positions.get(day, -1) + 1
+                    matches.append(
+                        Match(tournament_id=tournament_id, round=day, position=position, group_number=group, team_a_id=a, team_b_id=b)
+                    )
+        seeds = knockout_seeds(tournament.group_count, tournament.advance_per_group)
+        knockout = self._build_matches(tournament_id, round_one_pairings(seeds))
+        self.db.add_all(matches)
+        self.db.add_all(knockout)
+        await self.db.flush()
+        return matches + knockout
+
+    async def start_knockout(self, tournament_id: UUID, order: dict[int, list[UUID]]) -> None:
+        """The organization starts the knock-out stage: every group match has a result, a tie where it matters is
+        decided (`order`: the teams of a group in the order the organization gave). The places of the tree get their
+        teams, and from now on the group results are fixed."""
+        tournament = await TournamentService(self.db).get_tournament(tournament_id, for_update=True)
+        if tournament.mode != TournamentMode.GROUPS_KNOCKOUT or not tournament.is_started:
+            raise KnockoutError("Dieses Turnier hat keine K.-o.-Runde nach Gruppen.")
+        if tournament.knockout_started_at is not None:
+            raise KnockoutError("Die K.-o.-Runde läuft schon.")
+        matches = list((await self.db.execute(select(Match).where(Match.tournament_id == tournament_id))).scalars())
+        results = await self._current_results([m.id for m in matches])
+        if any(m.group_number is not None and m.id not in results for m in matches):
+            raise KnockoutError("Erst wenn alle Gruppenspiele ein Ergebnis haben, kann die K.-o.-Runde starten.")
+
+        places: dict[str, UUID] = {}
+        for group in await self.group_tables(tournament_id, matches, results):
+            ranks = [(row.team_id, row.rank) for row in group.standings]
+            given = order.get(group.group)
+            if not given and open_ties(ranks, tournament.advance_per_group):
+                raise KnockoutError(
+                    f"In Gruppe {group_letter(group.group)} gibt es einen Gleichstand: Lege die Reihenfolge fest."
+                )
+            try:
+                final = apply_order(ranks, given)
+            except ValueError as error:
+                raise KnockoutError(str(error)) from None
+            for rank, team_id in enumerate(final[: tournament.advance_per_group], start=1):
+                places[place_label(group.group, rank)] = team_id
+
+        for match in matches:
+            for slot in ("a", "b"):
+                source = getattr(match, f"source_{slot}")
+                if source is not None:
+                    setattr(match, f"team_{slot}_id", places[source])
+        tournament.knockout_started_at = datetime.now(UTC)
+        await self.db.flush()
+        await self.assign_stations(tournament_id)
+        await bump(self.db, tournament_id, "bracket", "tournament")
+
+    async def group_tables(
+        self, tournament_id: UUID, matches: list[Match], results: dict[UUID, Result]
+    ) -> list[GroupResponse]:
+        """The table of every group, from its matches."""
+        groups: dict[int, set[UUID]] = {}
+        for m in matches:
+            if m.group_number is not None:
+                groups.setdefault(m.group_number, set()).update(t for t in (m.team_a_id, m.team_b_id) if t)
+        return [
+            GroupResponse(
+                group=group,
+                standings=_rows(
+                    sorted(teams, key=str),
+                    [m for m in matches if m.group_number == group],
+                    results,
+                ),
+            )
+            for group, teams in sorted(groups.items())
+        ]
 
     async def generate_round_robin(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
         """Everybody against everybody once, match day by match day (see round_robin.match_days); the order of the
@@ -75,16 +202,19 @@ class BracketService:
         return matches
 
 
-    def _build_matches(self, tournament_id: UUID, pairings: list[tuple[UUID | None, UUID | None]]
+    def _build_matches(self, tournament_id: UUID, pairings: list[tuple[Entrant | None, Entrant | None]]
     ) -> list[Match]:
-        """Create the match tree for the given first-round pairings, ordered final first."""
+        """Create the match tree for the given first-round pairings, ordered final first.
+
+        An entrant is a team, or the place of a group ("A1") whose team comes in when the knock-out starts.
+        """
         total_rounds = int(math.log2(len(pairings))) + 1
         rounds: dict[int, list[Match | None]] = {}
 
         for round_num in range(1, total_rounds + 1):
             if round_num == 1:
                 rounds[1] = [
-                    Match(id=uuid.uuid4(), tournament_id=tournament_id, round=1, position=pos, team_a_id=a, team_b_id=b)
+                    _entered(_entered(Match(id=uuid.uuid4(), tournament_id=tournament_id, round=1, position=pos), "a", a), "b", b)
                     if a is not None and b is not None
                     else None
                     for pos, (a, b) in enumerate(pairings)
@@ -103,9 +233,8 @@ class BracketService:
                     match.next_match_id = parent.id
                     match.next_match_slot = slot
                 else:
-                    # Bye in round one: the single team skips the match
-                    team_id = pairings[pos][0] or pairings[pos][1]
-                    setattr(parent, f"team_{slot}_id", team_id)
+                    # Bye in round one: the single team (or place) skips the match
+                    _entered(parent, slot, pairings[pos][0] or pairings[pos][1])
 
         return [m for round_num in range(total_rounds, 0, -1) for m in rounds[round_num] if m is not None]
 
@@ -194,6 +323,9 @@ class BracketService:
         if result_type != ResultType.CREATED and not is_active:
             raise ResultConflictError("Für dieses Spiel gibt es noch kein Ergebnis.")
 
+        if match.group_number is not None and tournament.knockout_started_at is not None:
+            raise ResultConflictError("Die K.-o.-Runde läuft: Die Ergebnisse der Gruppen stehen fest.")
+
         if result_type != ResultType.DELETED:
             if match.team_a_id is None or match.team_b_id is None:
                 raise MatchNotReadyError()
@@ -201,7 +333,7 @@ class BracketService:
             if winner_team_id is None:
                 if score_a != score_b:
                     raise InvalidWinnerError()
-                check_draw(tournament.game, tournament.mode, score_a)
+                check_draw(tournament.game, _counts_points(tournament, match), score_a)
             else:
                 if winner_team_id not in (match.team_a_id, match.team_b_id):
                     raise InvalidWinnerError()
@@ -359,7 +491,9 @@ class BracketService:
         matches = list(result.scalars().all())
         results = await self._current_results([m.id for m in matches])
 
-        total_rounds = max((m.round for m in matches), default=0)
+        # the rounds of the tree (a knock-out), or the match days (everybody against everybody)
+        tree = [m for m in matches if m.group_number is None]
+        total_rounds = max((m.round for m in tree), default=0)
         names = dict(
             (
                 await self.db.execute(
@@ -382,6 +516,11 @@ class BracketService:
             for m in matches
         ]
         tournament = await TournamentService(self.db).get_tournament(tournament_id)
+        groups = (
+            await self.group_tables(tournament_id, matches, results)
+            if tournament.mode == TournamentMode.GROUPS_KNOCKOUT
+            else None
+        )
         if tournament.mode == TournamentMode.ROUND_ROBIN:
             table = await self.standings(tournament_id, matches, results)
             # the first of the table once everything is played (a shared first place has no single winner)
@@ -389,7 +528,7 @@ class BracketService:
             champion = leaders[0].team_id if tournament.finished_at and len(leaders) == 1 else None
         else:
             table = None
-            final = next((r for r in responses if r.round == total_rounds), None)
+            final = next((r for r in responses if r.round == total_rounds and r.group is None), None)
             champion = final.winner_team_id if final else None
 
         return BracketResponse(
@@ -399,6 +538,8 @@ class BracketService:
             champion_team_id=champion,
             matches=responses,
             standings=table,
+            groups=groups,
+            knockout_started=tournament.knockout_started_at is not None,
         )
 
     async def standings(
@@ -408,25 +549,7 @@ class BracketService:
         team_ids = list(
             (await self.db.execute(select(TournamentTeam.team_id).where(TournamentTeam.tournament_id == tournament_id))).scalars()
         )
-        played = [
-            Played(m.team_a_id, m.team_b_id, r.score_a or 0, r.score_b or 0, r.winner_team_id)
-            for m in matches
-            if (r := results.get(m.id)) is not None and m.team_a_id is not None and m.team_b_id is not None
-        ]
-        return [
-            StandingResponse(
-                team_id=row.team_id,
-                rank=row.rank,
-                played=row.played,
-                won=row.won,
-                drawn=row.drawn,
-                lost=row.lost,
-                score_for=row.score_for,
-                score_against=row.score_against,
-                points=row.points,
-            )
-            for row in standings(team_ids, played)
-        ]
+        return _rows(team_ids, matches, results)
 
     @staticmethod
     def _to_response(match: Match, current: Result | None) -> MatchResponse:

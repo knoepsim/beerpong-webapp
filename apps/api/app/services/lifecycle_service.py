@@ -5,11 +5,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import DbSession
-from app.core.exceptions import CheckinDisabledError, NotEnoughTeamsError, TournamentAlreadyStartedError
+from app.core.exceptions import (
+    CheckinDisabledError,
+    InvalidGroupsError,
+    NotEnoughTeamsError,
+    TournamentAlreadyStartedError,
+)
 from app.models.team import Team
-from app.models.tournament import TournamentTeam
+from app.models.tournament import TournamentMode, TournamentTeam
 from app.schemas.tournament import TournamentStartResponse
 from app.services.bracket_service import BracketService
+from app.services.groups import size_problem
 from app.services.revision import bump
 from app.services.tournament_service import TournamentService
 
@@ -61,6 +67,11 @@ class LifecycleService:
         playing = [e for e in entries if e.is_checked_in or not tournament.checkin_enabled]
         if len(playing) < 2:
             raise NotEnoughTeamsError(tournament.checkin_enabled)
+
+        if tournament.mode == TournamentMode.GROUPS_KNOCKOUT:
+            problem = size_problem(len(playing), tournament.group_count, tournament.advance_per_group)
+            if problem:
+                raise InvalidGroupsError(problem)
 
         removed = [e for e in entries if e not in playing]
         for entry in removed:

@@ -63,13 +63,13 @@ GAMES: dict[Game, GameRules] = {
         label="Bierpong",
         score=_beerpong,
         station=StationTerms(singular="Tisch", plural="Tische", accusative="einen Tisch", none="keinen Tisch"),
-        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN),
+        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN, TournamentMode.GROUPS_KNOCKOUT),
     ),
     Game.FOOTBALL: GameRules(
         label="Fußball",
         score=_football,
         station=StationTerms(singular="Platz", plural="Plätze", accusative="einen Platz", none="keinen Platz"),
-        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN),
+        modes=(TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN, TournamentMode.GROUPS_KNOCKOUT),
         draws=True,
     ),
 }
@@ -82,14 +82,13 @@ def check_score(game: Game, winner_score: int, loser_score: int) -> None:
         raise InvalidScoreError(problem)
 
 
-# the modes in which a match may end even: everybody against everybody counts points, a knock-out needs a winner
-DRAW_MODES = (TournamentMode.ROUND_ROBIN,)
+def check_draw(game: Game, counts_points: bool, score: int) -> None:
+    """Raise if this game has no draws or the match needs a winner (or the score is not possible).
 
-
-def check_draw(game: Game, mode: TournamentMode, score: int) -> None:
-    """Raise if this game or mode has no draws (or the score is not possible)."""
+    A match that counts points (everybody against everybody, a group) may end even; a knock-out match needs a winner.
+    """
     rules = GAMES[game]
-    if not rules.draws or mode not in DRAW_MODES:
+    if not rules.draws or not counts_points:
         raise InvalidScoreError("Ein Unentschieden gibt es hier nicht: Wähle den Sieger.")
     if not 0 <= score <= rules.max_score:
         raise InvalidScoreError("So viele Tore sind nicht möglich.")

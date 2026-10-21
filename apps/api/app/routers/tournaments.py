@@ -410,3 +410,26 @@ async def start_tournament(
 ):
     await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
     return await LifecycleService(db).start_tournament(tournament_id)
+
+
+class KnockoutStart(BaseModel):
+    """Where teams of a group share a place: the order the organization decided (group number -> its teams)."""
+    order: dict[int, list[UUID]] = {}
+
+
+@router.post(
+    "/{tournament_id}/knockout",
+    status_code=204,
+    summary="K.-o.-Runde starten",
+    description="Startet nach der Gruppenphase die K.-o.-Runde: Die Plätze im Baum bekommen ihre Teams, die "
+    "Ergebnisse der Gruppen stehen danach fest. Alle Gruppenspiele brauchen ein Ergebnis; bei Gleichstand an einem "
+    "Platz, der zählt, legt die Orga die Reihenfolge fest (`order`). Nur Admin und Manager.",
+)
+async def start_knockout(
+    tournament_id: UUID,
+    body: KnockoutStart,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbSession,
+):
+    await RoleService(db).require_role(tournament_id, current_user.id, TournamentRoleType.MANAGER)
+    await BracketService(db).start_knockout(tournament_id, body.order)

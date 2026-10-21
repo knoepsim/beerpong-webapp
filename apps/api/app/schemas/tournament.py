@@ -21,6 +21,9 @@ class TournamentCreate(BaseModel):
     checkin_start_time: datetime | None = None
     checkin_auto_open: bool = False
     station_count: int = Field(default=1, ge=1, le=100)
+    # group stage and knock-out only: how many groups, how many of each go on
+    group_count: int | None = Field(default=None, ge=1, le=26)
+    advance_per_group: int | None = Field(default=None, ge=1, le=16)
     # no default: what is played and how is a decision of the organizer
     game: Game
     mode: TournamentMode
@@ -44,6 +47,8 @@ class TournamentUpdate(BaseModel):
     mode: TournamentMode | None = None
     visibility: TournamentVisibility | None = None
     join_policy: JoinPolicy | None = None
+    group_count: int | None = Field(default=None, ge=1, le=26)
+    advance_per_group: int | None = Field(default=None, ge=1, le=16)
 
 
 class TournamentResponse(BaseModel):
@@ -67,6 +72,9 @@ class TournamentResponse(BaseModel):
     checkin_open: bool
     game: Game
     mode: TournamentMode
+    group_count: int | None = None
+    advance_per_group: int | None = None
+    knockout_started_at: datetime | None = None
     visibility: TournamentVisibility
     join_policy: JoinPolicy
     is_deleted: bool

@@ -180,6 +180,7 @@ async def create_tournament(
     name: str | None = None,
     game: Game = Game.BEERPONG,
     mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION,
+    groups: tuple[int, int] = (2, 2),
 ) -> dict:
     """Create (or replace) a dummy tournament. With `played` it is started and that share of its matches is played;
     without (`None`) it stays in the registration phase, or in the check-in phase if `state` is "checkin" / "both"."""
@@ -189,6 +190,7 @@ async def create_tournament(
 
     extra = [GAME_NAMES[game]] if game != Game.BEERPONG else []
     extra += ["jeder gegen jeden"] if mode == TournamentMode.ROUND_ROBIN else []
+    extra += ["Gruppen"] if mode == TournamentMode.GROUPS_KNOCKOUT else []
     name = name or tournament_name(teams, played, state) + (f" ({', '.join(extra)})" if extra else "")
     if not name.startswith(TOURNAMENT_PREFIX):
         name = TOURNAMENT_PREFIX + name  # keeps every dummy tournament findable by `delete`
@@ -205,6 +207,8 @@ async def create_tournament(
             station_count=stations,
             game=game,
             mode=mode,
+            group_count=groups[0] if mode == TournamentMode.GROUPS_KNOCKOUT else None,
+            advance_per_group=groups[1] if mode == TournamentMode.GROUPS_KNOCKOUT else None,
             visibility=TournamentVisibility.PUBLIC,
         ),
         owner.id,
@@ -227,9 +231,15 @@ async def create_tournament(
     rng = random.Random()  # NOSONAR
     done: set = set()
     while len(done) < target:
-        matches = (await bracket_service.get_bracket(tournament.id)).matches
-        ready = [m for m in matches if m.team_a_id and m.team_b_id and m.id not in done]
-        match = min(ready, key=lambda m: (m.round, m.position))
+        bracket = await bracket_service.get_bracket(tournament.id)
+        ready = [m for m in bracket.matches if m.team_a_id and m.team_b_id and m.id not in done]
+        if not ready and bracket.groups is not None and not bracket.knockout_started:
+            # the groups are played: the organization starts the knock-out, a tie goes by the order of the table
+            order = {g.group: [row.team_id for row in g.standings] for g in bracket.groups}
+            await bracket_service.start_knockout(tournament.id, order)
+            continue
+        # the group stage first, then the knock-out (its rounds also count from 1)
+        match = min(ready, key=lambda m: (m.group is None, m.round, m.position))
         winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
         won, lost = random_score(game, rng)
         score = (won, lost) if winner == match.team_a_id else (lost, won)
@@ -269,6 +279,8 @@ async def main() -> None:
     create.add_argument("--name", help="tournament name (default: scheme)")
     create.add_argument("--game", choices=[g.value for g in Game], default=Game.BEERPONG.value, help="what is played")
     create.add_argument("--mode", choices=[m.value for m in TournamentMode], default=TournamentMode.SINGLE_ELIMINATION.value)
+    create.add_argument("--groups", type=int, default=2, help="groups_knockout: number of groups (default 2)")
+    create.add_argument("--advance", type=int, default=2, help="groups_knockout: teams going on per group (default 2)")
 
     seed = sub.add_parser("seed", help="one tournament per phase (registration, check-in, both open, running, finished)")
     seed.add_argument("--teams", type=int, default=28)
@@ -304,6 +316,7 @@ async def main() -> None:
                 name=args.name,
                 game=Game(args.game),
                 mode=TournamentMode(args.mode),
+                groups=(args.groups, args.advance),
             )
             await db.commit()
             print(f"{info['name']}: {info['matches']} Matches, {info['rounds']} Runden, {info['played']} gespielt")

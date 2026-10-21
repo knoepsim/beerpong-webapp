@@ -209,6 +209,20 @@ class TooManyStationsError(AppException):
         super().__init__(409, "TOO_MANY_STATIONS", f"Ein Turnier kann höchstens {maximum} {plural} haben.")
 
 
+class InvalidGroupsError(AppException):
+    """Groups that do not work: none set, too few to go on, or too few teams for them."""
+
+    def __init__(self, detail: str):
+        super().__init__(400, "INVALID_GROUPS", detail)
+
+
+class KnockoutError(AppException):
+    """The knock-out stage cannot start (yet): open group matches, a tie without a decision, already started."""
+
+    def __init__(self, detail: str):
+        super().__init__(409, "KNOCKOUT_NOT_POSSIBLE", detail)
+
+
 class InvalidModeError(AppException):
     """The mode is not one of the modes of the game (app/games.py)."""
 

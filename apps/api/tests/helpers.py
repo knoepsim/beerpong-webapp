@@ -18,13 +18,22 @@ def won(match, winner_id, cups: int = 3) -> dict:
 
 
 async def generate_started_tournament(
-    db, n: int, mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION, game: Game = Game.BEERPONG
+    db,
+    n: int,
+    mode: TournamentMode = TournamentMode.SINGLE_ELIMINATION,
+    game: Game = Game.BEERPONG,
+    groups: tuple[int, int] | None = None,
 ):
-    """A started tournament with n teams and its matches. Returns (service, tournament, team ids)."""
+    """A started tournament with n teams and its matches. Returns (service, tournament, team ids).
+
+    `groups`: (number of groups, how many of each go on) for group stage and knock-out.
+    """
     tournament = Tournament(
         name="x",
         game=game,
         mode=mode,
+        group_count=groups[0] if groups else None,
+        advance_per_group=groups[1] if groups else None,
         visibility=TournamentVisibility.PRIVATE,
         created_by_id=uuid.uuid4(),
     )
