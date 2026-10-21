@@ -19,6 +19,9 @@ export const makeTournament = (overrides: Partial<Tournament> = {}): Tournament 
     join_policy: JoinPolicy.OPEN,
     game: Game.BEERPONG,
     mode: TournamentMode.SINGLE_ELIMINATION,
+    group_count: null,
+    advance_per_group: null,
+    knockout_started_at: null,
     ...overrides,
   }) as Tournament;
 

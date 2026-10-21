@@ -150,7 +150,7 @@ describe('BracketView', () => {
 
   it('renders nothing without a bracket', () => {
     const { container } = render(
-      <BracketView bracket={{ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, total_rounds: 0, champion_team_id: null, matches: [] }} teamsMap={{}} />,
+      <BracketView bracket={{ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, groups: null, knockout_started: false, total_rounds: 0, champion_team_id: null, matches: [] }} teamsMap={{}} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

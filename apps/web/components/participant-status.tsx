@@ -9,7 +9,7 @@ import { MatchRow } from "@/components/match-row";
 import { STATUS_ICONS } from "@/components/status-icons";
 import { useNow } from "@/hooks/use-now";
 import { JoinTournament } from "@/components/join-tournament";
-import { allMatchSlots, buildBracketLayout } from "@/lib/bracket-layout";
+import { matchSlotsOf } from "@/lib/bracket-layout";
 import { formatWhen } from "@/lib/format-when";
 import { statusBeforeStart, statusInBracket, type MyStatus, type StatusTone } from "@/lib/my-status";
 import { JoinPolicy, type Bracket, type Team, type Tournament, type TournamentTeam } from "@/types";
@@ -69,7 +69,7 @@ export function ParticipantStatus({
   onLeave,
   compact = false,
 }: Readonly<ParticipantStatusProps>) {
-  const slots = useMemo(() => (bracket ? allMatchSlots(buildBracketLayout(bracket)) : []), [bracket]);
+  const slots = useMemo(() => (bracket ? matchSlotsOf(bracket) : []), [bracket]);
   const now = useNow();
   const terms = useStationTerms();
 

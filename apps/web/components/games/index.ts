@@ -70,7 +70,7 @@ export interface GameDefinition {
   ResultInput: ComponentType<ResultInputProps>;
 }
 
-const ALL_MODES: ModeId[] = [TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN, "groups_knockout"];
+const ALL_MODES: ModeId[] = [TournamentMode.SINGLE_ELIMINATION, TournamentMode.ROUND_ROBIN, TournamentMode.GROUPS_KNOCKOUT];
 
 export const GAMES: Record<Game, GameDefinition> = {
   [Game.BEERPONG]: {

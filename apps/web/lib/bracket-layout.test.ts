@@ -39,7 +39,7 @@ describe('buildBracketLayout', () => {
   })
 
   it('is empty without rounds', () => {
-    expect(buildBracketLayout({ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, total_rounds: 0, champion_team_id: null, matches: [] }).rounds).toEqual([])
+    expect(buildBracketLayout({ tournament_id: 't', mode: TournamentMode.SINGLE_ELIMINATION, standings: null, groups: null, knockout_started: false, total_rounds: 0, champion_team_id: null, matches: [] }).rounds).toEqual([])
   })
 })
 

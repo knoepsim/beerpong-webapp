@@ -23,8 +23,9 @@ export function podium(bracket: Bracket): Podium | null {
     const at = (rank: number) => bracket.standings!.filter((row) => row.rank === rank).map((row) => row.team_id);
     return { champion: bracket.champion_team_id, runnerUp: at(2)[0] ?? null, third: at(3) };
   }
-  const final = bracket.matches.find((m) => m.round === bracket.total_rounds);
-  const semis = bracket.matches.filter((m) => m.round === bracket.total_rounds - 1);
+  const tree = bracket.matches.filter((m) => m.group === null);
+  const final = tree.find((m) => m.round === bracket.total_rounds);
+  const semis = tree.filter((m) => m.round === bracket.total_rounds - 1);
   return {
     champion: bracket.champion_team_id,
     runnerUp: final ? loser(final) : null,

@@ -32,6 +32,13 @@ export const newTournamentSchema = z.object({
   station_count: z.number({ error: "Gib eine Zahl an." }).int().min(1, "Mindestens 1.").max(100, "Höchstens 100."),
   visibility: z.enum(TournamentVisibility),
   join_policy: z.enum(JoinPolicy),
+  // group stage and knock-out only (sent only for that mode)
+  group_count: z.number({ error: "Gib die Zahl der Gruppen an." }).int().min(1, "Mindestens 1.").max(26, "Höchstens 26."),
+  advance_per_group: z
+    .number({ error: "Gib an, wie viele weiterkommen." })
+    .int()
+    .min(1, "Mindestens 1.")
+    .max(16, "Höchstens 16."),
 });
 
 export type NewTournamentValues = z.infer<typeof newTournamentSchema>;
@@ -50,6 +57,8 @@ export const NEW_TOURNAMENT_DEFAULTS: DefaultValues<NewTournamentValues> = {
     checkin_auto_open: false,
   },
   station_count: 1,
+  group_count: 2,
+  advance_per_group: 2,
   visibility: TournamentVisibility.PUBLIC,
   join_policy: JoinPolicy.OPEN,
 };
@@ -66,11 +75,22 @@ export const SCHEDULE_FIELDS = ["schedule.start_time", "schedule.registration_en
  */
 export const NEW_TOURNAMENT_STEPS = [
   { id: "spiel", title: "Spiel & Modus", fields: ["game", "mode"] },
+  // only for group stage and knock-out (see newTournamentSteps)
+  { id: "gruppen", title: "Gruppen", fields: ["group_count", "advance_per_group"] },
   { id: "turnier", title: "Turnier", fields: ["name", "location", "description"] },
   { id: "zeitplan", title: "Zeitplan", fields: SCHEDULE_FIELDS },
   // the title names the stations of the game ("Zugang & Tische"), see the form
   { id: "zugang", title: "Zugang & Spielstätten", fields: ["visibility", "join_policy", "station_count"] },
 ] as const satisfies readonly FormStep<NewTournamentValues>[];
+
+export type NewTournamentStep = (typeof NEW_TOURNAMENT_STEPS)[number];
+
+/** The steps for the chosen mode (the groups only for group stage and knock-out), the stations named by the game. */
+export function newTournamentSteps(mode: TournamentMode | undefined, stations: string): NewTournamentStep[] {
+  return NEW_TOURNAMENT_STEPS.filter((step) => step.id !== "gruppen" || mode === TournamentMode.GROUPS_KNOCKOUT).map(
+    (step) => (step.id === "zugang" ? { ...step, title: `Zugang & ${stations}` } : step) as NewTournamentStep,
+  );
+}
 
 export function toCreateRequest(values: NewTournamentValues): TournamentCreateRequest {
   return {
@@ -82,6 +102,9 @@ export function toCreateRequest(values: NewTournamentValues): TournamentCreateRe
     start_time: toIsoOrNull(values.schedule.start_time)!,
     ...scheduleToPayload(values.schedule),
     station_count: values.station_count,
+    ...(values.mode === TournamentMode.GROUPS_KNOCKOUT
+      ? { group_count: values.group_count, advance_per_group: values.advance_per_group }
+      : {}),
     visibility: values.visibility,
     join_policy: values.join_policy,
   };

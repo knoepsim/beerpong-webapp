@@ -4,6 +4,7 @@ import { minutesSince } from "@/lib/minutes";
 import type { Match, Team, Tournament, TournamentTeam, Bracket } from "@/types";
 import type { StationTerms } from "@/components/games";
 import { freeOne } from "@/lib/station-terms";
+import { groupLetter } from "@/lib/groups";
 
 /**
  * What the participant has to do, as a color: go now (urgent), get ready (attention), playing (active),
@@ -166,7 +167,24 @@ function tableStatus(bracket: BracketState, team: TournamentTeam): MyStatus | nu
   };
 }
 
-type BracketState = Pick<Bracket, "total_rounds" | "champion_team_id" | "standings">;
+/** After my group matches: my place in the group, then whether I go on (the organization starts the knock-out). */
+function groupStatus(bracket: BracketState, team: TournamentTeam): MyStatus | null {
+  const group = bracket.groups?.find((g) => g.standings.some((row) => row.team_id === team.id));
+  const row = group?.standings.find((r) => r.team_id === team.id);
+  if (!group || !row) return null;
+  const place = `Platz ${row.rank} in Gruppe ${groupLetter(group.group)}`;
+  if (bracket.knockout_started) {
+    return { tone: "done", icon: "award", title: `Du bist in der Gruppenphase ausgeschieden: ${place} mit ${team.name}.` };
+  }
+  return {
+    tone: "relaxed",
+    icon: "pause",
+    title: `Deine Gruppenspiele sind gespielt: ${place}.`,
+    detail: "Wer weiterkommt, steht fest, wenn die Spielleitung die K.-o.-Runde startet.",
+  };
+}
+
+type BracketState = Pick<Bracket, "total_rounds" | "champion_team_id" | "standings" | "groups" | "knockout_started">;
 
 /** While it runs and after: the next match of the team, or how it ended. */
 export function statusInBracket(
@@ -182,13 +200,15 @@ export function statusInBracket(
     return { tone: "done", icon: "trophy", title: `Du hast das Turnier gewonnen – Platz 1 mit ${team.name}!` };
   }
   // a knock-out ends with the first defeat; where everybody plays everybody a defeat costs points only
-  const lost = !bracket.standings && mine.find((s) => s.match.status === "finished" && s.match.winner_team_id !== team.id);
+  const lost =
+    !bracket.standings &&
+    mine.find((s) => s.match.group === null && s.match.status === "finished" && s.match.winner_team_id !== team.id);
   if (lost) {
     const place = knockoutPlace(lost.match.round, bracket.total_rounds);
     return { tone: "done", icon: "award", title: `Du bist ausgeschieden: Platz ${place} mit ${team.name}.` };
   }
   const next = mine.find((s) => s.match.status !== "finished");
-  if (!next) return tableStatus(bracket, team);
+  if (!next) return bracket.groups ? groupStatus(bracket, team) : tableStatus(bracket, team);
   const { match } = next;
   const opponentId = match.team_a_id === team.id ? match.team_b_id : match.team_a_id;
   const opponent = name(teamsMap, opponentId);

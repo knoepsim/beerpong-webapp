@@ -74,6 +74,7 @@ export enum Game {
 export enum TournamentMode {
   SINGLE_ELIMINATION = "single_elimination",
   ROUND_ROBIN = "round_robin",
+  GROUPS_KNOCKOUT = "groups_knockout",
 }
 
 /** Who sees bracket and results. */
@@ -178,6 +179,11 @@ export interface Tournament {
   checkin_open: boolean;
   game: Game;
   mode: TournamentMode;
+  /** Group stage and knock-out: how many groups, how many of each go on (null in the other modes). */
+  group_count: number | null;
+  advance_per_group: number | null;
+  /** When the organization started the knock-out stage: from then on the group results are fixed. */
+  knockout_started_at: string | null;
   visibility: TournamentVisibility;
   join_policy: JoinPolicy;
   is_deleted: boolean;
@@ -213,6 +219,8 @@ export interface TournamentCreateRequest {
   station_count?: number;
   game: Game;
   mode: TournamentMode;
+  group_count?: number | null;
+  advance_per_group?: number | null;
   visibility?: TournamentVisibility;
   join_policy?: JoinPolicy;
 }
@@ -253,6 +261,11 @@ export interface Match {
   team_b_id: string | null;
   next_match_id: string | null;
   next_match_slot: string | null;
+  /** Group stage: its group (1 = A); null for a match of the knock-out. */
+  group: number | null;
+  /** Knock-out after groups: where its teams come from ("A1"), until the knock-out starts. */
+  source_a: string | null;
+  source_b: string | null;
   /** The station it is played at (kept once it is finished); null while it has none. Decided by the API. */
   station_id: string | null;
   station_name: string | null;
@@ -298,6 +311,10 @@ export interface Bracket {
   matches: Match[];
   /** The table, only where everybody plays everybody. */
   standings: Standing[] | null;
+  /** Group stage and knock-out: the groups with their tables; the matches without a group are the knock-out tree. */
+  groups: { group: number; standings: Standing[] }[] | null;
+  /** The organization started the knock-out stage: its places have their teams, the groups are fixed. */
+  knockout_started: boolean;
 }
 
 // ── Result ────────────────────────────────────────────

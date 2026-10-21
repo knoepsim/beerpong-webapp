@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { MatchRow } from "@/components/match-row";
-import { buildBracketLayout, isMatchSlot, roundTitle } from "@/lib/bracket-layout";
-import { TournamentMode, type Bracket, type Match, type Team } from "@/types";
+import { buildBracketLayout, buildGroupLayouts, isMatchSlot, roundTitle } from "@/lib/bracket-layout";
+import type { Bracket, Match, Team } from "@/types";
 
 interface MatchListProps {
   bracket: Bracket;
@@ -13,11 +13,16 @@ interface MatchListProps {
   onMatchClick?: (match: Match) => void;
   /** Only these matches (e.g. the open ones); rounds without one are left out. */
   include?: (match: Match) => boolean;
+  /** The matches of this group (day by day) instead of the tree or the match days of the tournament. */
+  group?: number;
 }
 
 /** Every match of the tournament, round by round, in the same compact row as "my matches". */
-export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, include }: Readonly<MatchListProps>) {
-  const layout = useMemo(() => buildBracketLayout(bracket), [bracket]);
+export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, include, group }: Readonly<MatchListProps>) {
+  const layout = useMemo(
+    () => (group ? buildGroupLayouts(bracket).find((g) => g.group === group)?.layout : undefined) ?? buildBracketLayout(bracket),
+    [bracket, group],
+  );
 
   return (
     <div className="space-y-5">
@@ -37,7 +42,7 @@ export function MatchList({ bracket, teamsMap, highlightTeamId, onMatchClick, in
                     teamsMap={teamsMap}
                     // the trophy belongs to the final of a knock-out; in a table it shows on the podium
                     championTeamId={
-                      layout.mode === TournamentMode.SINGLE_ELIMINATION && round.round === layout.totalRounds
+                      layout.kind === "tree" && round.round === layout.totalRounds
                         ? bracket.champion_team_id
                         : null
                     }

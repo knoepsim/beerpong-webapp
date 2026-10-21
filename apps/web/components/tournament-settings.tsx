@@ -12,6 +12,7 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { GamePicker } from "@/components/game-picker";
 import { GAMES } from "@/components/games";
 import { ModePicker } from "@/components/mode-picker";
+import { NumberInput } from "@/components/number-input";
 import { StationManager } from "@/components/station-manager";
 import { TournamentScheduleFields } from "@/components/tournament-schedule-fields";
 import { scheduleToPayload, toIsoOrNull, toLocalInput, validateSchedule, type ScheduleValues } from "@/lib/tournament-schedule";
@@ -83,6 +84,9 @@ export function TournamentSettings({
   const [editSlug, setEditSlug] = useState(tournament.slug);
   const [editGame, setEditGame] = useState(tournament.game);
   const [editMode, setEditMode] = useState<TournamentMode | undefined>(tournament.mode);
+  const [editGroups, setEditGroups] = useState(tournament.group_count ?? 2);
+  const [editAdvance, setEditAdvance] = useState(tournament.advance_per_group ?? 2);
+  const groupsMode = editMode === TournamentMode.GROUPS_KNOCKOUT;
   // another game may not have the mode: then it is chosen again
   const changeGame = (game: Game) => {
     setEditGame(game);
@@ -110,7 +114,10 @@ export function TournamentSettings({
   const scheduleDirty = (Object.keys(initialSchedule) as (keyof ScheduleValues)[]).some(
     (k) => schedule[k] !== initialSchedule[k],
   );
-  const playDirty = editGame !== tournament.game || editMode !== tournament.mode;
+  const playDirty =
+    editGame !== tournament.game ||
+    editMode !== tournament.mode ||
+    (groupsMode && (editGroups !== tournament.group_count || editAdvance !== tournament.advance_per_group));
   const accessDirty =
     editVisibility !== tournament.visibility || editJoinPolicy !== tournament.join_policy || editSlug !== tournament.slug;
 
@@ -118,7 +125,11 @@ export function TournamentSettings({
   const save = (group: Group) => {
     const payloads: Record<Group, Partial<TournamentCreateRequest>> = {
       general: { name: editName, location: editLocation || undefined, description: editDescription || undefined },
-      play: { game: editGame, mode: editMode },
+      play: {
+        game: editGame,
+        mode: editMode,
+        ...(groupsMode ? { group_count: editGroups, advance_per_group: editAdvance } : {}),
+      },
       schedule: { start_time: toIsoOrNull(schedule.start_time) ?? undefined, ...scheduleToPayload(schedule) },
       access: { slug: editSlug, visibility: editVisibility, ...(started ? {} : { join_policy: editJoinPolicy }) },
     };
@@ -185,7 +196,7 @@ export function TournamentSettings({
           title="Spiel & Modus"
           description="Was und wie gespielt wird. Mit dem Start steht es fest und ist hier nicht mehr zu sehen."
           dirty={playDirty}
-          invalid={!editMode}
+          invalid={!editMode || (groupsMode && !(editGroups >= 1 && editAdvance >= 1))}
           saving={saving === "play"}
           onSave={() => save("play")}
         >
@@ -194,6 +205,18 @@ export function TournamentSettings({
             <GamePicker id="settings-game" value={editGame} onChange={(game) => game && changeGame(game)} />
           </div>
           <ModePicker name="settings-mode" modes={GAMES[editGame].modes} value={editMode} onChange={setEditMode} />
+          {groupsMode && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="settings-groups">Anzahl Gruppen</Label>
+                <NumberInput id="settings-groups" min={1} max={26} value={editGroups} onChange={setEditGroups} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="settings-advance">Weiter pro Gruppe</Label>
+                <NumberInput id="settings-advance" min={1} max={16} value={editAdvance} onChange={setEditAdvance} />
+              </div>
+            </div>
+          )}
         </SettingsCard>
       )}
 

@@ -8,7 +8,7 @@ import { MatchRow } from "@/components/match-row";
 import { MatchStatusBadge } from "@/components/match-status-badge";
 import { useNow } from "@/hooks/use-now";
 import { useSetMatchStarted } from "@/hooks/queries/matches";
-import { allMatchSlots, buildBracketLayout, type MatchSlot } from "@/lib/bracket-layout";
+import { matchSlotsOf, type MatchSlot } from "@/lib/bracket-layout";
 import { minutesSince, sinceLabel } from "@/lib/minutes";
 import { cn } from "@/lib/utils";
 import type { Bracket, Match, Team, Station } from "@/types";
@@ -123,7 +123,7 @@ function StationCard({
  */
 export function StationsBoard({ tournamentId, bracket, stations, teamsMap, highlightTeamId, onResult }: Readonly<StationsBoardProps>) {
   const now = useNow();
-  const slots = useMemo(() => allMatchSlots(buildBracketLayout(bracket)), [bracket]);
+  const slots = useMemo(() => matchSlotsOf(bracket), [bracket]);
   const atStation = (station: Station) =>
     slots.find((s) => (s.match.status === "ready" || s.match.status === "live") && s.match.station_id === station.id);
   const nextAt = (station: Station) =>

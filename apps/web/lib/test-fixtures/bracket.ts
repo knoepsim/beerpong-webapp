@@ -8,6 +8,9 @@ export const makeMatch = (overrides: Partial<Match> & Pick<Match, "id" | "round"
   team_b_id: null,
   next_match_id: null,
   next_match_slot: null,
+  group: null,
+  source_a: null,
+  source_b: null,
   station_id: null,
   station_name: null,
   queue_position: null,
@@ -38,6 +41,8 @@ export function fiveTeamBracket(overrides: Partial<Record<"m1" | "m2" | "m3" | "
     tournament_id: "t",
     mode: TournamentMode.SINGLE_ELIMINATION,
     standings: null,
+    groups: null,
+    knockout_started: false,
     total_rounds: 3,
     champion_team_id: null,
     matches: [
@@ -84,6 +89,8 @@ export function roundRobinBracket(overrides: Partial<Bracket> = {}): Bracket {
   return {
     tournament_id: "t",
     mode: TournamentMode.ROUND_ROBIN,
+    groups: null,
+    knockout_started: false,
     total_rounds: 3,
     champion_team_id: null,
     matches: [
@@ -104,3 +111,34 @@ export const abcTeams: Record<string, Team> = {
   ...abTeams,
   c: { id: "c", name: "Charlie" } as Team,
 };
+
+/**
+ * Group stage and knock-out: group A (a, b, c: a beat b) and group B (d, e: open), two of each go on into a final
+ * of "A1" against "B1" … here one knock-out match of A1 against B1 to keep it small.
+ */
+export function groupsBracket(overrides: Partial<Bracket> = {}): Bracket {
+  const m = (id: string, round: number, position: number, group: number | null, more: Partial<Match> = {}) =>
+    makeMatch({ id, round, position, group, status: "queued", ...more });
+  const row = (team_id: string, rank: number, points = 0) => ({
+    team_id, rank, played: 0, won: 0, drawn: 0, lost: 0, score_for: 0, score_against: 0, points,
+  });
+  return {
+    tournament_id: "t",
+    mode: TournamentMode.GROUPS_KNOCKOUT,
+    total_rounds: 1,
+    champion_team_id: null,
+    standings: null,
+    knockout_started: false,
+    groups: [
+      { group: 1, standings: [row("a", 1, 3), row("b", 2), row("c", 2)] },
+      { group: 2, standings: [row("d", 1), row("e", 1)] },
+    ],
+    matches: [
+      m("g1", 1, 0, 1, { team_a_id: "a", team_b_id: "b", status: "finished", winner_team_id: "a", score_a: 3, score_b: 0 }),
+      m("g2", 1, 1, 2, { team_a_id: "d", team_b_id: "e" }),
+      m("g3", 2, 0, 1, { team_a_id: "b", team_b_id: "c" }),
+      m("k1", 1, 0, null, { status: "waiting", source_a: "A1", source_b: "B1" }),
+    ],
+    ...overrides,
+  };
+}

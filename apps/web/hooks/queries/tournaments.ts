@@ -179,6 +179,13 @@ export function useSetPhaseOpen(id: string) {
   });
 }
 
+export function useStartKnockout(id: string) {
+  return useMutation({
+    mutationFn: (order: Record<number, string[]>) => api.tournaments.startKnockout(id, order),
+    meta: { invalidates: tournamentKeys(id, ["tournament", "bracket"]), successMessage: "K.-o.-Runde gestartet." },
+  });
+}
+
 export function useStartTournament(id: string) {
   return useMutation({
     mutationFn: () => api.tournaments.startTournament(id),

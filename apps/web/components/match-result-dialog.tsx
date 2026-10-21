@@ -27,8 +27,10 @@ interface MatchResultDialogProps {
   tournamentId: string;
   /** What is played: it decides the picture and the score that is entered. */
   game: Game;
-  /** How the teams meet: everybody against everybody also has draws (where the game has them). */
+  /** How the teams meet: a match that counts points (everybody against everybody, a group) may end even. */
   mode: TournamentMode;
+  /** The knock-out after the groups runs: the results of the groups are fixed. */
+  groupsFixed?: boolean;
   match: Match;
   teamA: TeamBasic;
   teamB: TeamBasic;
@@ -43,7 +45,17 @@ const timeOf = (iso: string) => TIME.format(new Date(iso));
  * The organization's view of a match: start it at its station (or take the start back) and report its result.
  * A result can always be reported, also without a start. The game brings the picture and the score.
  */
-export function MatchResultDialog({ tournamentId, game, mode, match, teamA, teamB, open, onOpenChange }: Readonly<MatchResultDialogProps>) {
+export function MatchResultDialog({
+  tournamentId,
+  game,
+  mode,
+  groupsFixed = false,
+  match,
+  teamA,
+  teamB,
+  open,
+  onOpenChange,
+}: Readonly<MatchResultDialogProps>) {
   const resultsQuery = useMatchResults(match.id, { enabled: open });
   // a result in the next match locks this one: its winner plays there already
   const nextResultsQuery = useMatchResults(match.next_match_id, { enabled: open });
@@ -77,12 +89,12 @@ export function MatchResultDialog({ tournamentId, game, mode, match, teamA, team
             key={currentResult(resultsQuery.data)?.id ?? "new"}
             tournamentId={tournamentId}
             game={GAMES[game]}
-            allowDraw={GAMES[game].draws && DRAW_MODES.includes(mode)}
+            allowDraw={GAMES[game].draws && (DRAW_MODES.includes(mode) || match.group !== null)}
             match={match}
             teamA={teamA}
             teamB={teamB}
             results={resultsQuery.data ?? []}
-            locked={!!currentResult(nextResultsQuery.data)}
+            lockReason={lockReason(match, groupsFixed, !!currentResult(nextResultsQuery.data))}
             onDone={() => onOpenChange(false)}
           />
         )}
@@ -140,7 +152,7 @@ function ResultForm({
   teamA,
   teamB,
   results,
-  locked,
+  lockReason,
   onDone,
 }: Readonly<{
   tournamentId: string;
@@ -151,13 +163,13 @@ function ResultForm({
   teamB: TeamBasic;
   /** All entries of the match, oldest first. */
   results: Result[];
-  /** The next match has a result already. */
-  locked: boolean;
+  /** Why the result cannot be changed (the next match has one, the groups are fixed); null when it can. */
+  lockReason: string | null;
   onDone: () => void;
 }>) {
   const nextMatchId = match.next_match_id;
   const existingResult = currentResult(results);
-  const nextMatchHasResult = locked;
+  const nextMatchHasResult = lockReason !== null;
   const setStarted = useSetMatchStarted(tournamentId);
   const save = useSaveResult(tournamentId, match.id);
   const remove = useDeleteResult(tournamentId, match.id);
@@ -204,12 +216,10 @@ function ResultForm({
       {results.length > 0 && <ResultHistory results={results} teamA={teamA} teamB={teamB} />}
 
       {/* Lock warning */}
-      {nextMatchHasResult && existingResult && (
+      {lockReason && existingResult && (
         <div className="bg-destructive/10 p-3 rounded-md text-sm mb-3 border border-destructive/20 text-destructive">
           <p className="font-semibold">Bearbeiten gesperrt</p>
-          <p className="mt-1">
-            Für das darauffolgende Spiel liegt bereits ein Ergebnis vor. Bitte lösche zuerst das Ergebnis des Folgespiels.
-          </p>
+          <p className="mt-1">{lockReason}</p>
         </div>
       )}
 
@@ -361,4 +371,13 @@ function toReported(result: Result | null | undefined): ReportedResult | null {
   // a draw has no winner, but its scores
   if (!result || result.score_a == null || result.score_b == null) return null;
   return { winnerTeamId: result.winner_team_id, scoreA: result.score_a, scoreB: result.score_b };
+}
+
+/** Why a result cannot be changed any more, or null. */
+function lockReason(match: Match, groupsFixed: boolean, nextHasResult: boolean): string | null {
+  if (groupsFixed && match.group !== null) return "Die K.-o.-Runde läuft: Die Ergebnisse der Gruppen stehen fest.";
+  if (nextHasResult) {
+    return "Für das darauffolgende Spiel liegt bereits ein Ergebnis vor. Bitte lösche zuerst das Ergebnis des Folgespiels.";
+  }
+  return null;
 }

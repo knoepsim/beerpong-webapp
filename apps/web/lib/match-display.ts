@@ -33,7 +33,11 @@ export interface SideInfo {
 const teamName = (teamsMap: Record<string, Team>, id: string | null) =>
   id === null ? null : teamsMap[id]?.name || "Unbekannt";
 
-const placeholderFor = (source: number | null) => (source === null ? "Offen" : `Sieger Spiel ${source}`);
+/** Where a team comes from while it is not known: the winner of a match, or a place of a group ("A1"). */
+function placeholderFor(source: number | null, groupPlace: string | null): string {
+  if (groupPlace) return `${groupPlace.slice(1)}. Gruppe ${groupPlace[0]}`;
+  return source === null ? "Offen" : `Sieger Spiel ${source}`;
+}
 
 export function describeSides(
   slot: MatchSlot,
@@ -48,7 +52,7 @@ export function describeSides(
       side,
       id,
       name: teamName(teamsMap, id),
-      placeholder: placeholderFor(source),
+      placeholder: placeholderFor(source, side === "a" ? match.source_a : match.source_b),
       isWinner,
       isChampion: id !== null && id === championTeamId,
       // a draw has no loser

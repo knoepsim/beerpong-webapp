@@ -6,7 +6,8 @@ import { PreparationControls } from "@/components/preparation-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { planStart } from "@/lib/tournament-phase";
-import type { Tournament, TournamentTeam } from "@/types";
+import { KnockoutStart } from "@/components/knockout-start";
+import { TournamentMode, type Bracket, type Team, type Tournament, type TournamentTeam } from "@/types";
 
 /**
  * The organization's controls before the start (registration, check-in, start); while it runs where results go.
@@ -15,12 +16,17 @@ import type { Tournament, TournamentTeam } from "@/types";
 export function TournamentControlCard({
   tournament,
   teams,
+  bracket,
+  teamsMap,
   isStarting,
   onSetOpen,
   onStart,
 }: Readonly<{
   tournament: Tournament;
   teams: TournamentTeam[];
+  /** While it runs: the matches (after the group stage the organization starts the knock-out here). */
+  bracket?: Bracket | null;
+  teamsMap?: Record<string, Team>;
   isStarting: boolean;
   onSetOpen: (kind: "registration" | "checkin", open: boolean) => void;
   onStart: () => void;
@@ -37,7 +43,12 @@ export function TournamentControlCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {tournament.started_at ? (
-          <p className="text-sm text-muted-foreground">Ergebnisse können im Spielplan eingetragen werden.</p>
+          <>
+            <p className="text-sm text-muted-foreground">Ergebnisse können im Spielplan eingetragen werden.</p>
+            {tournament.mode === TournamentMode.GROUPS_KNOCKOUT && !tournament.knockout_started_at && bracket && (
+              <KnockoutStart tournament={tournament} bracket={bracket} teamsMap={teamsMap ?? {}} />
+            )}
+          </>
         ) : (
           <>
             <PreparationControls

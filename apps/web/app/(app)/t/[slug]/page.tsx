@@ -191,6 +191,8 @@ export default function TournamentDetailPage({
             <TournamentControlCard
               tournament={tournament}
               teams={teams}
+              bracket={bracket}
+              teamsMap={teamsMap}
               isStarting={actions.isStarting}
               onSetOpen={actions.setOpen}
               onStart={actions.startTournament}
@@ -220,7 +222,13 @@ export default function TournamentDetailPage({
 
         <TabsContent value="schedule" className="mt-6">
           {bracket ? (
-            <Schedule bracket={bracket} teamsMap={teamsMap} highlightTeamId={myTeam?.id} onMatchClick={openResult} />
+            <Schedule
+              bracket={bracket}
+              teamsMap={teamsMap}
+              highlightTeamId={myTeam?.id}
+              onMatchClick={openResult}
+              advance={tournament.advance_per_group ?? undefined}
+            />
           ) : (
             <EmptyNote
               icon={Trophy}
@@ -266,6 +274,7 @@ export default function TournamentDetailPage({
           tournamentId={tournament.id}
           game={tournament.game}
           mode={tournament.mode}
+          groupsFixed={!!tournament.knockout_started_at}
           match={selectedMatch}
           teamA={{ id: matchTeamA.id, name: matchTeamA.name }}
           teamB={{ id: matchTeamB.id, name: matchTeamB.name }}

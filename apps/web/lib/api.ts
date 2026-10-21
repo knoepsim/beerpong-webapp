@@ -278,6 +278,9 @@ export const api = {
     startTournament: (id: string) =>
       request<TournamentStartResponse>(`/tournaments/${id}/start`, { method: "POST" }),
     getBracket: (id: string) => request<Bracket>(`/tournaments/${id}/bracket`),
+    /** After the group stage: `order` gives the teams of a group with a tie in the order the organization decided. */
+    startKnockout: (id: string, order: Record<number, string[]>) =>
+      request<void>(`/tournaments/${id}/knockout`, { method: "POST", body: JSON.stringify({ order }) }),
     getTeams: (id: string) => request<TournamentTeam[]>(`/tournaments/${id}/teams`),
     checkin: (tournamentId: string, teamId: string, is_checked_in: boolean) =>
       request<void>(`/tournaments/${tournamentId}/teams/${teamId}/checkin`, {

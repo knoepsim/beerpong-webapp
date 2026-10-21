@@ -15,13 +15,23 @@ export function StandingsTable({
   standings,
   teamsMap,
   highlightTeamId,
-}: Readonly<{ standings: Standing[]; teamsMap: Record<string, Team>; highlightTeamId?: string | null }>) {
+  advance,
+}: Readonly<{
+  standings: Standing[];
+  teamsMap: Record<string, Team>;
+  highlightTeamId?: string | null;
+  /** A group: the first ones go on to the knock-out (marked, with the line below the last of them). */
+  advance?: number;
+}>) {
   const draws = useGame()?.draws ?? standings.some((row) => row.drawn > 0);
   const number = "w-7 px-0.5 text-right tabular-nums";
 
   return (
     <Table>
-      <TableCaption className="sr-only">Tabelle: 3 Punkte für einen Sieg, 1 für ein Unentschieden</TableCaption>
+      <TableCaption className="sr-only">
+        Tabelle: 3 Punkte für einen Sieg, 1 für ein Unentschieden
+        {advance ? `. Die ersten ${advance} kommen weiter.` : ""}
+      </TableCaption>
       <TableHeader>
         <TableRow>
           <TableHead className="w-6 px-0.5 text-right">
@@ -55,7 +65,10 @@ export function StandingsTable({
           <TableRow
             key={row.team_id}
             aria-current={row.team_id === highlightTeamId ? "true" : undefined}
-            className={cn(row.team_id === highlightTeamId && "bg-primary/10")}
+            className={cn(
+              row.team_id === highlightTeamId && "bg-primary/10",
+              advance && row.rank <= advance && "border-l-2 border-l-primary",
+            )}
           >
             <TableCell className="px-0.5 text-right tabular-nums text-muted-foreground">{row.rank}.</TableCell>
             <TableCell className="whitespace-normal break-words font-medium leading-tight">{teamsMap[row.team_id]?.name ?? "Unbekannt"}</TableCell>
