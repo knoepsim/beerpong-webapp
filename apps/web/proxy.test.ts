@@ -6,7 +6,7 @@ import { config, proxy } from './proxy';
 const call = (path: string, token?: string) =>
   proxy(
     new NextRequest(`http://localhost:3000${path}`, {
-      headers: token ? { cookie: `beerpong_access_token=${token}` } : {},
+      headers: token ? { cookie: `matchbase_access_token=${token}` } : {},
     }),
   );
 

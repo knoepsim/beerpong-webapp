@@ -73,8 +73,8 @@ def generate_sms_code() -> str:
     return "".join(str(secrets.randbelow(10)) for _ in range(settings.sms_code_length))
 
 
-ACCESS_COOKIE = "beerpong_access_token"
-REFRESH_COOKIE = "beerpong_refresh_token"
+ACCESS_COOKIE = "matchbase_access_token"
+REFRESH_COOKIE = "matchbase_refresh_token"
 # A browser sends this header only from our own pages (a form on another site cannot set it, a script on another
 # site needs a CORS preflight we refuse): together with SameSite=Lax it keeps other sites from acting for a user.
 CSRF_HEADER = "X-Requested-With"
