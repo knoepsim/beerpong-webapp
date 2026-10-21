@@ -6,7 +6,62 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useStartKnockout } from "@/hooks/queries/tournaments";
 import { groupLetter, moveWithinRank, openTies } from "@/lib/groups";
-import type { Bracket, Team, Tournament } from "@/types";
+import type { Bracket, Standing, Team, Tournament } from "@/types";
+
+const MOVES = [
+  { step: -1, label: "nach oben", Icon: ArrowUp },
+  { step: 1, label: "nach unten", Icon: ArrowDown },
+] as const;
+
+/** The teams of a group that share a place that matters, in the order the organization gives them (up / down). */
+function TieOrder({
+  group,
+  standings,
+  advance,
+  order,
+  name,
+  onChange,
+}: Readonly<{
+  group: number;
+  standings: Standing[];
+  advance: number;
+  order: string[];
+  name: (id: string) => string;
+  onChange: (order: string[]) => void;
+}>) {
+  const tied = new Set(openTies(standings, advance).flat());
+  return (
+    <section aria-label={`Gleichstand in Gruppe ${groupLetter(group)}`} className="space-y-2 rounded-lg border p-3">
+      <p className="text-sm font-medium">Gleichstand in Gruppe {groupLetter(group)}: Lege die Reihenfolge fest.</p>
+      <ol className="space-y-1">
+        {order.map((id, i) =>
+          tied.has(id) ? (
+            <li key={id} className="flex items-center gap-2 text-sm">
+              <span className="w-6 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
+              <span className="min-w-0 flex-1 truncate">{name(id)}</span>
+              {MOVES.map(({ step, label, Icon }) => {
+                const next = moveWithinRank(order, standings, id, step);
+                return (
+                  <Button
+                    key={label}
+                    variant="ghost"
+                    size="icon"
+                    className="size-9"
+                    disabled={next === order}
+                    onClick={() => onChange(next)}
+                    aria-label={`${name(id)} ${label}`}
+                  >
+                    <Icon aria-hidden="true" />
+                  </Button>
+                );
+              })}
+            </li>
+          ) : null,
+        )}
+      </ol>
+    </section>
+  );
+}
 
 /**
  * After the group stage the organization starts the knock-out: who goes on is shown group by group; where teams share
@@ -52,42 +107,17 @@ export function KnockoutStart({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">Alle Gruppenspiele haben ein Ergebnis.</p>
-      {tied.map((g) => {
-        const tiedTeams = new Set(openTies(g.standings, advance).flat());
-        const order = orderOf(g.group);
-        return (
-          <section key={g.group} aria-label={`Gleichstand in Gruppe ${groupLetter(g.group)}`} className="space-y-2 rounded-lg border p-3">
-            <p className="text-sm font-medium">Gleichstand in Gruppe {groupLetter(g.group)}: Lege die Reihenfolge fest.</p>
-            <ol className="space-y-1">
-              {order.map((id, i) =>
-                tiedTeams.has(id) ? (
-                  <li key={id} className="flex items-center gap-2 text-sm">
-                    <span className="w-6 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
-                    <span className="min-w-0 flex-1 truncate">{name(id)}</span>
-                    {(["up", "down"] as const).map((dir) => {
-                      const next = moveWithinRank(order, g.standings, id, dir === "up" ? -1 : 1);
-                      const Icon = dir === "up" ? ArrowUp : ArrowDown;
-                      return (
-                        <Button
-                          key={dir}
-                          variant="ghost"
-                          size="icon"
-                          className="size-9"
-                          disabled={next === order}
-                          onClick={() => setOrders((prev) => ({ ...prev, [g.group]: next }))}
-                          aria-label={`${name(id)} ${dir === "up" ? "nach oben" : "nach unten"}`}
-                        >
-                          <Icon aria-hidden="true" />
-                        </Button>
-                      );
-                    })}
-                  </li>
-                ) : null,
-              )}
-            </ol>
-          </section>
-        );
-      })}
+      {tied.map((g) => (
+        <TieOrder
+          key={g.group}
+          group={g.group}
+          standings={g.standings}
+          advance={advance}
+          order={orderOf(g.group)}
+          name={name}
+          onChange={(next) => setOrders((prev) => ({ ...prev, [g.group]: next }))}
+        />
+      ))}
       <Button onClick={handleStart} disabled={start.isPending} className="w-full sm:w-auto" size="lg">
         {start.isPending ? "Wird gestartet…" : "K.-o.-Runde starten"}
       </Button>

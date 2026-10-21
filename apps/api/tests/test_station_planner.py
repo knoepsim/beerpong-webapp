@@ -78,7 +78,8 @@ def test_a_match_far_ahead_of_the_lowest_open_round_waits_even_with_a_free_stati
         m("near", rnd=3, pos=1, ready=True, ready_at=2),
     ]
     playing = assign_free_stations(matches, TABLES, window=2)
-    assert "far" not in playing and playing["near"] == "T2"
+    assert "far" not in playing
+    assert playing["near"] == "T2"
     # it keeps its place in the queue for when the window opens
     assert plan(matches, TABLES, window=2).queue == ["far"]
 

@@ -45,8 +45,9 @@ async def test_the_score_is_stored_per_team_and_checked_against_the_winner():
         final = (await service.get_bracket(tournament.id)).matches[0]
 
         # the winner needs the higher score
+        result = ResultCreate(winner_team_id=final.team_a_id, score_a=1, score_b=2)
         with pytest.raises(InvalidScoreError):
-            await service.report_result(final.id, ResultCreate(winner_team_id=final.team_a_id, score_a=1, score_b=2), USER)
+            await service.report_result(final.id, result, USER)
 
         await service.report_result(final.id, ResultCreate(winner_team_id=final.team_b_id, score_a=1, score_b=2), USER)
         match = (await service.get_bracket(tournament.id)).matches[0]
@@ -60,8 +61,9 @@ async def test_a_draw_is_refused_in_football():
         tournament.game = Game.FOOTBALL
         final = (await service.get_bracket(tournament.id)).matches[0]
 
+        result = ResultCreate(winner_team_id=final.team_a_id, score_a=2, score_b=2)
         with pytest.raises(InvalidScoreError, match="Elfmeterschießen"):
-            await service.report_result(final.id, ResultCreate(winner_team_id=final.team_a_id, score_a=2, score_b=2), USER)
+            await service.report_result(final.id, result, USER)
 
 
 @pytest.mark.asyncio
@@ -70,5 +72,6 @@ async def test_in_beer_pong_the_loser_has_no_cups_left():
         service, tournament, _ = await generate_started_tournament(db, 2)
         final = (await service.get_bracket(tournament.id)).matches[0]
 
+        result = ResultCreate(winner_team_id=final.team_a_id, score_a=3, score_b=1)
         with pytest.raises(InvalidScoreError):
-            await service.report_result(final.id, ResultCreate(winner_team_id=final.team_a_id, score_a=3, score_b=1), USER)
+            await service.report_result(final.id, result, USER)

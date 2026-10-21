@@ -369,7 +369,7 @@ function ResultHistory({ results, teamA, teamB }: Readonly<{ results: Result[]; 
 /** A saved result as the inputs take it; null without one (or for a deletion). */
 function toReported(result: Result | null | undefined): ReportedResult | null {
   // a draw has no winner, but its scores
-  if (!result || result.score_a == null || result.score_b == null) return null;
+  if (result?.score_a == null || result.score_b == null) return null;
   return { winnerTeamId: result.winner_team_id, scoreA: result.score_a, scoreB: result.score_b };
 }
 

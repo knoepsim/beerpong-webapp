@@ -25,7 +25,8 @@ def test_the_seconds_meet_the_winners_of_the_partner_group():
     assert seeds == ["A1", "B1", "A2", "B2"]
     assert round_one_pairings(seeds) == [("A1", "B2"), ("B1", "A2")]
     pairs = round_one_pairings(knockout_seeds(4, 2))
-    assert ("A1", "B2") in pairs and ("C1", "D2") in pairs
+    assert ("A1", "B2") in pairs
+    assert ("C1", "D2") in pairs
     assert all(a[0] != b[0] for a, b in pairs), "nobody meets its own group in the first round"
 
 
@@ -60,7 +61,8 @@ async def test_groups_then_the_knockout_the_organization_starts():
         assert len(group_matches) == 6  # two groups of three: three matches each
         assert [g.group for g in bracket.groups] == [1, 2]
         assert sorted((m.source_a, m.source_b) for m in tree if m.round == 1) == [("A1", "B2"), ("B1", "A2")]
-        assert all(m.team_a_id is None for m in tree) and not bracket.knockout_started
+        assert all(m.team_a_id is None for m in tree)
+        assert not bracket.knockout_started
 
         with pytest.raises(KnockoutError, match="alle Gruppenspiele"):
             await service.start_knockout(tournament.id, {})

@@ -205,19 +205,7 @@ class TournamentService:
         ):
             raise TournamentAlreadyStartedError()
 
-        game = update_data.get("game") or tournament.game
-        mode = update_data.get("mode") or tournament.mode
-        _check_mode(game, mode)
-        if {"mode", "group_count", "advance_per_group"} & update_data.keys():
-            update_data.update(
-                _group_settings(
-                    mode,
-                    update_data.get("group_count", tournament.group_count),
-                    update_data.get("advance_per_group", tournament.advance_per_group),
-                )
-            )
-        if game != tournament.game:
-            await StationService(self.db).rename_defaults(tournament.id, stations_of(tournament.game), stations_of(game))
+        await self._apply_play(tournament, update_data)
 
         if "slug" in update_data:
             slug = normalize_slug(update_data["slug"]) if update_data["slug"] is not None else tournament.slug
@@ -254,6 +242,23 @@ class TournamentService:
             await self.db.refresh(updated)  # the flush reloaded server-side columns (updated_at)
         return updated
 
+
+    async def _apply_play(self, tournament: Tournament, update_data: dict) -> None:
+        """Game, mode and groups of an update: the mode must belong to the game, the groups to the mode; another game
+        renames the numbered stations ("Tisch 3" -> "Platz 3")."""
+        game = update_data.get("game") or tournament.game
+        mode = update_data.get("mode") or tournament.mode
+        _check_mode(game, mode)
+        if {"mode", "group_count", "advance_per_group"} & update_data.keys():
+            update_data.update(
+                _group_settings(
+                    mode,
+                    update_data.get("group_count", tournament.group_count),
+                    update_data.get("advance_per_group", tournament.advance_per_group),
+                )
+            )
+        if game != tournament.game:
+            await StationService(self.db).rename_defaults(tournament.id, stations_of(tournament.game), stations_of(game))
 
     async def delete_tournament(self, tournament_id: UUID) -> None:
         """Soft delete a tournament."""

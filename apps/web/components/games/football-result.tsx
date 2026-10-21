@@ -49,9 +49,9 @@ export function FootballResult({ teamA, teamB, initial, locked, allowDraw, onCha
         <GoalField team={teamB} side="b" value={goals.b} onChange={(text) => change("b", text)} />
       </div>
       {draw && !allowDraw && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <output className="block text-sm text-muted-foreground">
           Unentschieden gibt es hier nicht: Trag das Ergebnis nach Verlängerung oder Elfmeterschießen ein.
-        </p>
+        </output>
       )}
     </fieldset>
   );

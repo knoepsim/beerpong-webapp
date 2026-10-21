@@ -39,6 +39,9 @@ function placeholderFor(source: number | null, groupPlace: string | null): strin
   return source === null ? "Offen" : `Sieger Spiel ${source}`;
 }
 
+/** The score of one side of a match (null before the result). */
+const scoreOf = (match: Match, side: Side) => (side === "a" ? match.score_a : match.score_b);
+
 export function describeSides(
   slot: MatchSlot,
   teamsMap: Record<string, Team>,
@@ -57,7 +60,7 @@ export function describeSides(
       isChampion: id !== null && id === championTeamId,
       // a draw has no loser
       isLoser: finished && id !== null && match.winner_team_id !== null && !isWinner,
-      score: finished && id !== null ? (side === "a" ? match.score_a : match.score_b) : null,
+      score: finished && id !== null ? scoreOf(match, side) : null,
     };
   };
   return [build("a", match.team_a_id, sources.a), build("b", match.team_b_id, sources.b)];

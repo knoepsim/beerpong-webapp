@@ -75,7 +75,10 @@ def _rows(team_ids: Sequence[TeamId], results: Sequence[Played]) -> dict[TeamId,
     for r in results:
         if r.team_a not in rows or r.team_b not in rows:
             continue
-        outcome_a = 1 if r.winner is None else (0 if r.winner == r.team_a else 2)
+        if r.winner is None:
+            outcome_a = 1
+        else:
+            outcome_a = 0 if r.winner == r.team_a else 2
         _add(rows[r.team_a], r.score_a, r.score_b, outcome_a)
         _add(rows[r.team_b], r.score_b, r.score_a, 2 - outcome_a)
     return rows

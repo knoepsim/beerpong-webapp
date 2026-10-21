@@ -41,7 +41,7 @@ await (async () => {
     ["favicon.svg", "favicon-32.png", 32],
     ["favicon.svg", "favicon-16.png", 16],
   ];
-  for (const [src, dst, size] of sizes) fs.writeFileSync(path.join(brand, dst), await png(src, size));
+  await Promise.all(sizes.map(async ([src, dst, size]) => fs.writeFileSync(path.join(brand, dst), await png(src, size))));
 
   fs.copyFileSync(path.join(brand, "favicon.svg"), path.join(app, "icon.svg"));
   fs.copyFileSync(path.join(brand, "apple-touch-icon.png"), path.join(app, "apple-icon.png"));

@@ -50,6 +50,37 @@ def _counts_points(tournament, match: Match) -> bool:
     return tournament.mode == TournamentMode.ROUND_ROBIN or match.group_number is not None
 
 
+def group_tables(matches: list[Match], results: dict[UUID, Result]) -> list[GroupResponse]:
+    """The table of every group, from its matches."""
+    groups: dict[int, set[UUID]] = {}
+    for m in matches:
+        if m.group_number is not None:
+            groups.setdefault(m.group_number, set()).update(t for t in (m.team_a_id, m.team_b_id) if t)
+    return [
+        GroupResponse(
+            group=group,
+            standings=_rows(sorted(teams, key=str), [m for m in matches if m.group_number == group], results),
+        )
+        for group, teams in sorted(groups.items())
+    ]
+
+
+def _knockout_places(groups: list[GroupResponse], order: dict[int, list[UUID]], advance: int) -> dict[str, UUID]:
+    """The team of every place of the tree ("A1"): the final order of each group, a tie decided by `order`."""
+    places: dict[str, UUID] = {}
+    for group in groups:
+        ranks = [(row.team_id, row.rank) for row in group.standings]
+        given = order.get(group.group)
+        if not given and open_ties(ranks, advance):
+            raise KnockoutError(f"In Gruppe {group_letter(group.group)} gibt es einen Gleichstand: Lege die Reihenfolge fest.")
+        try:
+            final = apply_order(ranks, given)
+        except ValueError as error:
+            raise KnockoutError(str(error)) from None
+        places.update({place_label(group.group, rank): team for rank, team in enumerate(final[:advance], start=1)})
+    return places
+
+
 def _rows(team_ids: list[UUID], matches: list[Match], results: dict[UUID, Result]) -> list[StandingResponse]:
     """The table of these teams from these matches (see round_robin.standings)."""
     played = [
@@ -122,21 +153,7 @@ class BracketService:
         if any(m.group_number is not None and m.id not in results for m in matches):
             raise KnockoutError("Erst wenn alle Gruppenspiele ein Ergebnis haben, kann die K.-o.-Runde starten.")
 
-        places: dict[str, UUID] = {}
-        for group in await self.group_tables(tournament_id, matches, results):
-            ranks = [(row.team_id, row.rank) for row in group.standings]
-            given = order.get(group.group)
-            if not given and open_ties(ranks, tournament.advance_per_group):
-                raise KnockoutError(
-                    f"In Gruppe {group_letter(group.group)} gibt es einen Gleichstand: Lege die Reihenfolge fest."
-                )
-            try:
-                final = apply_order(ranks, given)
-            except ValueError as error:
-                raise KnockoutError(str(error)) from None
-            for rank, team_id in enumerate(final[: tournament.advance_per_group], start=1):
-                places[place_label(group.group, rank)] = team_id
-
+        places = _knockout_places(group_tables(matches, results), order, tournament.advance_per_group)
         for match in matches:
             for slot in ("a", "b"):
                 source = getattr(match, f"source_{slot}")
@@ -146,26 +163,6 @@ class BracketService:
         await self.db.flush()
         await self.assign_stations(tournament_id)
         await bump(self.db, tournament_id, "bracket", "tournament")
-
-    async def group_tables(
-        self, tournament_id: UUID, matches: list[Match], results: dict[UUID, Result]
-    ) -> list[GroupResponse]:
-        """The table of every group, from its matches."""
-        groups: dict[int, set[UUID]] = {}
-        for m in matches:
-            if m.group_number is not None:
-                groups.setdefault(m.group_number, set()).update(t for t in (m.team_a_id, m.team_b_id) if t)
-        return [
-            GroupResponse(
-                group=group,
-                standings=_rows(
-                    sorted(teams, key=str),
-                    [m for m in matches if m.group_number == group],
-                    results,
-                ),
-            )
-            for group, teams in sorted(groups.items())
-        ]
 
     async def generate_round_robin(self, tournament_id: UUID, team_ids: list[UUID]) -> list[Match]:
         """Everybody against everybody once, match day by match day (see round_robin.match_days); the order of the
@@ -209,21 +206,20 @@ class BracketService:
         An entrant is a team, or the place of a group ("A1") whose team comes in when the knock-out starts.
         """
         total_rounds = int(math.log2(len(pairings))) + 1
-        rounds: dict[int, list[Match | None]] = {}
 
-        for round_num in range(1, total_rounds + 1):
-            if round_num == 1:
-                rounds[1] = [
-                    _entered(_entered(Match(id=uuid.uuid4(), tournament_id=tournament_id, round=1, position=pos), "a", a), "b", b)
-                    if a is not None and b is not None
-                    else None
-                    for pos, (a, b) in enumerate(pairings)
-                ]
-            else:
-                rounds[round_num] = [
-                    Match(id=uuid.uuid4(), tournament_id=tournament_id, round=round_num, position=pos)
-                    for pos in range(len(pairings) // 2 ** (round_num - 1))
-                ]
+        def first(pos: int, a: Entrant | None, b: Entrant | None) -> Match | None:
+            # a pairing with one entrant is a bye: no match
+            if a is None or b is None:
+                return None
+            match = Match(id=uuid.uuid4(), tournament_id=tournament_id, round=1, position=pos)
+            return _entered(_entered(match, "a", a), "b", b)
+
+        rounds: dict[int, list[Match | None]] = {1: [first(pos, a, b) for pos, (a, b) in enumerate(pairings)]}
+        for round_num in range(2, total_rounds + 1):
+            rounds[round_num] = [
+                Match(id=uuid.uuid4(), tournament_id=tournament_id, round=round_num, position=pos)
+                for pos in range(len(pairings) // 2 ** (round_num - 1))
+            ]
 
         for round_num in range(1, total_rounds):
             for pos, match in enumerate(rounds[round_num]):
@@ -516,11 +512,7 @@ class BracketService:
             for m in matches
         ]
         tournament = await TournamentService(self.db).get_tournament(tournament_id)
-        groups = (
-            await self.group_tables(tournament_id, matches, results)
-            if tournament.mode == TournamentMode.GROUPS_KNOCKOUT
-            else None
-        )
+        groups = group_tables(matches, results) if tournament.mode == TournamentMode.GROUPS_KNOCKOUT else None
         if tournament.mode == TournamentMode.ROUND_ROBIN:
             table = await self.standings(tournament_id, matches, results)
             # the first of the table once everything is played (a shared first place has no single winner)

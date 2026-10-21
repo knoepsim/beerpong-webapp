@@ -169,6 +169,29 @@ def random_score(game: Game, rng: random.Random) -> tuple[int, int]:
     return rng.randint(1, 10), 0  # NOSONAR
 
 
+async def play(bracket_service: BracketService, tournament_id, target: int, game: Game, user_id) -> None:
+    """Report `target` results in the order of play with random winners: the groups first, then the knock-out (which
+    starts by itself, a tie going by the order of the table)."""
+    # Zufällige Testdaten für lokale Dummy-Turniere, kein Sicherheitsbezug
+    rng = random.Random()  # NOSONAR
+    done: set = set()
+    while len(done) < target:
+        bracket = await bracket_service.get_bracket(tournament_id)
+        ready = [m for m in bracket.matches if m.team_a_id and m.team_b_id and m.id not in done]
+        if not ready and bracket.groups is not None and not bracket.knockout_started:
+            order = {g.group: [row.team_id for row in g.standings] for g in bracket.groups}
+            await bracket_service.start_knockout(tournament_id, order)
+            continue
+        match = min(ready, key=lambda m: (m.group is None, m.round, m.position))
+        winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
+        won, lost = random_score(game, rng)
+        score = (won, lost) if winner == match.team_a_id else (lost, won)
+        await bracket_service.report_result(
+            match.id, ResultCreate(winner_team_id=winner, score_a=score[0], score_b=score[1]), user_id
+        )
+        done.add(match.id)
+
+
 async def create_tournament(
     db: AsyncSession,
     *,
@@ -227,26 +250,7 @@ async def create_tournament(
     bracket_service = BracketService(db)
     total = len((await bracket_service.get_bracket(tournament.id)).matches)
     target = round(played * total)
-    # Zufällige Testdaten für lokale Dummy-Turniere, kein Sicherheitsbezug
-    rng = random.Random()  # NOSONAR
-    done: set = set()
-    while len(done) < target:
-        bracket = await bracket_service.get_bracket(tournament.id)
-        ready = [m for m in bracket.matches if m.team_a_id and m.team_b_id and m.id not in done]
-        if not ready and bracket.groups is not None and not bracket.knockout_started:
-            # the groups are played: the organization starts the knock-out, a tie goes by the order of the table
-            order = {g.group: [row.team_id for row in g.standings] for g in bracket.groups}
-            await bracket_service.start_knockout(tournament.id, order)
-            continue
-        # the group stage first, then the knock-out (its rounds also count from 1)
-        match = min(ready, key=lambda m: (m.group is None, m.round, m.position))
-        winner = rng.choice([match.team_a_id, match.team_b_id])  # NOSONAR
-        won, lost = random_score(game, rng)
-        score = (won, lost) if winner == match.team_a_id else (lost, won)
-        await bracket_service.report_result(
-            match.id, ResultCreate(winner_team_id=winner, score_a=score[0], score_b=score[1]), owner.id
-        )
-        done.add(match.id)
+    await play(bracket_service, tournament.id, target, game, owner.id)
 
     bracket = await bracket_service.get_bracket(tournament.id)
     return {
@@ -256,7 +260,7 @@ async def create_tournament(
         "teams": teams,
         "matches": total,
         "rounds": bracket.total_rounds,
-        "played": len(done),
+        "played": target,
     }
 
 

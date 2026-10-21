@@ -53,7 +53,8 @@ async def test_round_robin_is_over_when_every_match_has_a_result_and_the_table_n
         service, tournament, teams = await generate_started_tournament(db, 3, RR)
         bracket = await service.get_bracket(tournament.id)
         assert bracket.mode == RR
-        assert len(bracket.matches) == 3 and bracket.total_rounds == 3
+        assert len(bracket.matches) == 3
+        assert bracket.total_rounds == 3
         assert all(m.next_match_id is None for m in bracket.matches)
         assert [row.points for row in bracket.standings] == [0, 0, 0]
 
@@ -66,7 +67,7 @@ async def test_round_robin_is_over_when_every_match_has_a_result_and_the_table_n
         bracket = await service.get_bracket(tournament.id)
         assert tournament.finished_at is not None
         assert bracket.champion_team_id == best
-        assert bracket.standings[0].team_id == best and bracket.standings[0].points == 6
+        assert (bracket.standings[0].team_id, bracket.standings[0].points) == (best, 6)
 
         await service.delete_result(bracket.matches[0].id, USER)
         assert tournament.finished_at is None, "a result taken back opens it again"
@@ -84,8 +85,9 @@ async def test_football_has_draws_only_where_everybody_plays_everybody():
     async for db in app.dependency_overrides[get_db]():
         service, tournament, _ = await generate_started_tournament(db, 2, TournamentMode.SINGLE_ELIMINATION, Game.FOOTBALL)
         match = (await service.get_bracket(tournament.id)).matches[0]
+        result = ResultCreate(winner_team_id=None, score_a=1, score_b=1)
         with pytest.raises(InvalidScoreError, match="Unentschieden"):
-            await service.report_result(match.id, ResultCreate(winner_team_id=None, score_a=1, score_b=1), USER)
+            await service.report_result(match.id, result, USER)
 
 
 @pytest.mark.asyncio
@@ -93,5 +95,6 @@ async def test_beer_pong_has_no_draws():
     async for db in app.dependency_overrides[get_db]():
         service, tournament, _ = await generate_started_tournament(db, 2, RR)
         match = (await service.get_bracket(tournament.id)).matches[0]
+        result = ResultCreate(winner_team_id=None, score_a=0, score_b=0)
         with pytest.raises(InvalidScoreError):
-            await service.report_result(match.id, ResultCreate(winner_team_id=None, score_a=0, score_b=0), USER)
+            await service.report_result(match.id, result, USER)
