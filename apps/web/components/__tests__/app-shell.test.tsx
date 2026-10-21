@@ -10,8 +10,8 @@ const useMyTournaments = vi.fn();
 
 vi.mock('next/navigation', () => ({ usePathname: () => usePathname() }));
 vi.mock('next/link', () => ({
-  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
-    <a href={href} className={className}>{children}</a>
+  default: ({ href, children, ...rest }: { href: string; children: ReactNode } & Record<string, unknown>) => (
+    <a href={href} {...rest}>{children}</a>
   ),
 }));
 vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }));
