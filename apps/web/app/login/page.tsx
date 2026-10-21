@@ -6,7 +6,8 @@ import { api } from "@/lib/api";
 import { getRedirectParam } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
 import { useRequestCode, useVerifyCode } from "@/hooks/queries/user";
-import { RefreshCwIcon, Trophy } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
+import { BrandMark, BrandName } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -83,8 +84,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center space-y-1">
-          <Trophy className="mx-auto mb-2 size-10 text-primary" aria-hidden="true" />
-          <CardTitle className="text-2xl font-bold">Turnierplattform</CardTitle>
+          <BrandMark size={72} className="mx-auto mb-2 rounded-2xl" />
+          <CardTitle className="text-2xl">
+            <BrandName />
+          </CardTitle>
           <CardDescription>
             {step === "phone" && "Melde dich mit deiner Telefonnummer an"}
             {step === "code" && `Code an +49 ${currentPhone} gesendet`}

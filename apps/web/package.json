@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "brand": "python scripts/brand/make-logo.py && node scripts/brand/export.mjs",
     "test:e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
@@ -60,6 +61,7 @@
     "jsdom": "^29.1.1",
     "playwright": "^1.62.0",
     "shadcn": "^4.21.4",
+    "sharp": "0.35.5",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.11"

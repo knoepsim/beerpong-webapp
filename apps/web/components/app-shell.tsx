@@ -11,6 +11,7 @@ import { groupTournaments, mergeMyTournaments } from "@/lib/tournament-groups";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/auth";
+import { BrandMark, BrandName } from "@/components/brand";
 import { cn } from "@/lib/utils";
 
 /** A dot: there is something to look at (an open invitation, a tournament that runs); for screen readers in words. */
@@ -52,8 +53,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <Link href="/tournaments" className="flex items-center gap-2">
-            <Trophy className="size-5 text-primary" aria-hidden="true" />
-            <span className="text-lg font-bold tracking-tight text-primary">Turnierplattform</span>
+            <BrandMark size={28} />
+            <BrandName className="text-lg" />
           </Link>
 
           {isGuest && (
