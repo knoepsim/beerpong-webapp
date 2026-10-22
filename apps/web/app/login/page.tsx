@@ -7,6 +7,7 @@ import { getRedirectParam } from "@/lib/auth";
 import { errorMessage } from "@/lib/errors";
 import { useRequestCode, useVerifyCode } from "@/hooks/queries/user";
 import { RefreshCwIcon } from "lucide-react";
+import { BackToStart } from "@/components/back-to-start";
 import { BrandMark, BrandName } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,7 +83,9 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
+      <div className="flex w-full max-w-sm flex-col items-start gap-3">
+      <BackToStart />
+      <Card className="w-full">
         <CardHeader className="text-center space-y-1">
           <BrandMark size={72} className="mx-auto mb-2 rounded-2xl" />
           <CardTitle className="text-2xl">
@@ -226,6 +229,7 @@ export default function LoginPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

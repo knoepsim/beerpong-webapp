@@ -9,4 +9,8 @@ test('shows the start page to visitors and leads them to the login', async ({ pa
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByText('MatchBase', { exact: true })).toBeVisible();
   await expect(page.locator('input[type="tel"]')).toBeVisible();
+
+  // and back again
+  await page.getByRole('link', { name: 'Zurück zur Startseite' }).click();
+  await expect(page.getByRole('heading', { name: 'Turniere einfach organisieren.' })).toBeVisible();
 });

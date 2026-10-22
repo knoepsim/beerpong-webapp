@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Plus, Radio, Trophy, Users, type LucideIcon } from "lucide-react";
+import { LOGIN_FROM_START } from "@/components/back-to-start";
 import { BrandMark, BrandName } from "@/components/brand";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -70,7 +71,7 @@ function Welcome({ hasSession }: Readonly<{ hasSession: boolean }>) {
       <p className="max-w-md text-muted-foreground">
         Anmeldung, Spielplan und Ergebnisse an einem Ort, gemacht fürs Handy.
       </p>
-      <Link href="/login" className={cn(buttonVariants({ size: "lg" }), "h-11 w-full sm:w-auto")}>
+      <Link href={LOGIN_FROM_START} className={cn(buttonVariants({ size: "lg" }), "h-11 w-full sm:w-auto")}>
         Jetzt starten
         <ArrowRight data-icon="inline-end" aria-hidden="true" />
       </Link>
@@ -91,7 +92,7 @@ export function Landing({ hasSession }: Readonly<{ hasSession: boolean }>) {
           <BrandName className="text-lg" />
         </Link>
         {visitor && (
-          <Link href="/login" className={buttonVariants({ variant: "ghost" })}>
+          <Link href={LOGIN_FROM_START} className={buttonVariants({ variant: "ghost" })}>
             Anmelden
           </Link>
         )}

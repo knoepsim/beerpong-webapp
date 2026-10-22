@@ -17,8 +17,8 @@ describe('Landing', () => {
     vi.mocked(api.users.me).mockRejectedValue(new Error('no session'))
     render(<Landing hasSession />)
     expect(await screen.findByRole('heading', { name: 'Turniere einfach organisieren.' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Jetzt starten/ })).toHaveAttribute('href', '/login')
-    expect(screen.getByRole('link', { name: 'Anmelden' })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: /Jetzt starten/ })).toHaveAttribute('href', '/login?from=start')
+    expect(screen.getByRole('link', { name: 'Anmelden' })).toHaveAttribute('href', '/login?from=start')
   })
 
   it('greets a logged-in user by name and leads into the app', async () => {
