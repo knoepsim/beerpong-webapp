@@ -40,9 +40,9 @@ describe('proxy', () => {
     expect(location(call('/login', 'tok'))).toBe('http://localhost:3000/tournaments');
   });
 
-  it('routes the root depending on the session', () => {
-    expect(location(call('/', 'tok'))).toBe('http://localhost:3000/tournaments');
-    expect(location(call('/'))).toBe('http://localhost:3000/login');
+  it('lets everybody see the start page', () => {
+    expect(location(call('/', 'tok'))).toBeNull();
+    expect(location(call('/'))).toBeNull();
   });
 
   it('lets unrelated paths through', () => {

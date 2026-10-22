@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { SESSION_COOKIE } from "@/lib/session";
 
 export function proxy(request: NextRequest) {
-  // the session cookie of the API (apps/api/app/core/security.py ACCESS_COOKIE)
-  const token = request.cookies.get("matchbase_access_token")?.value;
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
   
   // Protected routes
   const isProtectedRoute = 
@@ -24,21 +24,12 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/tournaments", request.url));
   }
 
-  // Redirect from root to tournaments or login
-  if (request.nextUrl.pathname === "/") {
-    if (token) {
-        return NextResponse.redirect(new URL("/tournaments", request.url));
-    } else {
-        return NextResponse.redirect(new URL("/login", request.url));
-    }
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
+  // the start page (/) is open for everybody and greets by itself
   matcher: [
-    "/",
     "/tournaments/:path*", 
     "/teams/:path*", 
     "/profile/:path*", 

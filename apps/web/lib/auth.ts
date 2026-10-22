@@ -3,11 +3,11 @@
  * page does either). See lib/api.ts for how it is renewed.
  */
 
-/** Ends the session on the server (the cookies are cleared there) and goes to the login. */
+/** Ends the session on the server (the cookies are cleared there) and goes to the start page. */
 export async function logout(): Promise<void> {
   const { api } = await import("./api");
   await api.auth.logout().catch(() => undefined);
-  window.location.href = "/login";
+  window.location.href = "/";
 }
 
 /**

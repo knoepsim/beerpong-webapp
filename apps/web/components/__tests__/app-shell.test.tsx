@@ -10,8 +10,8 @@ const useMyTournaments = vi.fn();
 
 vi.mock('next/navigation', () => ({ usePathname: () => usePathname() }));
 vi.mock('next/link', () => ({
-  default: ({ href, children, className }: { href: string; children: ReactNode; className?: string }) => (
-    <a href={href} className={className}>{children}</a>
+  default: ({ href, children, ...rest }: { href: string; children: ReactNode } & Record<string, unknown>) => (
+    <a href={href} {...rest}>{children}</a>
   ),
 }));
 vi.mock('@/hooks/queries/user', () => ({ useCurrentUser: () => useCurrentUser() }));
@@ -107,13 +107,19 @@ describe('AppShell', () => {
     expect(container.querySelectorAll('nav.hidden, nav.md\:hidden.hidden').length).toBeGreaterThan(0)
   })
 
+  it('leads from the logo to the start page', () => {
+    useCurrentUser.mockReturnValue({ user: null, isLoading: false })
+    render(<AppShell>x</AppShell>)
+    expect(screen.getByRole('link', { name: 'MatchBase, Startseite' })).toHaveAttribute('href', '/')
+  })
+
   it('shows no login link while it is not yet known whether somebody is logged in', () => {
     useCurrentUser.mockReturnValue({ user: null, isLoading: true })
     render(<AppShell>x</AppShell>)
     expect(screen.queryByText('Anmelden')).not.toBeInTheDocument()
   })
 
-  it('logs out: ends the session on the server and goes to the login', async () => {
+  it('logs out: ends the session on the server and goes to the start page', async () => {
     const location = { href: '/teams' };
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
     vi.stubGlobal('location', location);
@@ -122,7 +128,7 @@ describe('AppShell', () => {
     render(<AppShell>x</AppShell>);
     fireEvent.click(screen.getByText('Abmelden'));
 
-    await waitFor(() => expect(location.href).toBe('/login'));
+    await waitFor(() => expect(location.href).toBe('/'));
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/logout$/);
   });
 });

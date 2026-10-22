@@ -4,7 +4,7 @@ import { getRedirectParam, logout, toSafeRedirectPath } from './auth';
 describe('logout', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('ends the session on the server and goes to the login', async () => {
+  it('ends the session on the server and goes to the start page', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
     const location = { href: '/teams', pathname: '/teams', search: '' };
     vi.stubGlobal('fetch', fetchMock);
@@ -14,17 +14,17 @@ describe('logout', () => {
 
     expect(fetchMock.mock.calls[0][0]).toMatch(/\/auth\/logout$/);
     expect(fetchMock.mock.calls[0][1].method).toBe('POST');
-    expect(location.href).toBe('/login');
+    expect(location.href).toBe('/');
   });
 
-  it('goes to the login even if the server cannot be reached', async () => {
+  it('goes to the start page even if the server cannot be reached', async () => {
     const location = { href: '/teams', pathname: '/teams', search: '' };
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     vi.stubGlobal('location', location);
 
     await logout();
 
-    expect(location.href).toBe('/login');
+    expect(location.href).toBe('/');
   });
 });
 

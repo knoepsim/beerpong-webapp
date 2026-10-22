@@ -1,9 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-test('redirects unauthenticated visitors from root to login', async ({ page }) => {
+test('shows the start page to visitors and leads them to the login', async ({ page }) => {
   await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Turniere einfach organisieren.' })).toBeVisible();
+  await page.getByRole('link', { name: 'Jetzt starten' }).click();
 
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByText('MatchBase', { exact: true })).toBeVisible();
   await expect(page.locator('input[type="tel"]')).toBeVisible();
+
+  // and back again
+  await page.getByRole('link', { name: 'Zurück zur Startseite' }).click();
+  await expect(page.getByRole('heading', { name: 'Turniere einfach organisieren.' })).toBeVisible();
 });
